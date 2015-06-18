@@ -29,6 +29,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "util/string.h"
 #include "util/srp.h"
 #include "client.h"
+
+#include "ambiance.h"
 #include "network/clientopcodes.h"
 #include "filesys.h"
 #include "porting.h"
@@ -51,6 +53,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "database-sqlite3.h"
 #include "serialization.h"
 #include "guiscalingfilter.h"
+
 
 extern gui::IGUIEnvironment* guienv;
 
@@ -278,6 +281,7 @@ Client::Client(
 
 	m_cache_smooth_lighting = g_settings->getBool("smooth_lighting");
 	m_cache_enable_shaders  = g_settings->getBool("enable_shaders");
+	m_ambiance = new Ambiance(m_sound, m_env);
 }
 
 void Client::Stop()
@@ -478,6 +482,10 @@ void Client::step(float dtime)
 
 	// Step environment
 	m_env.step(dtime);
+
+	if ( g_settings->getBool("ambiance") ){
+		m_ambiance->doAmbiance(dtime);
+	}
 
 	/*
 		Get events

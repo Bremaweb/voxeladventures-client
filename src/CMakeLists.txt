@@ -391,6 +391,7 @@ set(client_SRCS
 	${common_SRCS}
 	${sound_SRCS}
 	${client_network_SRCS}
+	ambiance.cpp
 	camera.cpp
 	chat.cpp
 	client.cpp

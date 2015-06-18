@@ -28,6 +28,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include <map>
 #include <set>
 #include <vector>
+
+#include "ambiance.h"
 #include "clientobject.h"
 #include "gamedef.h"
 #include "inventorymanager.h"
@@ -577,6 +579,7 @@ private:
 
 	MeshUpdateThread m_mesh_update_thread;
 	ClientEnvironment m_env;
+	Ambiance *m_ambiance;
 	ParticleManager m_particle_manager;
 	con::Connection m_con;
 	IrrlichtDevice *m_device;

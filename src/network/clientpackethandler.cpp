@@ -369,7 +369,7 @@ void Client::handleCommand_TimeOfDay(NetworkPacket* pkt)
 	m_time_of_day_set = true;
 
 	u32 dr = m_env.getDayNightRatio();
-	infostream << "Client: time_of_day=" << time_of_day
+	infostream << "Client: time_of_day=" << time_of_day << "::" << m_env.getTimeOfDay()
 			<< " time_speed=" << time_speed
 			<< " dr=" << dr << std::endl;
 }

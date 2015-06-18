@@ -143,6 +143,7 @@ void set_default_settings(Settings *settings)
 	settings->setDefault("mouse_sensitivity", "0.2");
 	settings->setDefault("enable_sound", "true");
 	settings->setDefault("sound_volume", "0.8");
+	settings->setDefault("ambiance","true");
 	settings->setDefault("desynchronize_mapblock_texture_animation", "true");
 	settings->setDefault("selectionbox_width","2");
 	settings->setDefault("hud_hotbar_max_width","1.0");
