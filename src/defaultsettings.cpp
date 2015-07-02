@@ -43,6 +43,7 @@ void set_default_settings(Settings *settings)
 	settings->setDefault("keymap_special1", "KEY_KEY_E");
 	settings->setDefault("keymap_chat", "KEY_KEY_T");
 	settings->setDefault("keymap_cmd", "/");
+	settings->setDefault("keymap_minimap", "KEY_F9");
 	settings->setDefault("keymap_console", "KEY_F10");
 	settings->setDefault("keymap_rangeselect", "KEY_KEY_R");
 	settings->setDefault("keymap_freemove", "KEY_KEY_K");
@@ -161,8 +162,10 @@ void set_default_settings(Settings *settings)
 	settings->setDefault("generate_normalmaps", "false");
 	settings->setDefault("normalmaps_strength", "0.6");
 	settings->setDefault("normalmaps_smooth", "1");
-	settings->setDefault("parallax_occlusion_scale", "0.06");
-	settings->setDefault("parallax_occlusion_bias", "0.03");
+	settings->setDefault("parallax_occlusion_mode", "1");
+	settings->setDefault("parallax_occlusion_iterations", "4");
+	settings->setDefault("parallax_occlusion_scale", "0.08");
+	settings->setDefault("parallax_occlusion_bias", "0.04");
 	settings->setDefault("enable_waving_water", "false");
 	settings->setDefault("water_wave_height", "1.0");
 	settings->setDefault("water_wave_length", "20.0");
@@ -173,7 +176,11 @@ void set_default_settings(Settings *settings)
 	settings->setDefault("enable_shaders", "true");
 	settings->setDefault("repeat_rightclick_time", "0.25");
 	settings->setDefault("enable_particles", "true");
-	settings->setDefault("enable_mesh_cache", "true");
+	settings->setDefault("enable_mesh_cache", "false");
+
+	settings->setDefault("enable_minimap", "true");
+	settings->setDefault("minimap_shape_round", "true");
+	settings->setDefault("minimap_double_scan_height", "true");
 
 	settings->setDefault("curl_timeout", "5000");
 	settings->setDefault("curl_parallel_limit", "8");

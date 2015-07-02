@@ -22,8 +22,6 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #include "mapgen.h"
 
-#define BIOMEGEN_BASE_V7 -192
-
 /////////////////// Mapgen V7 flags
 #define MGV7_MOUNTAINS   0x01
 #define MGV7_RIDGES      0x02
@@ -84,6 +82,8 @@ public:
 
 	Noise *noise_heat;
 	Noise *noise_humidity;
+	Noise *noise_heat_blend;
+	Noise *noise_humidity_blend;
 
 	content_t c_stone;
 	content_t c_water_source;
