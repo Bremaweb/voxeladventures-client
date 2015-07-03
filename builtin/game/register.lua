@@ -398,11 +398,41 @@ local function make_registration_wrap(reg_fn_name, clear_fn_name)
 
 	local orig_clear_fn = core[clear_fn_name]
 	core[clear_fn_name] = function()
-		list = {}
+		for k in pairs(list) do
+			list[k] = nil
+		end
 		return orig_clear_fn()
 	end
 
 	return list
+end
+
+core.registered_on_player_hpchanges = { modifiers = { }, loggers = { } }
+function core.registered_on_player_hpchange(player, hp_change)
+	local last = false
+	for i = #core.registered_on_player_hpchanges.modifiers, 1, -1 do
+		local func = core.registered_on_player_hpchanges.modifiers[i]
+		hp_change, last = func(player, hp_change)
+		if type(hp_change) ~= "number" then
+			local debuginfo = debug.getinfo(func)
+			error("The register_on_hp_changes function has to return a number at " ..
+				debuginfo.short_src .. " line " .. debuginfo.linedefined)
+		end
+		if last then
+			break
+		end
+	end
+	for i, func in ipairs(core.registered_on_player_hpchanges.loggers) do
+		func(player, hp_change)
+	end
+	return hp_change
+end
+function core.register_on_player_hpchange(func, modifier)
+	if modifier then
+		table.insert(core.registered_on_player_hpchanges.modifiers, func)
+	else
+		table.insert(core.registered_on_player_hpchanges.loggers, func)
+	end
 end
 
 core.registered_biomes      = make_registration_wrap("register_biome",      "clear_registered_biomes")
@@ -429,6 +459,7 @@ core.registered_on_crafts, core.register_on_craft = make_registration()
 core.registered_craft_predicts, core.register_craft_predict = make_registration()
 core.registered_on_protection_violation, core.register_on_protection_violation = make_registration()
 core.registered_on_item_eats, core.register_on_item_eat = make_registration()
+core.registered_on_punchplayers, core.register_on_punchplayer = make_registration()
 
 --
 -- Compatibility for on_mapgen_init()

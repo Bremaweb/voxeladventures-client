@@ -29,7 +29,11 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "content_sao.h"
 #include "server.h"
 #include "hud.h"
+#include "scripting_game.h"
 
+#define GET_ENV_PTR ServerEnvironment* env =                                   \
+				dynamic_cast<ServerEnvironment*>(getEnv(L));                   \
+				if (env == NULL) return 0
 
 struct EnumString es_HudElementType[] =
 {
@@ -376,6 +380,20 @@ int ObjectRef::l_set_armor_groups(lua_State *L)
 	return 0;
 }
 
+// get_armor_groups(self)
+int ObjectRef::l_get_armor_groups(lua_State *L)
+{
+	NO_MAP_LOCK_REQUIRED;
+	ObjectRef *ref = checkobject(L, 1);
+	ServerActiveObject *co = getobject(ref);
+	if (co == NULL)
+		return 0;
+	// Do it
+	ItemGroupList groups = co->getArmorGroups();
+	push_groups(L, groups);
+	return 1;
+}
+
 // set_physics_override(self, physics_override_speed, physics_override_jump,
 //                      physics_override_gravity, sneak, sneak_glitch)
 int ObjectRef::l_set_physics_override(lua_State *L)
@@ -409,7 +427,29 @@ int ObjectRef::l_set_physics_override(lua_State *L)
 	return 0;
 }
 
-// set_animation(self, frame_range, frame_speed, frame_blend)
+// get_physics_override(self)
+int ObjectRef::l_get_physics_override(lua_State *L)
+{
+	ObjectRef *ref = checkobject(L, 1);
+	PlayerSAO *co = (PlayerSAO *)getobject(ref);
+	if (co == NULL)
+		return 0;
+	// Do it
+	lua_newtable(L);
+	lua_pushnumber(L, co->m_physics_override_speed);
+	lua_setfield(L, -2, "speed");
+	lua_pushnumber(L, co->m_physics_override_jump);
+	lua_setfield(L, -2, "jump");
+	lua_pushnumber(L, co->m_physics_override_gravity);
+	lua_setfield(L, -2, "gravity");
+	lua_pushboolean(L, co->m_physics_override_sneak);
+	lua_setfield(L, -2, "sneak");
+	lua_pushboolean(L, co->m_physics_override_sneak_glitch);
+	lua_setfield(L, -2, "sneak_glitch");
+	return 1;
+}
+
+// set_animation(self, frame_range, frame_speed, frame_blend, frame_loop)
 int ObjectRef::l_set_animation(lua_State *L)
 {
 	NO_MAP_LOCK_REQUIRED;
@@ -426,8 +466,33 @@ int ObjectRef::l_set_animation(lua_State *L)
 	float frame_blend = 0;
 	if(!lua_isnil(L, 4))
 		frame_blend = lua_tonumber(L, 4);
-	co->setAnimation(frames, frame_speed, frame_blend);
+	bool frame_loop = true;
+	if(lua_isboolean(L, 5))
+		frame_loop = lua_toboolean(L, 5);
+	co->setAnimation(frames, frame_speed, frame_blend, frame_loop);
 	return 0;
+}
+
+// get_animation(self)
+int ObjectRef::l_get_animation(lua_State *L)
+{
+	NO_MAP_LOCK_REQUIRED;
+	ObjectRef *ref = checkobject(L, 1);
+	ServerActiveObject *co = getobject(ref);
+	if (co == NULL)
+		return 0;
+	// Do it
+	v2f frames = v2f(1,1);
+	float frame_speed = 15;
+	float frame_blend = 0;
+	bool frame_loop = true;
+	co->getAnimation(&frames, &frame_speed, &frame_blend, &frame_loop);
+
+	push_v2f(L, frames);
+	lua_pushnumber(L, frame_speed);
+	lua_pushnumber(L, frame_blend);
+	lua_pushboolean(L, frame_loop);
+	return 4;
 }
 
 // set_local_animation(self, {stand/idle}, {walk}, {dig}, {walk+dig}, frame_speed)
@@ -453,6 +518,27 @@ int ObjectRef::l_set_local_animation(lua_State *L)
 
 	lua_pushboolean(L, true);
 	return 0;
+}
+
+// get_local_animation(self)
+int ObjectRef::l_get_local_animation(lua_State *L)
+{
+	//NO_MAP_LOCK_REQUIRED
+	ObjectRef *ref = checkobject(L, 1);
+	Player *player = getplayer(ref);
+	if (player == NULL)
+		return 0;
+
+	v2s32 frames[4];
+	float frame_speed;
+	player->getLocalAnimations(frames, &frame_speed);
+
+	for (int i = 0; i < 4; i++) {
+		push_v2s32(L, frames[i]);
+	}
+
+	lua_pushnumber(L, frame_speed);
+	return 5;
 }
 
 // set_eye_offset(self, v3f first pv, v3f third pv)
@@ -485,6 +571,20 @@ int ObjectRef::l_set_eye_offset(lua_State *L)
 	return 0;
 }
 
+// get_eye_offset(self)
+int ObjectRef::l_get_eye_offset(lua_State *L)
+{
+	//NO_MAP_LOCK_REQUIRED;
+	ObjectRef *ref = checkobject(L, 1);
+	Player *player = getplayer(ref);
+	if (player == NULL)
+		return 0;
+	// Do it
+	push_v3f(L, player->eye_offset_first);
+	push_v3f(L, player->eye_offset_third);
+	return 2;
+}
+
 // set_bone_position(self, std::string bone, v3f position, v3f rotation)
 int ObjectRef::l_set_bone_position(lua_State *L)
 {
@@ -504,6 +604,28 @@ int ObjectRef::l_set_bone_position(lua_State *L)
 		rotation = read_v3f(L, 4);
 	co->setBonePosition(bone, position, rotation);
 	return 0;
+}
+
+// get_bone_position(self, bone)
+int ObjectRef::l_get_bone_position(lua_State *L)
+{
+	NO_MAP_LOCK_REQUIRED;
+	ObjectRef *ref = checkobject(L, 1);
+	ServerActiveObject *co = getobject(ref);
+	if (co == NULL)
+		return 0;
+	// Do it
+	std::string bone = "";
+	if(!lua_isnil(L, 2))
+		bone = lua_tostring(L, 2);
+
+	v3f position = v3f(0, 0, 0);
+	v3f rotation = v3f(0, 0, 0);
+	co->getBonePosition(bone, &position, &rotation);
+
+	push_v3f(L, position);
+	push_v3f(L, rotation);
+	return 2;
 }
 
 // set_attach(self, parent, bone, position, rotation)
@@ -528,6 +650,34 @@ int ObjectRef::l_set_attach(lua_State *L)
 		rotation = read_v3f(L, 5);
 	co->setAttachment(parent->getId(), bone, position, rotation);
 	return 0;
+}
+
+// get_attach(self)
+int ObjectRef::l_get_attach(lua_State *L)
+{
+	NO_MAP_LOCK_REQUIRED;
+	GET_ENV_PTR;
+
+	ObjectRef *ref = checkobject(L, 1);
+	ServerActiveObject *co = getobject(ref);
+	if (co == NULL)
+		return 0;
+
+	// Do it
+	int parent_id = 0;
+	std::string bone = "";
+	v3f position = v3f(0, 0, 0);
+	v3f rotation = v3f(0, 0, 0);
+	co->getAttachment(&parent_id, &bone, &position, &rotation);
+	if (!parent_id)
+		return 0;
+	ServerActiveObject *parent = env->getActiveObject(parent_id);
+
+	getScriptApiBase(L)->objectrefGetOrCreate(L, parent);
+	lua_pushlstring(L, bone.c_str(), bone.size());
+	push_v3f(L, position);
+	push_v3f(L, rotation);
+	return 4;
 }
 
 // set_detach(self)
@@ -555,6 +705,31 @@ int ObjectRef::l_set_properties(lua_State *L)
 	read_object_properties(L, 2, prop);
 	co->notifyObjectPropertiesModified();
 	return 0;
+}
+
+// get_properties(self)
+int ObjectRef::l_get_properties(lua_State *L)
+{
+	NO_MAP_LOCK_REQUIRED;
+	ObjectRef *ref = checkobject(L, 1);
+	ServerActiveObject *co = getobject(ref);
+	if (co == NULL)
+		return 0;
+	ObjectProperties *prop = co->accessObjectProperties();
+	if (!prop)
+		return 0;
+	push_object_properties(L, prop);
+	return 1;
+}
+
+// is_player(self)
+int ObjectRef::l_is_player(lua_State *L)
+{
+	NO_MAP_LOCK_REQUIRED;
+	ObjectRef *ref = checkobject(L, 1);
+	Player *player = getplayer(ref);
+	lua_pushboolean(L, (player != NULL));
+	return 1;
 }
 
 /* LuaEntitySAO-only */
@@ -704,16 +879,6 @@ int ObjectRef::l_get_luaentity(lua_State *L)
 }
 
 /* Player-only */
-
-// is_player(self)
-int ObjectRef::l_is_player(lua_State *L)
-{
-	NO_MAP_LOCK_REQUIRED;
-	ObjectRef *ref = checkobject(L, 1);
-	Player *player = getplayer(ref);
-	lua_pushboolean(L, (player != NULL));
-	return 1;
-}
 
 // is_player_connected(self)
 int ObjectRef::l_is_player_connected(lua_State *L)
@@ -1185,6 +1350,20 @@ int ObjectRef::l_hud_set_hotbar_itemcount(lua_State *L)
 	return 1;
 }
 
+// hud_get_hotbar_itemcount(self)
+int ObjectRef::l_hud_get_hotbar_itemcount(lua_State *L)
+{
+	ObjectRef *ref = checkobject(L, 1);
+	Player *player = getplayer(ref);
+	if (player == NULL)
+		return 0;
+
+	s32 hotbar_itemcount = getServer(L)->hudGetHotbarItemcount(player);
+
+	lua_pushnumber(L, hotbar_itemcount);
+	return 1;
+}
+
 // hud_set_hotbar_image(self, name)
 int ObjectRef::l_hud_set_hotbar_image(lua_State *L)
 {
@@ -1196,6 +1375,19 @@ int ObjectRef::l_hud_set_hotbar_image(lua_State *L)
 	std::string name = lua_tostring(L, 2);
 
 	getServer(L)->hudSetHotbarImage(player, name);
+	return 1;
+}
+
+// hud_get_hotbar_image(self)
+int ObjectRef::l_hud_get_hotbar_image(lua_State *L)
+{
+	ObjectRef *ref = checkobject(L, 1);
+	Player *player = getplayer(ref);
+	if (player == NULL)
+		return 0;
+
+	std::string name = getServer(L)->hudGetHotbarImage(player);
+	lua_pushlstring(L, name.c_str(), name.size());
 	return 1;
 }
 
@@ -1213,6 +1405,19 @@ int ObjectRef::l_hud_set_hotbar_selected_image(lua_State *L)
 	return 1;
 }
 
+// hud_get_hotbar_selected_image(self)
+int ObjectRef::l_hud_get_hotbar_selected_image(lua_State *L)
+{
+	ObjectRef *ref = checkobject(L, 1);
+	Player *player = getplayer(ref);
+	if (player == NULL)
+		return 0;
+
+	std::string name = getServer(L)->hudGetHotbarSelectedImage(player);
+	lua_pushlstring(L, name.c_str(), name.size());
+	return 1;
+}
+
 // set_sky(self, bgcolor, type, list)
 int ObjectRef::l_set_sky(lua_State *L)
 {
@@ -1222,8 +1427,7 @@ int ObjectRef::l_set_sky(lua_State *L)
 		return 0;
 
 	video::SColor bgcolor(255,255,255,255);
-	if (!lua_isnil(L, 2))
-		bgcolor = readARGB8(L, 2);
+	read_color(L, 2, &bgcolor);
 
 	std::string type = luaL_checkstring(L, 3);
 
@@ -1252,6 +1456,33 @@ int ObjectRef::l_set_sky(lua_State *L)
 	return 1;
 }
 
+// get_sky(self)
+int ObjectRef::l_get_sky(lua_State *L)
+{
+	ObjectRef *ref = checkobject(L, 1);
+	Player *player = getplayer(ref);
+	if (player == NULL)
+		return 0;
+	video::SColor bgcolor(255, 255, 255, 255);
+	std::string type;
+	std::vector<std::string> params;
+
+	player->getSky(&bgcolor, &type, &params);
+	type = type == "" ? "regular" : type;
+
+	push_ARGB8(L, bgcolor);
+	lua_pushlstring(L, type.c_str(), type.size());
+	lua_newtable(L);
+	s16 i = 1;
+	for (std::vector<std::string>::iterator it = params.begin();
+			it != params.end(); ++it) {
+		lua_pushlstring(L, it->c_str(), it->size());
+		lua_rawseti(L, -2, i);
+		i++;
+	}
+	return 3;
+}
+
 // override_day_night_ratio(self, brightness=0...1)
 int ObjectRef::l_override_day_night_ratio(lua_State *L)
 {
@@ -1271,6 +1502,65 @@ int ObjectRef::l_override_day_night_ratio(lua_State *L)
 		return 0;
 
 	lua_pushboolean(L, true);
+	return 1;
+}
+
+// get_day_night_ratio(self)
+int ObjectRef::l_get_day_night_ratio(lua_State *L)
+{
+	ObjectRef *ref = checkobject(L, 1);
+	Player *player = getplayer(ref);
+	if (player == NULL)
+		return 0;
+
+	bool do_override;
+	float ratio;
+	player->getDayNightRatio(&do_override, &ratio);
+
+	if (do_override)
+		lua_pushnumber(L, ratio);
+	else
+		lua_pushnil(L);
+
+	return 1;
+}
+
+// set_nametag_attributes(self, attributes)
+int ObjectRef::l_set_nametag_attributes(lua_State *L)
+{
+	NO_MAP_LOCK_REQUIRED;
+	ObjectRef *ref = checkobject(L, 1);
+	PlayerSAO *playersao = getplayersao(ref);
+	if (playersao == NULL)
+		return 0;
+
+	lua_getfield(L, 2, "color");
+	if (!lua_isnil(L, -1)) {
+		video::SColor color = playersao->getNametagColor();
+		if (!read_color(L, -1, &color))
+			return 0;
+		playersao->setNametagColor(color);
+	}
+
+	lua_pushboolean(L, true);
+	return 1;
+}
+
+// get_nametag_attributes(self)
+int ObjectRef::l_get_nametag_attributes(lua_State *L)
+{
+	NO_MAP_LOCK_REQUIRED;
+	ObjectRef *ref = checkobject(L, 1);
+	PlayerSAO *playersao = getplayersao(ref);
+	if (playersao == NULL)
+		return 0;
+
+	video::SColor color = playersao->getNametagColor();
+
+	lua_newtable(L);
+	push_ARGB8(L, color);
+	lua_setfield(L, -2, "color");
+
 	return 1;
 }
 
@@ -1351,12 +1641,16 @@ const luaL_reg ObjectRef::methods[] = {
 	luamethod(ObjectRef, get_wielded_item),
 	luamethod(ObjectRef, set_wielded_item),
 	luamethod(ObjectRef, set_armor_groups),
-	luamethod(ObjectRef, set_physics_override),
+	luamethod(ObjectRef, get_armor_groups),
 	luamethod(ObjectRef, set_animation),
+	luamethod(ObjectRef, get_animation),
 	luamethod(ObjectRef, set_bone_position),
+	luamethod(ObjectRef, get_bone_position),
 	luamethod(ObjectRef, set_attach),
+	luamethod(ObjectRef, get_attach),
 	luamethod(ObjectRef, set_detach),
 	luamethod(ObjectRef, set_properties),
+	luamethod(ObjectRef, get_properties),
 	// LuaEntitySAO-only
 	luamethod(ObjectRef, setvelocity),
 	luamethod(ObjectRef, getvelocity),
@@ -1383,6 +1677,8 @@ const luaL_reg ObjectRef::methods[] = {
 	luamethod(ObjectRef, get_inventory_formspec),
 	luamethod(ObjectRef, get_player_control),
 	luamethod(ObjectRef, get_player_control_bits),
+	luamethod(ObjectRef, set_physics_override),
+	luamethod(ObjectRef, get_physics_override),
 	luamethod(ObjectRef, hud_add),
 	luamethod(ObjectRef, hud_remove),
 	luamethod(ObjectRef, hud_change),
@@ -1390,11 +1686,20 @@ const luaL_reg ObjectRef::methods[] = {
 	luamethod(ObjectRef, hud_set_flags),
 	luamethod(ObjectRef, hud_get_flags),
 	luamethod(ObjectRef, hud_set_hotbar_itemcount),
+	luamethod(ObjectRef, hud_get_hotbar_itemcount),
 	luamethod(ObjectRef, hud_set_hotbar_image),
+	luamethod(ObjectRef, hud_get_hotbar_image),
 	luamethod(ObjectRef, hud_set_hotbar_selected_image),
+	luamethod(ObjectRef, hud_get_hotbar_selected_image),
 	luamethod(ObjectRef, set_sky),
+	luamethod(ObjectRef, get_sky),
 	luamethod(ObjectRef, override_day_night_ratio),
+	luamethod(ObjectRef, get_day_night_ratio),
 	luamethod(ObjectRef, set_local_animation),
+	luamethod(ObjectRef, get_local_animation),
 	luamethod(ObjectRef, set_eye_offset),
+	luamethod(ObjectRef, get_eye_offset),
+	luamethod(ObjectRef, set_nametag_attributes),
+	luamethod(ObjectRef, get_nametag_attributes),
 	{0,0}
 };

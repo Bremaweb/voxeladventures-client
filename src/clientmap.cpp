@@ -24,12 +24,11 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include <matrix4.h>
 #include "log.h"
 #include "mapsector.h"
-#include "main.h" // dout_client, g_settings
 #include "nodedef.h"
 #include "mapblock.h"
 #include "profiler.h"
 #include "settings.h"
-#include "camera.h" // CameraModes
+#include "camera.h"               // CameraModes
 #include "util/mathconstants.h"
 #include <algorithm>
 
@@ -540,7 +539,7 @@ void ClientMap::renderMap(video::IVideoDriver* driver, s32 pass)
 			MapBlockMesh *mapBlockMesh = block->mesh;
 			assert(mapBlockMesh);
 
-			scene::SMesh *mesh = mapBlockMesh->getMesh();
+			scene::IMesh *mesh = mapBlockMesh->getMesh();
 			assert(mesh);
 
 			u32 c = mesh->getMeshBufferCount();

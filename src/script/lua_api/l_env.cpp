@@ -334,6 +334,22 @@ int ModApiEnvMod::l_add_node_level(lua_State *L)
 	return 1;
 }
 
+// find_nodes_with_meta(pos1, pos2)
+int ModApiEnvMod::l_find_nodes_with_meta(lua_State *L)
+{
+	GET_ENV_PTR;
+
+	std::vector<v3s16> positions = env->getMap().findNodesWithMetadata(
+		check_v3s16(L, 1), check_v3s16(L, 2));
+
+	lua_newtable(L);
+	for (size_t i = 0; i != positions.size(); i++) {
+		push_v3s16(L, positions[i]);
+		lua_rawseti(L, -2, i + 1);
+	}
+
+	return 1;
+}
 
 // get_meta(pos)
 int ModApiEnvMod::l_get_meta(lua_State *L)
@@ -438,10 +454,11 @@ int ModApiEnvMod::l_get_objects_inside_radius(lua_State *L)
 	// Do it
 	v3f pos = checkFloatPos(L, 1);
 	float radius = luaL_checknumber(L, 2) * BS;
-	std::set<u16> ids = env->getObjectsInsideRadius(pos, radius);
+	std::vector<u16> ids;
+	env->getObjectsInsideRadius(ids, pos, radius);
 	ScriptApiBase *script = getScriptApiBase(L);
 	lua_createtable(L, ids.size(), 0);
-	std::set<u16>::const_iterator iter = ids.begin();
+	std::vector<u16>::const_iterator iter = ids.begin();
 	for(u32 i = 0; iter != ids.end(); iter++) {
 		ServerActiveObject *obj = env->getActiveObject(*iter);
 		// Insert object reference into table
@@ -555,19 +572,28 @@ int ModApiEnvMod::l_find_nodes_in_area(lua_State *L)
 		ndef->getIds(lua_tostring(L, 3), filter);
 	}
 
+	std::map<content_t, u16> individual_count;
+
 	lua_newtable(L);
 	u64 i = 0;
-	for(s16 x = minp.X; x <= maxp.X; x++)
-	for(s16 y = minp.Y; y <= maxp.Y; y++)
-	for(s16 z = minp.Z; z <= maxp.Z; z++) {
-		v3s16 p(x, y, z);
-		content_t c = env->getMap().getNodeNoEx(p).getContent();
-		if(filter.count(c) != 0) {
-			push_v3s16(L, p);
-			lua_rawseti(L, -2, ++i);
-		}
+	for (s16 x = minp.X; x <= maxp.X; x++)
+		for (s16 y = minp.Y; y <= maxp.Y; y++)
+			for (s16 z = minp.Z; z <= maxp.Z; z++) {
+				v3s16 p(x, y, z);
+				content_t c = env->getMap().getNodeNoEx(p).getContent();
+				if (filter.count(c) != 0) {
+					push_v3s16(L, p);
+					lua_rawseti(L, -2, ++i);
+					individual_count[c]++;
+				}
 	}
-	return 1;
+	lua_newtable(L);
+	for (std::set<content_t>::iterator it = filter.begin();
+			it != filter.end(); ++it) {
+		lua_pushnumber(L, individual_count[*it]);
+		lua_setfield(L, -2, ndef->get(*it).name.c_str());
+	}
+	return 2;
 }
 
 // find_nodes_in_area_under_air(minp, maxp, nodenames) -> list of positions
@@ -911,6 +937,7 @@ void ModApiEnvMod::Initialize(lua_State *L, int top)
 	API_FCT(set_node_level);
 	API_FCT(add_node_level);
 	API_FCT(add_entity);
+	API_FCT(find_nodes_with_meta);
 	API_FCT(get_meta);
 	API_FCT(get_node_timer);
 	API_FCT(get_player_by_name);

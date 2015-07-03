@@ -29,11 +29,10 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #include "irrlicht.h" // createDevice
 
-#include "main.h"
 #include "mainmenumanager.h"
 #include "irrlichttypes_extrabloated.h"
 #include "debug.h"
-#include "test.h"
+#include "unittest/test.h"
 #include "server.h"
 #include "filesys.h"
 #include "version.h"
@@ -58,38 +57,6 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #ifdef HAVE_TOUCHSCREENGUI
 #include "touchscreengui.h"
 #endif
-
-/*
-	Settings.
-	These are loaded from the config file.
-*/
-static Settings main_settings;
-Settings *g_settings = &main_settings;
-std::string g_settings_path;
-
-// Global profiler
-Profiler main_profiler;
-Profiler *g_profiler = &main_profiler;
-
-// Menu clouds are created later
-Clouds *g_menuclouds = 0;
-irr::scene::ISceneManager *g_menucloudsmgr = 0;
-
-/*
-	Debug streams
-*/
-
-// Connection
-std::ostream *dout_con_ptr = &dummyout;
-std::ostream *derr_con_ptr = &verbosestream;
-
-// Server
-std::ostream *dout_server_ptr = &infostream;
-std::ostream *derr_server_ptr = &errorstream;
-
-// Client
-std::ostream *dout_client_ptr = &infostream;
-std::ostream *derr_client_ptr = &errorstream;
 
 #define DEBUGFILE "debug.txt"
 #define DEFAULT_SERVER_PORT 30000
@@ -136,26 +103,6 @@ static bool run_dedicated_server(const GameParams &game_params, const Settings &
 static bool migrate_database(const GameParams &game_params, const Settings &cmd_args);
 
 /**********************************************************************/
-
-#ifndef SERVER
-/*
-	Random stuff
-*/
-
-/* mainmenumanager.h */
-
-gui::IGUIEnvironment* guienv = NULL;
-gui::IGUIStaticText *guiroot = NULL;
-MainMenuManager g_menumgr;
-
-bool noMenuActive()
-{
-	return (g_menumgr.menuCount() == 0);
-}
-
-// Passed to menus to allow disconnecting and exiting
-MainGameCallback *g_gamecallback = NULL;
-#endif
 
 /*
 	gettime.h implementation
@@ -400,13 +347,11 @@ static void print_allowed_options(const OptionList &allowed_options)
 
 static void print_version()
 {
-#ifdef SERVER
-	dstream << "minetestserver " << minetest_version_hash << std::endl;
-#else
-	dstream << "Minetest " << minetest_version_hash << std::endl;
+	dstream << PROJECT_NAME_C " " << g_version_hash << std::endl;
+#ifndef SERVER
 	dstream << "Using Irrlicht " << IRRLICHT_SDK_VERSION << std::endl;
 #endif
-	dstream << "Build info: " << minetest_build_info << std::endl;
+	dstream << "Build info: " << g_build_info << std::endl;
 }
 
 static void list_game_ids()
@@ -543,7 +488,7 @@ static void startup_message()
 	infostream << PROJECT_NAME << " " << _("with")
 	           << " SER_FMT_VER_HIGHEST_READ="
                << (int)SER_FMT_VER_HIGHEST_READ << ", "
-               << minetest_build_info << std::endl;
+               << g_build_info << std::endl;
 }
 
 static bool read_config_file(const Settings &cmd_args)

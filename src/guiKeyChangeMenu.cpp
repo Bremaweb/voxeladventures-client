@@ -22,7 +22,6 @@
 #include "guiKeyChangeMenu.h"
 #include "debug.h"
 #include "serialization.h"
-#include "main.h"
 #include <string>
 #include <IGUICheckBox.h>
 #include <IGUIEditBox.h>
@@ -414,7 +413,7 @@ bool GUIKeyChangeMenu::resetMenu()
 				key_setting *k = key_settings.at(i);
 				if (k->id == activeKey)
 				{
-					wchar_t* text = wgettext(k->key.name());
+					const wchar_t* text = wgettext(k->key.name());
 					k->button->setText(text);
 					delete[] text;
 					break;
@@ -433,8 +432,7 @@ bool GUIKeyChangeMenu::resetMenu()
 }
 bool GUIKeyChangeMenu::OnEvent(const SEvent& event)
 {
-	if (event.EventType == EET_KEY_INPUT_EVENT && activeKey >= 0
-		&& event.KeyInput.PressedDown)
+	if (event.EventType == EET_KEY_INPUT_EVENT && activeKey >= 0 && event.KeyInput.PressedDown)
 	{
 		bool prefer_character = shift_down && (activeKey != GUI_ID_KEY_ALIAS_BUTTON);
 		KeyPress kp(event.KeyInput, prefer_character);
@@ -498,7 +496,7 @@ bool GUIKeyChangeMenu::OnEvent(const SEvent& event)
 			kc.modifier_control = control_down;
 			set_key_text(m_command_key,kc);
 		}
- 
+
 		if (!shift_went_down && !control_went_down)
 		{
 			 activeKey = -1;

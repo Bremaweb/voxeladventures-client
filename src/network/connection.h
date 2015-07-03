@@ -34,6 +34,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include <list>
 #include <map>
 
+class NetworkPacket;
+
 namespace con
 {
 
@@ -437,19 +439,12 @@ struct ConnectionCommand
 		peer_id = peer_id_;
 	}
 	void send(u16 peer_id_, u8 channelnum_,
-			SharedBuffer<u8> data_, bool reliable_)
+			NetworkPacket* pkt, bool reliable_)
 	{
 		type = CONNCMD_SEND;
 		peer_id = peer_id_;
 		channelnum = channelnum_;
-		data = data_;
-		reliable = reliable_;
-	}
-	void sendToAll(u8 channelnum_, SharedBuffer<u8> data_, bool reliable_)
-	{
-		type = CONNCMD_SEND_TO_ALL;
-		channelnum = channelnum_;
-		data = data_;
+		data = pkt->oldForgePacket();
 		reliable = reliable_;
 	}
 
@@ -508,7 +503,7 @@ public:
 	std::queue<BufferedPacket> queued_reliables;
 
 	//queue commands prior splitting to packets
-	std::queue<ConnectionCommand> queued_commands;
+	std::deque<ConnectionCommand> queued_commands;
 
 	IncomingSplitBuffer incoming_splits;
 
@@ -870,7 +865,8 @@ struct ConnectionEvent
 	bool timeout;
 	Address address;
 
-	ConnectionEvent(): type(CONNEVENT_NONE) {}
+	ConnectionEvent(): type(CONNEVENT_NONE), peer_id(0),
+			timeout(false) {}
 
 	std::string describe()
 	{
@@ -1032,7 +1028,7 @@ public:
 	void Connect(Address address);
 	bool Connected();
 	void Disconnect();
-	u32 Receive(u16 &peer_id, SharedBuffer<u8> &data);
+	void Receive(NetworkPacket* pkt);
 	void Send(u16 peer_id, u8 channelnum, NetworkPacket* pkt, bool reliable);
 	u16 GetPeerID() { return m_peer_id; }
 	Address GetPeerAddress(u16 peer_id);

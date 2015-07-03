@@ -23,9 +23,9 @@ local function current_game()
 end
 
 local function singleplayer_refresh_gamebar()
-	
+
 	local old_bar = ui.find_by_name("game_button_bar")
-	
+
 	if old_bar ~= nil then
 		old_bar:delete()
 	end
@@ -38,6 +38,14 @@ local function singleplayer_refresh_gamebar()
 					core.set_topleft_text(gamemgr.games[j].name)
 					core.setting_set("menu_last_game",gamemgr.games[j].id)
 					menudata.worldlist:set_filtercriteria(gamemgr.games[j].id)
+					local index = filterlist.get_current_index(menudata.worldlist,
+						tonumber(core.setting_get("mainmenu_last_selected_world")))
+					local selected = core.get_textlist_index("sp_worlds")
+					if not index or index < 1 then
+						index = math.min(core.get_textlist_index("sp_worlds"),
+							#menudata.worldlist:get_list())
+					end
+					menu_worldmt_legacy(index)
 					return true
 				end
 			end
@@ -76,7 +84,7 @@ end
 
 local function get_formspec(tabview, name, tabdata)
 	local retval = ""
-	
+
 	local index = filterlist.get_current_index(menudata.worldlist,
 				tonumber(core.setting_get("mainmenu_last_selected_world"))
 				)
@@ -105,14 +113,17 @@ local function main_button_handler(this, fields, name, tabdata)
 
 	if fields["sp_worlds"] ~= nil then
 		local event = core.explode_textlist_event(fields["sp_worlds"])
+		local selected = core.get_textlist_index("sp_worlds")
+
+		menu_worldmt_legacy(selected)
 
 		if event.type == "DCL" then
 			world_doubleclick = true
 		end
 
-		if event.type == "CHG" then
+		if event.type == "CHG" and selected ~= nil then
 			core.setting_set("mainmenu_last_selected_world",
-				menudata.worldlist:get_raw_index(core.get_textlist_index("sp_worlds")))
+				menudata.worldlist:get_raw_index(selected))
 			return true
 		end
 	end
@@ -123,11 +134,17 @@ local function main_button_handler(this, fields, name, tabdata)
 
 	if fields["cb_creative_mode"] then
 		core.setting_set("creative_mode", fields["cb_creative_mode"])
+		local selected = core.get_textlist_index("sp_worlds")
+		menu_worldmt(selected, "creative_mode", fields["cb_creative_mode"])
+
 		return true
 	end
 
 	if fields["cb_enable_damage"] then
 		core.setting_set("enable_damage", fields["cb_enable_damage"])
+		local selected = core.get_textlist_index("sp_worlds")
+		menu_worldmt(selected, "enable_damage", fields["cb_enable_damage"])
+
 		return true
 	end
 

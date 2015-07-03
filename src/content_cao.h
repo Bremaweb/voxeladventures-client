@@ -60,7 +60,6 @@ private:
 	std::string m_name;
 	bool m_is_player;
 	bool m_is_local_player;
-	int m_id;
 	// Property-ish things
 	ObjectProperties m_prop;
 	//
@@ -71,6 +70,7 @@ private:
 	scene::IAnimatedMeshSceneNode *m_animated_meshnode;
 	WieldMeshSceneNode *m_wield_meshnode;
 	scene::IBillboardSceneNode *m_spritenode;
+	video::SColor m_nametag_color;
 	scene::ITextSceneNode* m_textnode;
 	v3f m_position;
 	v3f m_velocity;
@@ -86,6 +86,7 @@ private:
 	v2s32 m_animation_range;
 	int m_animation_speed;
 	int m_animation_blend;
+	bool m_animation_loop;
 	std::map<std::string, core::vector2d<v3f> > m_bone_position; // stores position and rotation for each bone name
 	std::string m_attachment_bone;
 	v3f m_attachment_position;
@@ -160,6 +161,8 @@ public:
 	{
 		m_is_visible = toset;
 	}
+
+	void setChildrenVisible(bool toset);
 
 	void setAttachments();
 

@@ -19,7 +19,6 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #include "localplayer.h"
 
-#include "main.h" // For g_settings
 #include "event.h"
 #include "collision.h"
 #include "gamedef.h"
@@ -43,8 +42,6 @@ LocalPlayer::LocalPlayer(IGameDef *gamedef, const char *name):
 	last_pitch(0),
 	last_yaw(0),
 	last_keyPressed(0),
-	eye_offset_first(v3f(0,0,0)),
-	eye_offset_third(v3f(0,0,0)),
 	last_animation(NO_ANIM),
 	hotbar_image(""),
 	hotbar_selected_image(""),
@@ -60,6 +57,8 @@ LocalPlayer::LocalPlayer(IGameDef *gamedef, const char *name):
 	// Initialize hp to 0, so that no hearts will be shown if server
 	// doesn't support health points
 	hp = 0;
+	eye_offset_first = v3f(0,0,0);
+	eye_offset_third = v3f(0,0,0);
 }
 
 LocalPlayer::~LocalPlayer()
@@ -87,9 +86,8 @@ void LocalPlayer::move(f32 dtime, Environment *env, f32 pos_max_d,
 	bool noclip = m_gamedef->checkLocalPrivilege("noclip") &&
 		g_settings->getBool("noclip");
 	bool free_move = noclip && fly_allowed && g_settings->getBool("free_move");
-	if(free_move)
-	{
-        position += m_speed * dtime;
+	if (free_move) {
+		position += m_speed * dtime;
 		setPosition(position);
 		m_sneak_node_exists = false;
 		return;
@@ -409,11 +407,12 @@ void LocalPlayer::applyControl(float dtime)
 	// When aux1_descends is enabled the fast key is used to go down, so fast isn't possible
 	bool fast_climb = fast_move && control.aux1 && !g_settings->getBool("aux1_descends");
 	bool continuous_forward = g_settings->getBool("continuous_forward");
+	bool always_fly_fast = g_settings->getBool("always_fly_fast");
 
 	// Whether superspeed mode is used or not
 	bool superspeed = false;
 
-	if(g_settings->getBool("always_fly_fast") && free_move && fast_move)
+	if (always_fly_fast && free_move && fast_move)
 		superspeed = true;
 
 	// Old descend control
@@ -471,7 +470,7 @@ void LocalPlayer::applyControl(float dtime)
 			if(free_move)
 			{
 				// In free movement mode, sneak descends
-				if(fast_move && (control.aux1 || g_settings->getBool("always_fly_fast")))
+				if (fast_move && (control.aux1 || always_fly_fast))
 					speedV.Y = -movement_speed_fast;
 				else
 					speedV.Y = -movement_speed_walk;
@@ -518,11 +517,9 @@ void LocalPlayer::applyControl(float dtime)
 	}
 	if(control.jump)
 	{
-		if(free_move)
-		{
-			if(g_settings->getBool("aux1_descends") || g_settings->getBool("always_fly_fast"))
-			{
-				if(fast_move)
+		if (free_move) {
+			if (g_settings->getBool("aux1_descends") || always_fly_fast) {
+				if (fast_move)
 					speedV.Y = movement_speed_fast;
 				else
 					speedV.Y = movement_speed_walk;

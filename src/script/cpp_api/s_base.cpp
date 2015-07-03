@@ -19,6 +19,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #include "cpp_api/s_base.h"
 #include "cpp_api/s_internal.h"
+#include "cpp_api/s_security.h"
 #include "lua_api/l_object.h"
 #include "serverobject.h"
 #include "debug.h"
@@ -45,18 +46,18 @@ class ModNameStorer
 private:
 	lua_State *L;
 public:
-	ModNameStorer(lua_State *L_, const std::string &modname):
+	ModNameStorer(lua_State *L_, const std::string &mod_name):
 		L(L_)
 	{
-		// Store current modname in registry
-		lua_pushstring(L, modname.c_str());
-		lua_setfield(L, LUA_REGISTRYINDEX, "current_modname");
+		// Store current mod name in registry
+		lua_pushstring(L, mod_name.c_str());
+		lua_setfield(L, LUA_REGISTRYINDEX, SCRIPT_MOD_NAME_FIELD);
 	}
 	~ModNameStorer()
 	{
-		// Clear current modname in registry
+		// Clear current mod name from registry
 		lua_pushnil(L);
-		lua_setfield(L, LUA_REGISTRYINDEX, "current_modname");
+		lua_setfield(L, LUA_REGISTRYINDEX, SCRIPT_MOD_NAME_FIELD);
 	}
 };
 
@@ -102,6 +103,11 @@ ScriptApiBase::ScriptApiBase()
 	lua_pushstring(m_luastack, porting::getPlatformName());
 	lua_setglobal(m_luastack, "PLATFORM");
 
+	// m_secure gets set to true inside
+	// ScriptApiSecurity::initializeSecurity(), if neccessary.
+	// Default to false otherwise
+	m_secure = false;
+
 	m_server = NULL;
 	m_environment = NULL;
 	m_guiengine = NULL;
@@ -112,36 +118,36 @@ ScriptApiBase::~ScriptApiBase()
 	lua_close(m_luastack);
 }
 
-bool ScriptApiBase::loadMod(const std::string &scriptpath,
-		const std::string &modname)
+bool ScriptApiBase::loadMod(const std::string &script_path,
+		const std::string &mod_name, std::string *error)
 {
-	ModNameStorer modnamestorer(getStack(), modname);
+	ModNameStorer mod_name_storer(getStack(), mod_name);
 
-	if (!string_allowed(modname, MODNAME_ALLOWED_CHARS)) {
-		errorstream<<"Error loading mod \""<<modname
-				<<"\": modname does not follow naming conventions: "
-				<<"Only chararacters [a-z0-9_] are allowed."<<std::endl;
-		return false;
-	}
-
-	return loadScript(scriptpath);
+	return loadScript(script_path, error);
 }
 
-bool ScriptApiBase::loadScript(const std::string &scriptpath)
+bool ScriptApiBase::loadScript(const std::string &script_path, std::string *error)
 {
-	verbosestream<<"Loading and running script from "<<scriptpath<<std::endl;
+	verbosestream << "Loading and running script from " << script_path << std::endl;
 
 	lua_State *L = getStack();
 
-	int ret = luaL_loadfile(L, scriptpath.c_str()) || lua_pcall(L, 0, 0, m_errorhandler);
-	if (ret) {
-		errorstream << "========== ERROR FROM LUA ===========" << std::endl;
-		errorstream << "Failed to load and run script from " << std::endl;
-		errorstream << scriptpath << ":" << std::endl;
-		errorstream << std::endl;
-		errorstream << lua_tostring(L, -1) << std::endl;
-		errorstream << std::endl;
-		errorstream << "======= END OF ERROR FROM LUA ========" << std::endl;
+	bool ok;
+	if (m_secure) {
+		ok = ScriptApiSecurity::safeLoadFile(L, script_path.c_str());
+	} else {
+		ok = !luaL_loadfile(L, script_path.c_str());
+	}
+	ok = ok && !lua_pcall(L, 0, 0, m_errorhandler);
+	if (!ok) {
+		std::string error_msg = lua_tostring(L, -1);
+		if (error)
+			(*error) = error_msg;
+		errorstream << "========== ERROR FROM LUA ===========" << std::endl
+			<< "Failed to load and run script from " << std::endl
+			<< script_path << ":" << std::endl << std::endl
+			<< error_msg << std::endl << std::endl
+			<< "======= END OF ERROR FROM LUA ========" << std::endl;
 		lua_pop(L, 1); // Pop error message from stack
 		return false;
 	}
@@ -263,4 +269,3 @@ void ScriptApiBase::objectrefGet(lua_State *L, u16 id)
 	lua_remove(L, -2); // object_refs
 	lua_remove(L, -2); // core
 }
-

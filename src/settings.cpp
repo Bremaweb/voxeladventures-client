@@ -33,6 +33,9 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include <cctype>
 #include <algorithm>
 
+static Settings main_settings;
+Settings *g_settings = &main_settings;
+std::string g_settings_path;
 
 Settings::~Settings()
 {
@@ -65,10 +68,11 @@ Settings & Settings::operator = (const Settings &other)
 
 bool Settings::checkNameValid(const std::string &name)
 {
-	size_t pos = name.find_first_of("\t\n\v\f\r\b =\"{}#");
-	if (pos != std::string::npos) {
-		errorstream << "Invalid character '" << name[pos]
-			<< "' found in setting name" << std::endl;
+	bool valid = name.find_first_of("=\"{}#") == std::string::npos;
+	if (valid) valid = trim(name) == name;
+	if (!valid) {
+		errorstream << "Invalid setting name \"" << name << "\""
+			<< std::endl;
 		return false;
 	}
 	return true;
@@ -80,7 +84,7 @@ bool Settings::checkValueValid(const std::string &value)
 	if (value.substr(0, 3) == "\"\"\"" ||
 		value.find("\n\"\"\"") != std::string::npos) {
 		errorstream << "Invalid character sequence '\"\"\"' found in"
-			" setting value" << std::endl;
+			" setting value!" << std::endl;
 		return false;
 	}
 	return true;
@@ -89,9 +93,9 @@ bool Settings::checkValueValid(const std::string &value)
 
 std::string Settings::sanitizeName(const std::string &name)
 {
-	std::string n(name);
+	std::string n = trim(name);
 
-	for (const char *s = "\t\n\v\f\r\b =\"{}#"; *s; s++)
+	for (const char *s = "=\"{}#"; *s; s++)
 		n.erase(std::remove(n.begin(), n.end(), *s), n.end());
 
 	return n;
@@ -887,6 +891,11 @@ void Settings::clear()
 	clearNoLock();
 }
 
+void Settings::clearDefaults()
+{
+	JMutexAutoLock lock(m_mutex);
+	clearDefaultsNoLock();
+}
 
 void Settings::updateValue(const Settings &other, const std::string &name)
 {
@@ -958,10 +967,17 @@ void Settings::clearNoLock()
 		delete it->second.group;
 	m_settings.clear();
 
+	clearDefaultsNoLock();
+}
+
+void Settings::clearDefaultsNoLock()
+{
+	std::map<std::string, SettingsEntry>::const_iterator it;
 	for (it = m_defaults.begin(); it != m_defaults.end(); ++it)
 		delete it->second.group;
 	m_defaults.clear();
 }
+
 
 void Settings::registerChangedCallback(std::string name,
 	setting_changed_callback cbf, void *userdata)

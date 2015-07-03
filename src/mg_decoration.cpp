@@ -25,8 +25,6 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "log.h"
 #include "util/numeric.h"
 
-const char *DecorationManager::ELEMENT_TITLE = "decoration";
-
 FlagDesc flagdesc_deco[] = {
 	{"place_center_x", DECO_PLACE_CENTER_X},
 	{"place_center_y", DECO_PLACE_CENTER_Y},
@@ -40,7 +38,7 @@ FlagDesc flagdesc_deco[] = {
 
 
 DecorationManager::DecorationManager(IGameDef *gamedef) :
-	GenElementManager(gamedef)
+	ObjDefManager(gamedef, OBJDEF_DECORATION)
 {
 }
 
@@ -50,8 +48,8 @@ size_t DecorationManager::placeAllDecos(Mapgen *mg, u32 blockseed,
 {
 	size_t nplaced = 0;
 
-	for (size_t i = 0; i != m_elements.size(); i++) {
-		Decoration *deco = (Decoration *)m_elements[i];
+	for (size_t i = 0; i != m_objects.size(); i++) {
+		Decoration *deco = (Decoration *)m_objects[i];
 		if (!deco)
 			continue;
 
@@ -60,16 +58,6 @@ size_t DecorationManager::placeAllDecos(Mapgen *mg, u32 blockseed,
 	}
 
 	return nplaced;
-}
-
-
-void DecorationManager::clear()
-{
-	for (size_t i = 0; i < m_elements.size(); i++) {
-		Decoration *deco = (Decoration *)m_elements[i];
-		delete deco;
-	}
-	m_elements.clear();
 }
 
 
@@ -90,9 +78,9 @@ Decoration::~Decoration()
 }
 
 
-void Decoration::resolveNodeNames(NodeResolveInfo *nri)
+void Decoration::resolveNodeNames()
 {
-	m_ndef->getIdsFromResolveInfo(nri, c_place_on);
+	getIdsFromNrBacklog(&c_place_on);
 }
 
 
@@ -141,15 +129,12 @@ size_t Decoration::placeDeco(Mapgen *mg, u32 blockseed, v3s16 nmin, v3s16 nmax)
 			s16 y = mg->heightmap ?
 					mg->heightmap[mapindex] :
 					mg->findGroundLevel(v2s16(x, z), nmin.Y, nmax.Y);
-			y = MYMAX(y, mg->water_level);
 
 			if (y < nmin.Y || y > nmax.Y ||
 				y < y_min  || y > y_max)
 				continue;
 
-			int height = getHeight();
-			int max_y = nmax.Y;// + MAP_BLOCKSIZE - 1;
-			if (y + 1 + height > max_y) {
+			if (y + getHeight() >= mg->vm->m_area.MaxEdge.Y) {
 				continue;
 #if 0
 				printf("Decoration at (%d %d %d) cut off\n", x, y, z);
@@ -170,8 +155,8 @@ size_t Decoration::placeDeco(Mapgen *mg, u32 blockseed, v3s16 nmin, v3s16 nmax)
 			}
 
 			v3s16 pos(x, y, z);
-			if (generate(mg->vm, &ps, max_y, pos))
-				mg->gennotify.addEvent(GENNOTIFY_DECORATION, pos, id);
+			if (generate(mg->vm, &ps, pos))
+				mg->gennotify.addEvent(GENNOTIFY_DECORATION, pos, index);
 		}
 	}
 
@@ -236,11 +221,11 @@ void Decoration::placeCutoffs(Mapgen *mg, u32 blockseed, v3s16 nmin, v3s16 nmax)
 ///////////////////////////////////////////////////////////////////////////////
 
 
-void DecoSimple::resolveNodeNames(NodeResolveInfo *nri)
+void DecoSimple::resolveNodeNames()
 {
-	Decoration::resolveNodeNames(nri);
-	m_ndef->getIdsFromResolveInfo(nri, c_decos);
-	m_ndef->getIdsFromResolveInfo(nri, c_spawnby);
+	Decoration::resolveNodeNames();
+	getIdsFromNrBacklog(&c_decos);
+	getIdsFromNrBacklog(&c_spawnby);
 }
 
 
@@ -289,7 +274,7 @@ bool DecoSimple::canPlaceDecoration(MMVManip *vm, v3s16 p)
 }
 
 
-size_t DecoSimple::generate(MMVManip *vm, PseudoRandom *pr, s16 max_y, v3s16 p)
+size_t DecoSimple::generate(MMVManip *vm, PseudoRandom *pr, v3s16 p)
 {
 	if (!canPlaceDecoration(vm, p))
 		return 0;
@@ -298,8 +283,6 @@ size_t DecoSimple::generate(MMVManip *vm, PseudoRandom *pr, s16 max_y, v3s16 p)
 
 	s16 height = (deco_height_max > 0) ?
 		pr->range(deco_height, deco_height_max) : deco_height;
-
-	height = MYMIN(height, max_y - p.Y);
 
 	v3s16 em = vm->m_area.getExtent();
 	u32 vi = vm->m_area.index(p);
@@ -326,18 +309,17 @@ int DecoSimple::getHeight()
 ///////////////////////////////////////////////////////////////////////////////
 
 
-size_t DecoSchematic::generate(MMVManip *vm, PseudoRandom *pr, s16 max_y, v3s16 p)
+DecoSchematic::DecoSchematic()
 {
-	if (flags & DECO_PLACE_CENTER_X)
-		p.X -= (schematic->size.X + 1) / 2;
-	if (flags & DECO_PLACE_CENTER_Y)
-		p.Y -= (schematic->size.Y + 1) / 2;
-	if (flags & DECO_PLACE_CENTER_Z)
-		p.Z -= (schematic->size.Z + 1) / 2;
+	schematic = NULL;
+}
 
-	bool force_placement = (flags & DECO_FORCE_PLACEMENT);
 
-	if (!vm->m_area.contains(p))
+size_t DecoSchematic::generate(MMVManip *vm, PseudoRandom *pr, v3s16 p)
+{
+	// Schematic could have been unloaded but not the decoration
+	// In this case generate() does nothing (but doesn't *fail*)
+	if (schematic == NULL)
 		return 0;
 
 	u32 vi = vm->m_area.index(p);
@@ -345,10 +327,19 @@ size_t DecoSchematic::generate(MMVManip *vm, PseudoRandom *pr, s16 max_y, v3s16 
 	if (!CONTAINS(c_place_on, c))
 		return 0;
 
+	if (flags & DECO_PLACE_CENTER_X)
+		p.X -= (schematic->size.X - 1) / 2;
+	if (flags & DECO_PLACE_CENTER_Y)
+		p.Y -= (schematic->size.Y - 1) / 2;
+	if (flags & DECO_PLACE_CENTER_Z)
+		p.Z -= (schematic->size.Z - 1) / 2;
+
 	Rotation rot = (rotation == ROTATE_RAND) ?
 		(Rotation)pr->range(ROTATE_0, ROTATE_270) : rotation;
 
-	schematic->blitToVManip(p, vm, rot, force_placement, m_ndef);
+	bool force_placement = (flags & DECO_FORCE_PLACEMENT);
+
+	schematic->blitToVManip(p, vm, rot, force_placement);
 
 	return 1;
 }

@@ -20,10 +20,10 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include <iomanip>
 #include <errno.h>
 #include "connection.h"
-#include "main.h"
 #include "serialization.h"
 #include "log.h"
 #include "porting.h"
+#include "network/networkpacket.h"
 #include "util/serialize.h"
 #include "util/numeric.h"
 #include "util/string.h"
@@ -608,7 +608,7 @@ void Channel::setNextSplitSeqNum(u16 seqnum)
 	next_outgoing_split_seqnum = seqnum;
 }
 
-u16 Channel::getOutgoingSequenceNumber(bool& successfull)
+u16 Channel::getOutgoingSequenceNumber(bool& successful)
 {
 	JMutexAutoLock internal(m_internal_mutex);
 	u16 retval = next_outgoing_seqnum;
@@ -628,7 +628,7 @@ u16 Channel::getOutgoingSequenceNumber(bool& successfull)
 			// know about difference of two unsigned may be negative in general
 			// but we already made sure it won't happen in this case
 			if (((u16)(next_outgoing_seqnum - lowest_unacked_seqnumber)) > window_size) {
-				successfull = false;
+				successful = false;
 				return 0;
 			}
 		}
@@ -638,7 +638,7 @@ u16 Channel::getOutgoingSequenceNumber(bool& successfull)
 			// but we already made sure it won't happen in this case
 			if ((next_outgoing_seqnum + (u16)(SEQNUM_MAX - lowest_unacked_seqnumber)) >
 				window_size) {
-				successfull = false;
+				successful = false;
 				return 0;
 			}
 		}
@@ -1063,14 +1063,14 @@ void UDPPeer::PutReliableSendCommand(ConnectionCommand &c,
 				<<" processing reliable command for peer id: " << c.peer_id
 				<<" data size: " << c.data.getSize() << std::endl);
 		if (!processReliableSendCommand(c,max_packet_size)) {
-			channels[c.channelnum].queued_commands.push(c);
+			channels[c.channelnum].queued_commands.push_back(c);
 		}
 	}
 	else {
 		LOG(dout_con<<m_connection->getDesc()
 				<<" Queueing reliable command for peer id: " << c.peer_id
 				<<" data size: " << c.data.getSize() <<std::endl);
-		channels[c.channelnum].queued_commands.push(c);
+		channels[c.channelnum].queued_commands.push_back(c);
 	}
 }
 
@@ -1182,25 +1182,26 @@ void UDPPeer::RunCommandQueues(
 							unsigned int maxtransfer)
 {
 
-	for (unsigned int i = 0; i < CHANNEL_COUNT; i++)
-	{
+	for (unsigned int i = 0; i < CHANNEL_COUNT; i++) {
 		unsigned int commands_processed = 0;
 
 		if ((channels[i].queued_commands.size() > 0) &&
 				(channels[i].queued_reliables.size() < maxtransfer) &&
-				(commands_processed < maxcommands))
-		{
+				(commands_processed < maxcommands)) {
 			try {
 				ConnectionCommand c = channels[i].queued_commands.front();
-				channels[i].queued_commands.pop();
-				LOG(dout_con<<m_connection->getDesc()
-						<<" processing queued reliable command "<<std::endl);
-				if (!processReliableSendCommand(c,max_packet_size)) {
-					LOG(dout_con<<m_connection->getDesc()
+
+				LOG(dout_con << m_connection->getDesc()
+						<< " processing queued reliable command " << std::endl);
+
+				// Packet is processed, remove it from queue
+				if (processReliableSendCommand(c,max_packet_size)) {
+					channels[i].queued_commands.pop_front();
+				} else {
+					LOG(dout_con << m_connection->getDesc()
 							<< " Failed to queue packets for peer_id: " << c.peer_id
 							<< ", delaying sending of " << c.data.getSize()
 							<< " bytes" << std::endl);
-					channels[i].queued_commands.push(c);
 				}
 			}
 			catch (ItemNotFoundException &e) {
@@ -1328,12 +1329,10 @@ bool ConnectionSendThread::packetsQueued()
 		if (dynamic_cast<UDPPeer*>(&peer) == 0)
 			continue;
 
-		for(u16 i=0; i<CHANNEL_COUNT; i++)
-		{
+		for(u16 i=0; i < CHANNEL_COUNT; i++) {
 			Channel *channel = &(dynamic_cast<UDPPeer*>(&peer))->channels[i];
 
-			if (channel->queued_commands.size() > 0)
-			{
+			if (channel->queued_commands.size() > 0) {
 				return true;
 			}
 		}
@@ -1725,9 +1724,8 @@ void ConnectionSendThread::connect(Address address)
 
 	// Send a dummy packet to server with peer_id = PEER_ID_INEXISTENT
 	m_connection->SetPeerID(PEER_ID_INEXISTENT);
-	NetworkPacket* pkt = new NetworkPacket(0,0);
-	m_connection->Send(PEER_ID_SERVER, 0, pkt, true);
-	delete pkt;
+	NetworkPacket pkt(0,0);
+	m_connection->Send(PEER_ID_SERVER, 0, &pkt, true);
 }
 
 void ConnectionSendThread::disconnect()
@@ -2886,30 +2884,36 @@ void Connection::Disconnect()
 	putCommand(c);
 }
 
-u32 Connection::Receive(u16 &peer_id, SharedBuffer<u8> &data)
+void Connection::Receive(NetworkPacket* pkt)
 {
 	for(;;) {
 		ConnectionEvent e = waitEvent(m_bc_receive_timeout);
 		if (e.type != CONNEVENT_NONE)
-			LOG(dout_con<<getDesc()<<": Receive: got event: "
-					<<e.describe()<<std::endl);
+			LOG(dout_con << getDesc() << ": Receive: got event: "
+					<< e.describe() << std::endl);
 		switch(e.type) {
 		case CONNEVENT_NONE:
 			throw NoIncomingDataException("No incoming data");
 		case CONNEVENT_DATA_RECEIVED:
-			peer_id = e.peer_id;
-			data = SharedBuffer<u8>(e.data);
-			return e.data.getSize();
+			// Data size is lesser than command size, ignoring packet
+			if (e.data.getSize() < 2) {
+				continue;
+			}
+
+			pkt->putRawPacket(*e.data, e.data.getSize(), e.peer_id);
+			return;
 		case CONNEVENT_PEER_ADDED: {
 			UDPPeer tmp(e.peer_id, e.address, this);
 			if (m_bc_peerhandler)
 				m_bc_peerhandler->peerAdded(&tmp);
-			continue; }
+			continue;
+		}
 		case CONNEVENT_PEER_REMOVED: {
 			UDPPeer tmp(e.peer_id, e.address, this);
 			if (m_bc_peerhandler)
 				m_bc_peerhandler->deletingPeer(&tmp, e.timeout);
-			continue; }
+			continue;
+		}
 		case CONNEVENT_BIND_FAILED:
 			throw ConnectionBindFailed("Failed to bind socket "
 					"(port already in use?)");
@@ -2925,7 +2929,7 @@ void Connection::Send(u16 peer_id, u8 channelnum,
 
 	ConnectionCommand c;
 
-	c.send(peer_id, channelnum, pkt->oldForgePacket(), reliable);
+	c.send(peer_id, channelnum, pkt, reliable);
 	putCommand(c);
 }
 

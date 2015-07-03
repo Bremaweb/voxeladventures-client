@@ -28,6 +28,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "threads.h"
 #include <string>
 #include <vector>
+#include "util/numeric.h"
 
 class IGameDef;
 
@@ -102,11 +103,14 @@ public:
 	virtual video::ITexture* getTexture(u32 id)=0;
 	virtual video::ITexture* getTexture(
 			const std::string &name, u32 *id = NULL)=0;
+	virtual video::ITexture* getTextureForMesh(
+			const std::string &name, u32 *id = NULL) = 0;
 	virtual IrrlichtDevice* getDevice()=0;
 	virtual bool isKnownSourceImage(const std::string &name)=0;
 	virtual video::ITexture* generateTextureFromMesh(
 			const TextureFromMeshParams &params)=0;
 	virtual video::ITexture* getNormalTexture(const std::string &name)=0;
+	virtual video::SColor getTextureAverageColor(const std::string &name)=0;
 };
 
 class IWritableTextureSource : public ITextureSource
@@ -128,26 +132,12 @@ public:
 	virtual void insertSourceImage(const std::string &name, video::IImage *img)=0;
 	virtual void rebuildImagesAndTextures()=0;
 	virtual video::ITexture* getNormalTexture(const std::string &name)=0;
+	virtual video::SColor getTextureAverageColor(const std::string &name)=0;
 };
 
 IWritableTextureSource* createTextureSource(IrrlichtDevice *device);
 
 #ifdef __ANDROID__
-/**
- * @param size get next npot2 value
- * @return npot2 value
- */
-inline unsigned int npot2(unsigned int size)
-{
-	if (size == 0) return 0;
-	unsigned int npot = 1;
-
-	while ((size >>= 1) > 0) {
-		npot <<= 1;
-	}
-	return npot;
-}
-
 video::IImage * Align2Npot2(video::IImage * image, video::IVideoDriver* driver);
 #endif
 

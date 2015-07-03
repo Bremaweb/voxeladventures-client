@@ -20,6 +20,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "player.h"
 
 #include <fstream>
+#include "jthread/jmutexautolock.h"
 #include "util/numeric.h"
 #include "hud.h"
 #include "constants.h"
@@ -70,6 +71,7 @@ Player::Player(IGameDef *gamedef, const char *name):
 		//"image[1,0.6;1,2;player.png]"
 		"list[current_player;main;0,3.5;8,4;]"
 		"list[current_player;craft;3,0;3,3;]"
+		"listring[]"
 		"list[current_player;craftpreview;7,1;1,1;]";
 
 	// Initialize movement settings at default values, so movement can work if the server fails to send them
@@ -85,6 +87,7 @@ Player::Player(IGameDef *gamedef, const char *name):
 	movement_liquid_fluidity_smooth = 0.5  * BS;
 	movement_liquid_sink            = 10   * BS;
 	movement_gravity                = 9.81 * BS;
+	local_animation_speed           = 0.0;
 
 	// Movement overrides are multipliers and must be 1 by default
 	physics_override_speed        = 1;
@@ -240,6 +243,8 @@ void Player::deSerialize(std::istream &is, std::string playername)
 
 u32 Player::addHud(HudElement *toadd)
 {
+	JMutexAutoLock lock(m_mutex);
+
 	u32 id = getFreeHudID();
 
 	if (id < hud.size())
@@ -252,6 +257,8 @@ u32 Player::addHud(HudElement *toadd)
 
 HudElement* Player::getHud(u32 id)
 {
+	JMutexAutoLock lock(m_mutex);
+
 	if (id < hud.size())
 		return hud[id];
 
@@ -260,6 +267,8 @@ HudElement* Player::getHud(u32 id)
 
 HudElement* Player::removeHud(u32 id)
 {
+	JMutexAutoLock lock(m_mutex);
+
 	HudElement* retval = NULL;
 	if (id < hud.size()) {
 		retval = hud[id];
@@ -270,6 +279,8 @@ HudElement* Player::removeHud(u32 id)
 
 void Player::clearHud()
 {
+	JMutexAutoLock lock(m_mutex);
+
 	while(!hud.empty()) {
 		delete hud.back();
 		hud.pop_back();

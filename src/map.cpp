@@ -20,7 +20,6 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "map.h"
 #include "mapsector.h"
 #include "mapblock.h"
-#include "main.h"
 #include "filesys.h"
 #include "voxel.h"
 #include "porting.h"
@@ -1437,7 +1436,7 @@ void Map::timerUpdate(float dtime, float unload_timeout,
 
 				// Save if modified
 				if (block->getModified() != MOD_STATE_CLEAN && save_before_unloading) {
-					modprofiler.add(block->getModifiedReason(), 1);
+					modprofiler.add(block->getModifiedReasonString(), 1);
 					if (!saveBlock(block))
 						continue;
 					saved_blocks_count++;
@@ -1889,6 +1888,47 @@ void Map::transformLiquids(std::map<v3s16, MapBlock*> & modified_blocks)
 		m_queue_size_timer_started = false; // optimistically assume we can keep up now
 		m_unprocessed_count = m_transforming_liquid.size();
 	}
+}
+
+std::vector<v3s16> Map::findNodesWithMetadata(v3s16 p1, v3s16 p2)
+{
+	std::vector<v3s16> positions_with_meta;
+
+	sortBoxVerticies(p1, p2);
+	v3s16 bpmin = getNodeBlockPos(p1);
+	v3s16 bpmax = getNodeBlockPos(p2);
+
+	VoxelArea area(p1, p2);
+
+	for (s16 z = bpmin.Z; z <= bpmax.Z; z++)
+	for (s16 y = bpmin.Y; y <= bpmax.Y; y++)
+	for (s16 x = bpmin.X; x <= bpmax.X; x++) {
+		v3s16 blockpos(x, y, z);
+
+		MapBlock *block = getBlockNoCreateNoEx(blockpos);
+		if (!block) {
+			verbosestream << "Map::getNodeMetadata(): Need to emerge "
+				<< PP(blockpos) << std::endl;
+			block = emergeBlock(blockpos, false);
+		}
+		if (!block) {
+			infostream << "WARNING: Map::getNodeMetadata(): Block not found"
+				<< std::endl;
+			continue;
+		}
+
+		v3s16 p_base = blockpos * MAP_BLOCKSIZE;
+		std::vector<v3s16> keys = block->m_node_metadata.getAllKeys();
+		for (size_t i = 0; i != keys.size(); i++) {
+			v3s16 p(keys[i] + p_base);
+			if (!area.contains(p))
+				continue;
+
+			positions_with_meta.push_back(p);
+		}
+	}
+
+	return positions_with_meta;
 }
 
 NodeMetadata *Map::getNodeMetadata(v3s16 p)
@@ -2372,7 +2412,7 @@ void ServerMap::finishBlockMake(BlockMakeData *data,
 			Set block as modified
 		*/
 		block->raiseModified(MOD_STATE_WRITE_NEEDED,
-				"finishBlockMake expireDayNightDiff");
+			MOD_REASON_EXPIRE_DAYNIGHTDIFF);
 	}
 
 	/*
@@ -2941,7 +2981,7 @@ void ServerMap::save(ModifiedState save_level)
 					save_started = true;
 				}
 
-				modprofiler.add(block->getModifiedReason(), 1);
+				modprofiler.add(block->getModifiedReasonString(), 1);
 
 				saveBlock(block);
 				block_count++;

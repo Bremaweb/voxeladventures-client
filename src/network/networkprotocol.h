@@ -108,9 +108,31 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 	PROTOCOL_VERSION 24:
 		ContentFeatures version 7
 		ContentFeatures: change number of special tiles to 6 (CF_SPECIAL_COUNT)
+	PROTOCOL_VERSION 25:
+		Rename TOCLIENT_ACCESS_DENIED to TOCLIENT_ACCESS_DENIED_LEGAGY
+		Rename TOCLIENT_DELETE_PARTICLESPAWNER to
+			TOCLIENT_DELETE_PARTICLESPAWNER_LEGACY
+		Rename TOSERVER_PASSWORD to TOSERVER_PASSWORD_LEGACY
+		Rename TOSERVER_INIT to TOSERVER_INIT_LEGACY
+		Rename TOCLIENT_INIT to TOCLIENT_INIT_LEGACY
+		Add TOCLIENT_ACCESS_DENIED new opcode (0x0A), using error codes
+			for standard error, keeping customisation possible. This
+			permit translation
+		Add TOCLIENT_DELETE_PARTICLESPAWNER (0x53), fixing the u16 read and
+			reading u32
+		Add new opcode TOSERVER_INIT for client presentation to server
+		Add new opcodes TOSERVER_FIRST_SRP, TOSERVER_SRP_BYTES_A,
+			TOSERVER_SRP_BYTES_M, TOCLIENT_SRP_BYTES_S_B
+			for the three supported auth mechanisms around srp
+		Add new opcodes TOCLIENT_ACCEPT_SUDO_MODE and TOCLIENT_DENY_SUDO_MODE
+			for sudo mode handling (auth mech generic way of changing password).
+		Add TOCLIENT_HELLO for presenting server to client after client
+			presentation
+		Add TOCLIENT_AUTH_ACCEPT to accept connection from client
+		Rename GENERIC_CMD_SET_ATTACHMENT to GENERIC_CMD_ATTACH_TO
 */
 
-#define LATEST_PROTOCOL_VERSION 24
+#define LATEST_PROTOCOL_VERSION 25
 
 // Server's supported network protocol range
 #define SERVER_PROTOCOL_VERSION_MIN 13
@@ -133,7 +155,35 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 enum ToClientCommand
 {
-	TOCLIENT_INIT = 0x10,
+	TOCLIENT_HELLO = 0x02,
+	/*
+		Sent after TOSERVER_INIT.
+
+		u8 deployed serialisation version
+		u16 deployed network compression mode
+		u16 deployed protocol version
+		u32 supported auth methods
+		std::string username that should be used for legacy hash (for proper casing)
+	*/
+	TOCLIENT_AUTH_ACCEPT = 0x03,
+	/*
+		Message from server to accept auth.
+
+		v3s16 player's position + v3f(0,BS/2,0) floatToInt'd
+		u64 map seed
+		f1000 recommended send interval
+		u32 : supported auth methods for sudo mode
+		      (where the user can change their password)
+	*/
+	TOCLIENT_ACCEPT_SUDO_MODE = 0x04,
+	/*
+		Sent to client to show it is in sudo mode now.
+	*/
+	TOCLIENT_DENY_SUDO_MODE = 0x05,
+	/*
+		Signals client that sudo mode auth failed.
+	*/
+	TOCLIENT_INIT_LEGACY = 0x10,
 	/*
 		Server's reply to TOSERVER_INIT.
 		Sent second after connected.
@@ -147,7 +197,11 @@ enum ToClientCommand
 		NOTE: The position in here is deprecated; position is
 		      explicitly sent afterwards
 	*/
-
+	TOCLIENT_ACCESS_DENIED = 0x0A,
+	/*
+		u8 reason
+		std::string custom reason (if reason == SERVER_ACCESSDENIED_CUSTOM_STRING)
+	*/
 	TOCLIENT_BLOCKDATA = 0x20, //TODO: Multiple blocks
 	TOCLIENT_ADDNODE = 0x21,
 	/*
@@ -270,7 +324,7 @@ enum ToClientCommand
 		f1000 player yaw
 	*/
 
-	TOCLIENT_ACCESS_DENIED = 0x35,
+	TOCLIENT_ACCESS_DENIED_LEGACY = 0x35,
 	/*
 		u16 command
 		u16 reason_length
@@ -457,10 +511,10 @@ enum ToClientCommand
 		u32 id
 	*/
 
-	TOCLIENT_DELETE_PARTICLESPAWNER = 0x48,
+	TOCLIENT_DELETE_PARTICLESPAWNER_LEGACY = 0x48,
 	/*
 		u16 command
-		u32 id
+		u16 id
 	*/
 
 	TOCLIENT_HUDADD = 0x49,
@@ -557,16 +611,42 @@ enum ToClientCommand
 		v3f1000 third
 	*/
 
-	TOCLIENT_NUM_MSG_TYPES = 0x53,
+	TOCLIENT_DELETE_PARTICLESPAWNER = 0x53,
+	/*
+		u16 command
+		u32 id
+	*/
+
+	TOCLIENT_SRP_BYTES_S_B = 0x60,
+	/*
+		Belonging to AUTH_MECHANISM_LEGACY_PASSWORD and AUTH_MECHANISM_SRP.
+
+		u16 command
+		std::string bytes_s
+		std::string bytes_B
+	*/
+
+	TOCLIENT_NUM_MSG_TYPES = 0x61,
 };
 
 enum ToServerCommand
 {
-	TOSERVER_INIT=0x10,
+	TOSERVER_INIT = 0x02,
 	/*
 		Sent first after connected.
 
-		[0] u16 TOSERVER_INIT
+		u8 serialisation version (=SER_FMT_VER_HIGHEST_READ)
+		u16 supported network compression modes
+		u16 minimum supported network protocol version
+		u16 maximum supported network protocol version
+		std::string player name
+	*/
+
+	TOSERVER_INIT_LEGACY = 0x10,
+	/*
+		Sent first after connected.
+
+		[0] u16 TOSERVER_INIT_LEGACY
 		[2] u8 SER_FMT_VER_HIGHEST_READ
 		[3] u8[20] player_name
 		[23] u8[28] password (new in some version)
@@ -694,7 +774,7 @@ enum ToServerCommand
 		u8 amount
 	*/
 
-	TOSERVER_PASSWORD=0x36,
+	TOSERVER_PASSWORD_LEGACY = 0x36,
 	/*
 		Sent to change password.
 
@@ -703,7 +783,7 @@ enum ToServerCommand
 		[30] u8[28] new password
 	*/
 
-	TOSERVER_PLAYERITEM=0x37,
+	TOSERVER_PLAYERITEM = 0x37,
 	/*
 		Sent to change selected item.
 
@@ -711,7 +791,7 @@ enum ToServerCommand
 		[2] u16 item
 	*/
 
-	TOSERVER_RESPAWN=0x38,
+	TOSERVER_RESPAWN = 0x38,
 	/*
 		u16 TOSERVER_RESPAWN
 	*/
@@ -798,7 +878,82 @@ enum ToServerCommand
 		u8[len] full_version_string
 	*/
 
-	TOSERVER_NUM_MSG_TYPES = 0x44,
+	TOSERVER_FIRST_SRP = 0x50,
+	/*
+		Belonging to AUTH_MECHANISM_FIRST_SRP.
+
+		std::string srp salt
+		std::string srp verification key
+		u8 is_empty (=1 if password is empty, 0 otherwise)
+	*/
+
+	TOSERVER_SRP_BYTES_A = 0x51,
+	/*
+		Belonging to AUTH_MECHANISM_LEGACY_PASSWORD and AUTH_MECHANISM_SRP,
+			depending on current_login_based_on.
+
+		std::string bytes_A
+		u8 current_login_based_on : on which version of the password's
+		                            hash this login is based on (0 legacy hash,
+		                            or 1 directly the password)
+	*/
+
+	TOSERVER_SRP_BYTES_M = 0x52,
+	/*
+		Belonging to AUTH_MECHANISM_LEGACY_PASSWORD and AUTH_MECHANISM_SRP.
+
+		std::string bytes_M
+	*/
+
+	TOSERVER_NUM_MSG_TYPES = 0x53,
+};
+
+enum AuthMechanism
+{
+	// reserved
+	AUTH_MECHANISM_NONE = 0,
+
+	// SRP based on the legacy hash
+	AUTH_MECHANISM_LEGACY_PASSWORD = 1 << 0,
+
+	// SRP based on the srp verification key
+	AUTH_MECHANISM_SRP = 1 << 1,
+
+	// Establishes a srp verification key, for first login and password changing
+	AUTH_MECHANISM_FIRST_SRP = 1 << 2,
+};
+
+enum AccessDeniedCode {
+	SERVER_ACCESSDENIED_WRONG_PASSWORD,
+	SERVER_ACCESSDENIED_UNEXPECTED_DATA,
+	SERVER_ACCESSDENIED_SINGLEPLAYER,
+	SERVER_ACCESSDENIED_WRONG_VERSION,
+	SERVER_ACCESSDENIED_WRONG_CHARS_IN_NAME,
+	SERVER_ACCESSDENIED_WRONG_NAME,
+	SERVER_ACCESSDENIED_TOO_MANY_USERS,
+	SERVER_ACCESSDENIED_EMPTY_PASSWORD,
+	SERVER_ACCESSDENIED_ALREADY_CONNECTED,
+	SERVER_ACCESSDENIED_SERVER_FAIL,
+	SERVER_ACCESSDENIED_CUSTOM_STRING,
+	SERVER_ACCESSDENIED_MAX,
+};
+
+enum NetProtoCompressionMode {
+	NETPROTO_COMPRESSION_NONE = 0,
+};
+
+const static std::string accessDeniedStrings[SERVER_ACCESSDENIED_MAX] = {
+	"Invalid password",
+	"Your client sent something the server didn't expect.  Try reconnecting or updating your client",
+	"The server is running in simple singleplayer mode.  You cannot connect.",
+	"Your client's version is not supported.\nPlease contact server administrator.",
+	"Player name contains disallowed characters.",
+	"Player name not allowed.",
+	"Too many users.",
+	"Empty passwords are disallowed.  Set a password and try again.",
+	"Another client is connected with this name.  If your client closed unexpectedly, try again in a minute.",
+	"Server authention failed.  This is likely a server error."
+	"",
 };
 
 #endif

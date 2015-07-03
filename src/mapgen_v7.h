@@ -82,18 +82,21 @@ public:
 
 	Noise *noise_heat;
 	Noise *noise_humidity;
+	Noise *noise_heat_blend;
+	Noise *noise_humidity_blend;
 
 	content_t c_stone;
-	content_t c_dirt;
-	content_t c_dirt_with_grass;
-	content_t c_sand;
 	content_t c_water_source;
 	content_t c_lava_source;
-	content_t c_ice;
-	content_t c_gravel;
-	content_t c_cobble;
-	content_t c_desert_sand;
 	content_t c_desert_stone;
+	content_t c_ice;
+	content_t c_sandstone;
+
+	content_t c_cobble;
+	content_t c_stair_cobble;
+	content_t c_mossycobble;
+	content_t c_sandstonebrick;
+	content_t c_stair_sandstonebrick;
 
 	MapgenV7(int mapgenid, MapgenParams *params, EmergeManager *emerge);
 	~MapgenV7();
@@ -114,7 +117,7 @@ public:
 	int generateMountainTerrain(int ymax);
 	void generateRidgeTerrain();
 
-	void generateBiomes(float *heat_map, float *humidity_map);
+	MgStoneType generateBiomes(float *heat_map, float *humidity_map);
 	void dustTopNodes();
 
 	//void addTopNodes();

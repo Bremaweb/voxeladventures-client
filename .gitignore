@@ -1,11 +1,15 @@
 ## Generic ignorable patterns and files
 *~
 .*.swp
+.*-swp
 *bak*
 tags
 *.vim
 *.orig
 *.rej
+
+## Files related to minetest development cycle
+/*.patch
 
 ## Non-static Minetest directories
 /bin/
@@ -44,6 +48,7 @@ src/script/common/CMakeFiles/*
 src/script/cpp_api/CMakeFiles/*
 src/script/lua_api/CMakeFiles/*
 src/util/CMakeFiles/*
+src/unittest/CMakeFiles/*
 src/jthread/CMakeFiles/*
 src/jthread/Makefile
 src/jthread/cmake_config.h
@@ -56,6 +61,8 @@ src/cguittfont/CMakeFiles/
 src/cguittfont/libcguittfont.a
 src/cguittfont/cmake_install.cmake
 src/cguittfont/Makefile
+src/gmp/CMakeFiles/
+src/gmp/libgmp.a
 src/json/CMakeFiles/
 src/json/libjsoncpp.a
 src/sqlite/CMakeFiles/*
@@ -68,7 +75,10 @@ CPackSourceConfig.cmake
 Makefile
 cmake_install.cmake
 locale/
+.directory
+.kdev4/
 *.cbp
+*.kdev4
 *.layout
 *.o
 
@@ -82,6 +92,7 @@ build/android/jni/src
 build/android/libs
 build/android/obj
 build/android/path.cfg
+build/android/and_env
 build/android/AndroidManifest.xml
 timestamp
 

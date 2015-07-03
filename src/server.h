@@ -63,11 +63,6 @@ enum ClientDeletionReason {
 	CDR_DENY
 };
 
-/*
-	Some random functions
-*/
-v3f findSpawnPos(ServerMap &map);
-
 class MapEditEventIgnorer
 {
 public:
@@ -198,6 +193,7 @@ public:
 	void handleCommand_Null(NetworkPacket* pkt) {};
 	void handleCommand_Deprecated(NetworkPacket* pkt);
 	void handleCommand_Init(NetworkPacket* pkt);
+	void handleCommand_Init_Legacy(NetworkPacket* pkt);
 	void handleCommand_Init2(NetworkPacket* pkt);
 	void handleCommand_RequestMedia(NetworkPacket* pkt);
 	void handleCommand_ReceivedMedia(NetworkPacket* pkt);
@@ -216,8 +212,11 @@ public:
 	void handleCommand_RemovedSounds(NetworkPacket* pkt);
 	void handleCommand_NodeMetaFields(NetworkPacket* pkt);
 	void handleCommand_InventoryFields(NetworkPacket* pkt);
+	void handleCommand_FirstSrp(NetworkPacket* pkt);
+	void handleCommand_SrpBytesA(NetworkPacket* pkt);
+	void handleCommand_SrpBytesM(NetworkPacket* pkt);
 
-	void ProcessData(u8 *data, u32 datasize, u16 peer_id);
+	void ProcessData(NetworkPacket *pkt);
 
 	void Send(NetworkPacket* pkt);
 
@@ -235,7 +234,7 @@ public:
 		Shall be called with the environment and the connection locked.
 	*/
 	Inventory* getInventory(const InventoryLocation &loc);
-	void setInventoryModified(const InventoryLocation &loc);
+	void setInventoryModified(const InventoryLocation &loc, bool playerSend = true);
 
 	// Connection must be locked when called
 	std::wstring getStatusString();
@@ -300,9 +299,6 @@ public:
 	// Envlock and conlock should be locked when using scriptapi
 	GameScripting *getScriptIface(){ return m_script; }
 
-	//TODO: determine what (if anything) should be locked to access EmergeManager
-	EmergeManager *getEmergeManager(){ return m_emerge; }
-
 	// actions: time-reversed list
 	// Return value: success/failure
 	bool rollbackRevertActions(const std::list<RollbackAction> &actions,
@@ -320,16 +316,16 @@ public:
 	virtual MtEventManager* getEventManager();
 	virtual scene::ISceneManager* getSceneManager();
 	virtual IRollbackManager *getRollbackManager() { return m_rollback; }
-
+	virtual EmergeManager *getEmergeManager() { return m_emerge; }
 
 	IWritableItemDefManager* getWritableItemDefManager();
 	IWritableNodeDefManager* getWritableNodeDefManager();
 	IWritableCraftDefManager* getWritableCraftDefManager();
 
-	const ModSpec* getModSpec(const std::string &modname);
+	const ModSpec* getModSpec(const std::string &modname) const;
 	void getModNames(std::vector<std::string> &modlist);
 	std::string getBuiltinLuaPath();
-	inline std::string getWorldPath()
+	inline std::string getWorldPath() const
 			{ return m_path_world; }
 
 	inline bool isSingleplayer()
@@ -347,8 +343,11 @@ public:
 	bool hudChange(Player *player, u32 id, HudElementStat stat, void *value);
 	bool hudSetFlags(Player *player, u32 flags, u32 mask);
 	bool hudSetHotbarItemcount(Player *player, s32 hotbar_itemcount);
+	s32 hudGetHotbarItemcount(Player *player);
 	void hudSetHotbarImage(Player *player, std::string name);
+	std::string hudGetHotbarImage(Player *player);
 	void hudSetHotbarSelectedImage(Player *player, std::string name);
+	std::string hudGetHotbarSelectedImage(Player *player);
 
 	inline Address getPeerAddress(u16 peer_id)
 			{ return m_con.GetPeerAddress(peer_id); }
@@ -366,7 +365,10 @@ public:
 	void peerAdded(con::Peer *peer);
 	void deletingPeer(con::Peer *peer, bool timeout);
 
-	void DenyAccess(u16 peer_id, const std::wstring &reason);
+	void DenySudoAccess(u16 peer_id);
+	void DenyAccess(u16 peer_id, AccessDeniedCode reason, const std::string &custom_reason="");
+	void acceptAuth(u16 peer_id, bool forSudoMode);
+	void DenyAccess_Legacy(u16 peer_id, const std::wstring &reason);
 	bool getClientConInfo(u16 peer_id, con::rtt_stat_type type,float* retval);
 	bool getClientInfo(u16 peer_id,ClientState* state, u32* uptime,
 			u8* ser_vers, u16* prot_vers, u8* major, u8* minor, u8* patch,
@@ -388,7 +390,8 @@ private:
 	void SendMovement(u16 peer_id);
 	void SendHP(u16 peer_id, u8 hp);
 	void SendBreath(u16 peer_id, u16 breath);
-	void SendAccessDenied(u16 peer_id,const std::wstring &reason);
+	void SendAccessDenied(u16 peer_id, AccessDeniedCode reason, const std::string &custom_reason);
+	void SendAccessDenied_Legacy(u16 peer_id, const std::wstring &reason);
 	void SendDeathscreen(u16 peer_id,bool set_camera_point_target, v3f camera_point_target);
 	void SendItemDef(u16 peer_id,IItemDefManager *itemdef, u16 protocol_version);
 	void SendNodeDef(u16 peer_id,INodeDefManager *nodedef, u16 protocol_version);
@@ -459,6 +462,8 @@ private:
 		float expirationtime, float size,
 		bool collisiondetection, bool vertical, std::string texture);
 
+	u32 SendActiveObjectRemoveAdd(u16 peer_id, const std::string &datas);
+	void SendActiveObjectMessages(u16 peer_id, const std::string &datas, bool reliable = true);
 	/*
 		Something random
 	*/
@@ -467,6 +472,8 @@ private:
 	void RespawnPlayer(u16 peer_id);
 	void DeleteClient(u16 peer_id, ClientDeletionReason reason);
 	void UpdateCrafting(Player *player);
+
+	v3f findSpawnPos();
 
 	// When called, connection mutex should be locked
 	RemoteClient* getClient(u16 peer_id,ClientState state_min=CS_Active);
