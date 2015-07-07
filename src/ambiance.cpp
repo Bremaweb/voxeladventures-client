@@ -111,9 +111,16 @@ verbosestream << "[AMBIANCE] Setting up environments...";
 	a_env[ENV_DESERT_NIGHT] = { "Desert Night", 400, 1, "", "", "", 3 };
 	a_env[ENV_DESERT_NIGHT].sounds[1] = { "desert", .8 };
 
-	a_env[ENV_JUNGLE] = { "Jungle", -1, 0, "", "", "", 0 };
+	a_env[ENV_JUNGLE] = { "Jungle", 725, 3, "", "", "", 2 };
+	a_env[ENV_JUNGLE].sounds[1] = {"bird4",.6};
+	a_env[ENV_JUNGLE].sounds[2] = {"bird3",.6};
+	a_env[ENV_JUNGLE].sounds[3] = {"bird",.5};
 
-	a_env[ENV_JUNGLE_NIGHT] = { "Jungle Night", -1, 0, "", "", "", 0 };
+	a_env[ENV_JUNGLE_NIGHT] = { "Jungle Night", 300, 3, "", "", "crickets", 3 };
+	a_env[ENV_JUNGLE_NIGHT].sounds[1] = {"owl",.7};
+	a_env[ENV_JUNGLE_NIGHT].sounds[2] = {"coyote",.7};
+	a_env[ENV_JUNGLE_NIGHT].sounds[3] = {"wolves",.8};
+
 
 verbosestream << "done" << std::endl;
 
@@ -235,8 +242,8 @@ int Ambiance::readEnvironment(){
 		moving = true;
 
 	// if they aren't moving and the time of day hasn't changed don't recheck the environment
-	if ( moving != true && TOD == lastTOD && currentEnv != ENV_INWATER )
-		return currentEnv;
+	//if ( moving != true && TOD == lastTOD && currentEnv != ENV_INWATER )
+//		return currentEnv;
 
 	lastpos = pos;
 	lastTOD = TOD;
@@ -252,7 +259,7 @@ int Ambiance::readEnvironment(){
 		return ENV_UNDERWATER;
 	}
 
-	if ( moving == true && ( lowerBodyNode == WATER || lowerBodyNode == WATER_FLOWING ) ){
+	if ( moving == true && ( lowerBodyNode == WATER || lowerBodyNode == WATER_FLOWING || standingOnNode == WATER || standingOnNode == WATER_FLOWING ) ){
 		return ENV_INWATER;
 	}
 
@@ -316,34 +323,21 @@ bool Ambiance::nodesInRange(v3s16 pos, short searchRange, short searchAbove, sho
 	//verbosestream << "[AMBIANCE] nodesInRange(pos, " << to_string(searchRange) << ", " << nodeName << ")" << std::endl;
 	int nodeCount = 0;
 	std::string cNode;
-	bool valid_pos;
 	// set positions for node checks
 	v3s16 p1 = v3s16((pos.X - searchRange), (pos.Y - searchBelow), (pos.Z - searchRange));
 	v3s16 p2 = v3s16((pos.X + searchRange), (pos.Y + searchAbove), (pos.Z + searchRange));
-	//verbosestream << "[AMBIANCE] Searching from " << to_string(p1.X) << ", " << to_string(p1.Y) << ", " << to_string(p1.Z) << " to " << to_string(p2.X) << ", " << to_string(p2.Y) << ", " << to_string(p2.Z) << std::endl;
 	for ( int y = p1.Y; y < p2.Y; y+=accuracy ){
 		for ( int x = p1.X; x < p2.X; x+=accuracy ){
 			for ( int z = p1.Z; z < p2.Z; z+=accuracy ){
-				//verbosestream << "[AMBIANCE] Position " << to_string(x) << ", " << to_string(y) << ", " << to_string(z) << std::endl;
-				//MapNode n = m_env.getMap().getNodeNoEx(v3s16(x,y,z), &valid_pos);
 				cNode = getNodeName(v3s16(x,y,z));
-				//ContentFeatures f = m_env.getGameDef()->getNodeDefManager()->get(n);
-				//verbosestream << f.name << std::endl;
-				if ( valid_pos == true ){
-					if ( cNode == nodeName )
-						nodeCount++;
-				} else {
-					//verbosestream << "[AMBIANCE] Invalid position " << to_string(x) << ", " << to_string(y) << ", " << to_string(z) << std::endl;
-					return 0;
-				}
+				if ( cNode == nodeName )
+					nodeCount++;
+			}
 				if ( nodeCount > count )
 					return true;
-			}
 		}
 	}
 	return false;
-	//verbosestream << "[AMBIANCE] Node Count: " << to_string(nodeCount) << std::endl;
-	//return nodeCount;
 }
 
 std::string Ambiance::getNodeName(v3s16 pos){
