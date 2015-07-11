@@ -2696,7 +2696,7 @@ void Game::processKeyboardInput(VolatileRunFlags *flags,
 
 				statustext = narrow_to_wide(
 						"Pressed key " + kc.setting_name + " with command " + kc.command);
-// TODO: This used to be needed, but the variable is no longer in scope					
+// TODO: This used to be needed, but the variable is no longer in scope
 //					statustext_time = 0;
 			}
 		}
@@ -3454,9 +3454,16 @@ void Game::updateSound(f32 dtime)
 
 	LocalPlayer *player = client->getEnv().getLocalPlayer();
 
+	v3s16 spos = player->getStandingNodePos();
 	ClientMap &map = client->getEnv().getClientMap();
-	MapNode n = map.getNodeNoEx(player->getStandingNodePos());
-	soundmaker->m_player_step_sound = nodedef_manager->get(n).sound_footstep;
+	MapNode n = map.getNodeNoEx(spos);
+	MapNode a = map.getNodeNoEx(v3s16(spos.X,(spos.Y+1),spos.Z));
+	if ( !nodedef_manager->get(a).isLiquid() ){
+		soundmaker->m_player_step_sound = nodedef_manager->get(n).sound_footstep;
+	} else {
+		SimpleSoundSpec no_sound;
+		soundmaker->m_player_step_sound = no_sound;
+	}
 }
 
 

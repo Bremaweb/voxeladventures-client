@@ -78,7 +78,7 @@ cd $builddir
 if [ ! "x$EXISTING_MINETEST_DIR" = "x" ]; then
 	ln -s $EXISTING_MINETEST_DIR minetest
 else
-	[ -d minetest ] && (cd minetest && git pull) || (git clone https://github.com/minetest/minetest)
+	[ -d minetest ] && (cd minetest && git pull) || (git clone https://github.com/bremaweb/adventuretest-client minetest)
 fi
 cd minetest
 git_hash=`git show | head -c14 | tail -c7`
@@ -86,7 +86,7 @@ git_hash=`git show | head -c14 | tail -c7`
 # Get minetest_game
 cd games
 if [ "x$NO_MINETEST_GAME" = "x" ]; then
-	[ -d minetest_game ] && (cd minetest_game && git pull) || (git clone https://github.com/minetest/minetest_game)
+	[ -d adventuretest ] && (cd adventuretest && git pull) || (git clone https://github.com/bremaweb/adventuretest)
 fi
 cd ../..
 
@@ -108,7 +108,7 @@ cmake .. \
 	-DENABLE_LEVELDB=1 \
 	\
 	-DIRRLICHT_INCLUDE_DIR=$libdir/irrlicht-$irrlicht_version/include \
-	-DIRRLICHT_LIBRARY=$libdir/irrlicht-$irrlicht_version/lib/Win32-gcc/libIrrlicht.dll.a \
+	-DIRRLICHT_LIBRARY=$libdir/irrlicht-$irrlicht_version/lib/Win32-gcc/libIrrlicht.a \
 	-DIRRLICHT_DLL=$libdir/irrlicht-$irrlicht_version/bin/Win32-gcc/Irrlicht.dll \
 	\
 	-DZLIB_INCLUDE_DIR=$libdir/zlib/include \
