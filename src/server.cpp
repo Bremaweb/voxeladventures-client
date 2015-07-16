@@ -394,10 +394,13 @@ Server::~Server()
 		// Execute script shutdown hooks
 		m_script->on_shutdown();
 
-		infostream<<"Server: Saving players"<<std::endl;
+		infostream << "Server: Saving players" << std::endl;
 		m_env->saveLoadedPlayers();
 
-		infostream<<"Server: Saving environment metadata"<<std::endl;
+		infostream << "Server: kick players" << std::endl;
+		m_env->kickAllPlayers("Server shutting down...");
+
+		infostream << "Server: Saving environment metadata" << std::endl;
 		m_env->saveMeta();
 	}
 
@@ -499,6 +502,7 @@ void Server::step(float dtime)
 			throw ServerError(async_err);
 		}
 		else {
+			m_env->kickAllPlayers("The server has crashed. Disconnecting all players. Please reconnect soon...");
 			errorstream << "UNRECOVERABLE error occurred. Stopping server. "
 					<< "Please fix the following error:" << std::endl
 					<< async_err << std::endl;
@@ -1108,7 +1112,7 @@ PlayerSAO* Server::StageTwoClientInit(u16 peer_id)
 	SendInventory(playersao);
 
 	// Send HP
-	SendPlayerHPOrDie(peer_id, playersao->getHP() == 0);
+	SendPlayerHPOrDie(playersao);
 
 	// Send Breath
 	SendPlayerBreath(peer_id);
@@ -1183,7 +1187,7 @@ void Server::ProcessData(NetworkPacket *pkt)
 					<< ban_name << std::endl;
 			// This actually doesn't seem to transfer to the client
 			DenyAccess_Legacy(peer_id, L"Your ip is banned. Banned name was "
-					+ narrow_to_wide(ban_name));
+					+ utf8_to_wide(ban_name));
 			return;
 		}
 	}
@@ -1485,6 +1489,20 @@ void Server::SendMovement(u16 peer_id)
 	pkt << g_settings->getFloat("movement_gravity");
 
 	Send(&pkt);
+}
+
+void Server::SendPlayerHPOrDie(PlayerSAO *playersao)
+{
+	if (!g_settings->getBool("enable_damage"))
+		return;
+
+	u16 peer_id   = playersao->getPeerID();
+	bool is_alive = playersao->getHP() > 0;
+
+	if (is_alive)
+		SendPlayerHP(peer_id);
+	else
+		DiePlayer(peer_id);
 }
 
 void Server::SendHP(u16 peer_id, u8 hp)
