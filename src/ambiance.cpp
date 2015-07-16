@@ -12,9 +12,26 @@
 #include "map.h"
 #include "clientmap.h"
 
+const std::string DIRT = "default:dirt";//m_env.getGameDef()->getNodeDefManager()->getId("default:dirt");
+const std::string STONE = "default:stone";//m_env.getGameDef()->getNodeDefManager()->getId("default:stone");
+const std::string GRASS = "default:dirt_with_grass";//m_env.getGameDef()->getNodeDefManager()->getId("default:dirt_with_grass");
+const std::string TREE = "default:tree";//m_env.getGameDef()->getNodeDefManager()->getId("default:tree");
+const std::string LEAVES = "default:leaves";//m_env.getGameDef()->getNodeDefManager()->getId("default:leaves");
+const std::string WATER = "default:water_source";//m_env.getGameDef()->getNodeDefManager()->getId("default:water_source");
+const std::string WATER_FLOWING = "default:water_flowing";//m_env.getGameDef()->getNodeDefManager()->getId("default:water_flowing");
+const std::string SNOW = "default:snow";
+const std::string DIRT_SNOW = "default:dirt_with_snow";
+const std::string SAND = "default:sand";
+const std::string DESERT_STONE = "default:desert_stone";
+const std::string DESERT_SAND = "default:desert_sand";
+const std::string JUNGLE_TREE = "default:jungletree";
+const std::string JUNGLE_LEAVES = "default:jungleleaves";
+const std::string JUNGLE_GRASS = "default:junglegrass";
+
 Ambiance::Ambiance(ISoundManager *sound, ClientEnvironment &e):
 	m_sound(sound),
-	m_env(e)
+	m_env(e),
+	currentEnv(0)
 {
 	verbosestream << "[AMBIANCE] Loading sound files...";
 	m_sound->loadSoundFile("bats","client/sounds/bats.ogg");
@@ -53,73 +70,73 @@ Ambiance::Ambiance(ISoundManager *sound, ClientEnvironment &e):
 verbosestream << "done" << std::endl;
 
 verbosestream << "[AMBIANCE] Setting up environments...";
-	a_env[ENV_UNKNOWN] = { "Unknown", 0, 0, "", "", "", 0 };
+		a_env[ENV_UNKNOWN] = ambiance_environment("Unknown", 0, 0, "", "", "", 0);
 
 	// setup the various environment's sounds and frequencies
-	a_env[ENV_CAVE] = { "Cave", 400, 6, "", "", "", 5.75 };
-	a_env[ENV_CAVE].sounds[1] = {"bats",.4};
-	a_env[ENV_CAVE].sounds[2] = {"drip_a",.8};
-	a_env[ENV_CAVE].sounds[3] = {"drip_b",.8};
-	a_env[ENV_CAVE].sounds[4] = {"drip_c",.6};
-	a_env[ENV_CAVE].sounds[5] = {"drip_d",.4};
-	a_env[ENV_CAVE].sounds[6] = {"drip_e",.5};
+		a_env[ENV_CAVE] = ambiance_environment("Cave", 400, 6, "", "", "", 5.75);
+		a_env[ENV_CAVE].sounds[1] = env_sound("bats",.4);
+		a_env[ENV_CAVE].sounds[2] = env_sound("drip_a",.8);
+		a_env[ENV_CAVE].sounds[3] = env_sound("drip_b",.8);
+		a_env[ENV_CAVE].sounds[4] = env_sound("drip_c",.6);
+		a_env[ENV_CAVE].sounds[5] = env_sound("drip_d",.4);
+		a_env[ENV_CAVE].sounds[6] = env_sound("drip_e",.5);
 
-	a_env[ENV_UNDERWATER] = { "Underwater", 1001, 5, "splash", "drowning_gasp", "", 0 };
-	a_env[ENV_UNDERWATER].sounds[1] = {"scuba1",1};
-	a_env[ENV_UNDERWATER].sounds[2] = {"scuba2",1};
-	a_env[ENV_UNDERWATER].sounds[3] = {"scuba3",1};
-	a_env[ENV_UNDERWATER].sounds[4] = {"scuba4",1};
-	a_env[ENV_UNDERWATER].sounds[5] = {"scuba5",1};
+		a_env[ENV_UNDERWATER] = ambiance_environment("Underwater", 1001, 5, "splash", "drowning_gasp", "", 0);
+		a_env[ENV_UNDERWATER].sounds[1] = env_sound("scuba1",1);
+		a_env[ENV_UNDERWATER].sounds[2] = env_sound("scuba2",1);
+		a_env[ENV_UNDERWATER].sounds[3] = env_sound("scuba3",1);
+		a_env[ENV_UNDERWATER].sounds[4] = env_sound("scuba4",1);
+		a_env[ENV_UNDERWATER].sounds[5] = env_sound("scuba5",1);
 
-	a_env[ENV_INWATER] = { "Standing in Water", 1001, 2, "splash", "splash", "", 0 };
-	a_env[ENV_INWATER].sounds[1] = {"swimming1",.6};
-	a_env[ENV_INWATER].sounds[2] = {"swimming2",.6};
+		a_env[ENV_INWATER] = ambiance_environment("Standing in Water", 1001, 2, "splash", "splash", "", 0);
+		a_env[ENV_INWATER].sounds[1] = env_sound("swimming1",.6);
+		a_env[ENV_INWATER].sounds[2] = env_sound("swimming2",.6);
 
-	a_env[ENV_PLAINS] = { "Plains", 300, 5, "", "", "", 4 };
-	a_env[ENV_PLAINS].sounds[1] = {"bird2",.2};
-	a_env[ENV_PLAINS].sounds[2] = {"bird4",.2};
-	a_env[ENV_PLAINS].sounds[3] = {"bird3",.2};
-	a_env[ENV_PLAINS].sounds[4] = {"bird",.2};
-	a_env[ENV_PLAINS].sounds[5] = {"birdsong",.2};
+		a_env[ENV_PLAINS] = ambiance_environment("Plains", 300, 5, "", "", "", 4);
+		a_env[ENV_PLAINS].sounds[1] = env_sound("bird2",.2);
+		a_env[ENV_PLAINS].sounds[2] = env_sound("bird4",.2);
+		a_env[ENV_PLAINS].sounds[3] = env_sound("bird3",.2);
+		a_env[ENV_PLAINS].sounds[4] = env_sound("bird",.2);
+		a_env[ENV_PLAINS].sounds[5] = env_sound("birdsong",.2);
 
-	a_env[ENV_PLAINS_NIGHT] = { "Plains Night", 300, 0, "", "", "crickets", 6 };
+		a_env[ENV_PLAINS_NIGHT] = ambiance_environment("Plains Night", 300, 0, "", "", "crickets", 6);
 
-	a_env[ENV_FOREST] = { "Forest", 700, 5, "", "", "", 3 };
-	a_env[ENV_FOREST].sounds[1] = {"bird2",.5};
-	a_env[ENV_FOREST].sounds[2] = {"bird4",.5};
-	a_env[ENV_FOREST].sounds[3] = {"bird3",.5};
-	a_env[ENV_FOREST].sounds[4] = {"bird",.5};
-	a_env[ENV_FOREST].sounds[5] = {"birdsong",.5};
+		a_env[ENV_FOREST] = ambiance_environment("Forest", 700, 5, "", "", "", 3);
+		a_env[ENV_FOREST].sounds[1] = env_sound("bird2",.5);
+		a_env[ENV_FOREST].sounds[2] = env_sound("bird4",.5);
+		a_env[ENV_FOREST].sounds[3] = env_sound("bird3",.5);
+		a_env[ENV_FOREST].sounds[4] = env_sound("bird",.5);
+		a_env[ENV_FOREST].sounds[5] = env_sound("birdsong",.5);
 
-	a_env[ENV_FOREST_NIGHT] = { "Forest Night", 400, 3, "", "", "crickets", 4 };
-	a_env[ENV_FOREST_NIGHT].sounds[1] = {"owl",.8};
-	a_env[ENV_FOREST_NIGHT].sounds[2] = {"coyote",.8};
-	a_env[ENV_FOREST_NIGHT].sounds[3] = {"wolves",.9};
+		a_env[ENV_FOREST_NIGHT] = ambiance_environment("Forest Night", 400, 3, "", "", "crickets", 4);
+		a_env[ENV_FOREST_NIGHT].sounds[1] = env_sound("owl",.8);
+		a_env[ENV_FOREST_NIGHT].sounds[2] = env_sound("coyote",.8);
+		a_env[ENV_FOREST_NIGHT].sounds[3] = env_sound("wolves",.9);
 
-	a_env[ENV_SNOW] = { "Snow", -1, 0, "", "", "", 0 };
+		a_env[ENV_SNOW] = ambiance_environment("Snow", -1, 0, "", "", "", 0);
 
-	a_env[ENV_SNOW_NIGHT] = { "Snow Night", -1, 0, "", "", "", 0 };
+		a_env[ENV_SNOW_NIGHT] = ambiance_environment("Snow Night", -1, 0, "", "", "", 0);
 
-	a_env[ENV_OCEAN] = { "Ocean", 800, 3, "", "", "", 1 };
-	a_env[ENV_OCEAN].sounds[1] = {"waves", .8};
-	a_env[ENV_OCEAN].sounds[2] = {"waves2",.8};
-	a_env[ENV_OCEAN].sounds[3] = {"seagull",.7};
+		a_env[ENV_OCEAN] = ambiance_environment("Ocean", 800, 3, "", "", "", 1);
+		a_env[ENV_OCEAN].sounds[1] = env_sound("waves", .8);
+		a_env[ENV_OCEAN].sounds[2] = env_sound("waves2",.8);
+		a_env[ENV_OCEAN].sounds[3] = env_sound("seagull",.7);
 
-	a_env[ENV_DESERT] = { "Desert", 625, 1, "", "", "desert", 3 };
-	a_env[ENV_DESERT].sounds[1] = { "rattlesnake", .6 };
+		a_env[ENV_DESERT] = ambiance_environment("Desert", 625, 1, "", "", "desert", 3);
+		a_env[ENV_DESERT].sounds[1] = env_sound("rattlesnake", .6 );
 
-	a_env[ENV_DESERT_NIGHT] = { "Desert Night", 400, 1, "", "", "", 3 };
-	a_env[ENV_DESERT_NIGHT].sounds[1] = { "desert", .8 };
+		a_env[ENV_DESERT_NIGHT] = ambiance_environment("Desert Night", 400, 1, "", "", "", 3);
+		a_env[ENV_DESERT_NIGHT].sounds[1] = env_sound("desert", .8 );
 
-	a_env[ENV_JUNGLE] = { "Jungle", 725, 3, "", "", "", 2 };
-	a_env[ENV_JUNGLE].sounds[1] = {"bird4",.6};
-	a_env[ENV_JUNGLE].sounds[2] = {"bird3",.6};
-	a_env[ENV_JUNGLE].sounds[3] = {"bird",.5};
+		a_env[ENV_JUNGLE] = ambiance_environment("Jungle", 725, 3, "", "", "", 2);
+		a_env[ENV_JUNGLE].sounds[1] = env_sound("bird4",.6);
+		a_env[ENV_JUNGLE].sounds[2] = env_sound("bird3",.6);
+		a_env[ENV_JUNGLE].sounds[3] = env_sound("bird",.5);
 
-	a_env[ENV_JUNGLE_NIGHT] = { "Jungle Night", 300, 3, "", "", "crickets", 3 };
-	a_env[ENV_JUNGLE_NIGHT].sounds[1] = {"owl",.7};
-	a_env[ENV_JUNGLE_NIGHT].sounds[2] = {"coyote",.7};
-	a_env[ENV_JUNGLE_NIGHT].sounds[3] = {"wolves",.8};
+		a_env[ENV_JUNGLE_NIGHT] = ambiance_environment("Jungle Night", 300, 3, "", "", "crickets", 3);
+		a_env[ENV_JUNGLE_NIGHT].sounds[1] = env_sound("owl",.7);
+		a_env[ENV_JUNGLE_NIGHT].sounds[2] = env_sound("coyote",.7);
+		a_env[ENV_JUNGLE_NIGHT].sounds[3] = env_sound("wolves",.8);
 
 
 verbosestream << "done" << std::endl;

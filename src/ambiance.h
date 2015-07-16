@@ -47,18 +47,38 @@ private:
 	float envDelay;
 	float tickDelay;
 
-	int currentEnv = 0;
+	int currentEnv;
 	int lastEnv;
 	float lastPlay;
 	int TOD;
 	int lastTOD;
 
 	struct env_sound {
+		env_sound() {}
+		env_sound(std::string name,
+				float gain):
+			name(name),
+			gain(gain) {}
 		std::string name;
 		float gain;
 	};
 
 	struct ambiance_environment {
+		ambiance_environment() {}
+		ambiance_environment(std::string name,
+				int frequency,
+				int sound_count,
+				std::string on_start,
+				std::string on_stop,
+				std::string background_sound,
+				float next_sound_delay):
+			name(name),
+			frequency(frequency),
+			sound_count(sound_count),
+			on_start(on_start),
+			on_stop(on_stop),
+			background_sound(background_sound),
+			next_sound_delay(next_sound_delay) {}
 		std::string name;
 		int frequency;
 		int sound_count;
@@ -97,22 +117,6 @@ private:
 	};
 
 	ambiance_environment a_env[15];
-
-	const std::string DIRT = "default:dirt";//m_env.getGameDef()->getNodeDefManager()->getId("default:dirt");
-	const std::string STONE = "default:stone";//m_env.getGameDef()->getNodeDefManager()->getId("default:stone");
-	const std::string GRASS = "default:dirt_with_grass";//m_env.getGameDef()->getNodeDefManager()->getId("default:dirt_with_grass");
-	const std::string TREE = "default:tree";//m_env.getGameDef()->getNodeDefManager()->getId("default:tree");
-	const std::string LEAVES = "default:leaves";//m_env.getGameDef()->getNodeDefManager()->getId("default:leaves");
-	const std::string WATER = "default:water_source";//m_env.getGameDef()->getNodeDefManager()->getId("default:water_source");
-	const std::string WATER_FLOWING = "default:water_flowing";//m_env.getGameDef()->getNodeDefManager()->getId("default:water_flowing");
-	const std::string SNOW = "default:snow";
-	const std::string DIRT_SNOW = "default:dirt_with_snow";
-	const std::string SAND = "default:sand";
-	const std::string DESERT_STONE = "default:desert_stone";
-	const std::string DESERT_SAND = "default:desert_sand";
-	const std::string JUNGLE_TREE = "default:jungletree";
-	const std::string JUNGLE_LEAVES = "default:jungleleaves";
-	const std::string JUNGLE_GRASS = "default:junglegrass";
 
 };
 
