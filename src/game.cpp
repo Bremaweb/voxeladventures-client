@@ -4158,6 +4158,7 @@ void Game::updateGui(float *statustext_time, const RunStats &stats,
 	v2u32 screensize = driver->getScreenSize();
 	LocalPlayer *player = client->getEnv().getLocalPlayer();
 	v3f player_position = player->getPosition();
+	v3s16 player_standing = player->getStandingNodePos();
 
 	if (flags.show_debug) {
 		static float drawtime_avg = 0;
@@ -4184,7 +4185,11 @@ void Game::updateGui(float *statustext_time, const RunStats &stats,
 		guitext->setVisible(true);
 	} else if (flags.show_hud || flags.show_chat) {
 		std::ostringstream os(std::ios_base::binary);
-		os << PROJECT_NAME_C " " << g_version_hash;
+		os << PROJECT_NAME_C " " << g_version_hash
+				<< "   (" << (player_standing.X)
+				<< ", " << (player_standing.Y)
+				<< ", " << (player_standing.Z)
+				<< ")   " << yawToDirectionString(cam.camera_yaw);
 		guitext->setText(utf8_to_wide(os.str()).c_str());
 		guitext->setVisible(true);
 	} else {
@@ -4200,15 +4205,15 @@ void Game::updateGui(float *statustext_time, const RunStats &stats,
 	}
 
 	if (flags.show_debug) {
+
 		std::ostringstream os(std::ios_base::binary);
 		os << std::setprecision(1) << std::fixed
 		   << "(" << (player_position.X / BS)
 		   << ", " << (player_position.Y / BS)
 		   << ", " << (player_position.Z / BS)
-		   << ") (yaw=" << (wrapDegrees_0_360(cam.camera_yaw))
+		   << ") (" << (wrapDegrees_0_360(cam.camera_yaw))
 		   << " " << yawToDirectionString(cam.camera_yaw)
-		   << ") (seed = " << ((u64)client->getMapSeed())
-		   << ")";
+		   << ") (seed = " << ((u64)client->getMapSeed()) << ")";
 
 		if (runData.pointed_old.type == POINTEDTHING_NODE) {
 			ClientMap &map = client->getEnv().getClientMap();
