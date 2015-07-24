@@ -247,6 +247,7 @@ Client::Client(
 	m_chosen_auth_mech(AUTH_MECHANISM_NONE),
 	m_auth_data(NULL),
 	m_access_denied(false),
+	m_access_denied_reconnect(false),
 	m_itemdef_received(false),
 	m_nodedef_received(false),
 	m_media_downloader(new ClientMediaDownloader()),
@@ -751,14 +752,19 @@ bool Client::loadMedia(const std::string &data, const std::string &filename)
 // Virtual methods from con::PeerHandler
 void Client::peerAdded(con::Peer *peer)
 {
-	infostream<<"Client::peerAdded(): peer->id="
-			<<peer->id<<std::endl;
+	infostream << "Client::peerAdded(): peer->id="
+			<< peer->id << std::endl;
 }
 void Client::deletingPeer(con::Peer *peer, bool timeout)
 {
-	infostream<<"Client::deletingPeer(): "
+	infostream << "Client::deletingPeer(): "
 			"Server Peer is getting deleted "
-			<<"(timeout="<<timeout<<")"<<std::endl;
+			<< "(timeout=" << timeout << ")" << std::endl;
+
+	if (timeout) {
+		m_access_denied = true;
+		m_access_denied_reason = gettext("Connection timed out.");
+	}
 }
 
 /*
