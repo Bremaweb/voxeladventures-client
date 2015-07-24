@@ -88,7 +88,7 @@ verbosestream << "[AMBIANCE] Setting up environments...";
 		a_env[ENV_UNDERWATER].sounds[4] = env_sound("scuba4",1);
 		a_env[ENV_UNDERWATER].sounds[5] = env_sound("scuba5",1);
 
-		a_env[ENV_INWATER] = ambiance_environment("Standing in Water", 1001, 2, "splash", "splash", "", 0);
+		a_env[ENV_INWATER] = ambiance_environment("Standing in Water", 1001, 2, "", "", "", 0);
 		a_env[ENV_INWATER].sounds[1] = env_sound("swimming1",.6);
 		a_env[ENV_INWATER].sounds[2] = env_sound("swimming2",.6);
 
