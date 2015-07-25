@@ -537,6 +537,28 @@ public:
 		alSource3f(sound->source_id, AL_VELOCITY, 0, 0, 0);
 		alSourcef(sound->source_id, AL_REFERENCE_DISTANCE, 30.0);
 	}
+
+	bool updateSoundGain(int id, float gain){
+		std::map<int, PlayingSound*>::iterator i = m_sounds_playing.find(id);
+		if(i == m_sounds_playing.end())
+			return false;
+
+		PlayingSound *sound = i->second;
+		alSourcef(sound->source_id, AL_GAIN, gain);
+		return true;
+	}
+
+	float getSoundGain(int id){
+		std::map<int, PlayingSound*>::iterator i = m_sounds_playing.find(id);
+			if(i == m_sounds_playing.end())
+				return 0;
+		actionstream << "getSoundGain(" << id << ") = ";
+		PlayingSound *sound = i->second;
+		ALfloat gain;
+		alGetSourcef(sound->source_id,AL_GAIN, &gain);
+		actionstream << gain << std::endl;
+		return gain;
+	}
 };
 
 ISoundManager *createOpenALSoundManager(OnDemandSoundFetcher *fetcher)

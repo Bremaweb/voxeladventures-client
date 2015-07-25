@@ -146,6 +146,7 @@ void Ambiance::doAmbiance(float dtime, u32 tod){
 	static bool newEnv = false;
 	m_timeOfDay = tod;
 	tickDelay += dtime;
+	doFades(dtime);
 	if ( startDelay > 3 && tickDelay > .1 ) {	// delay ambiance 3 seconds from launch of game
 		lastPlay += dtime;
 		tickDelay = 0;
@@ -160,7 +161,8 @@ void Ambiance::doAmbiance(float dtime, u32 tod){
 			newEnv = true;
 			actionstream << "[AMBIANCE] readEnvironment Results: " << a_env[currentEnv].name << std::endl;
 			if  ( !a_env[currentEnv].background_sound.empty() ){
-				m_background_sound = m_sound->playSound(a_env[currentEnv].background_sound,true,0.6);
+				m_background_sound = m_sound->playSound(a_env[currentEnv].background_sound,true,0.0);
+				fadeSound(m_background_sound,1.25,0.6);
 			} else {
 				m_background_sound = 0;
 			}
@@ -200,7 +202,8 @@ void Ambiance::doAmbiance(float dtime, u32 tod){
 }
 
 // type is 0 - normal sound, 1 start sound, 2 stop sound
-bool Ambiance::playSound(std::string name, float gain){
+bool Ambiance::playSound(std::string name, float gain, bool fade){
+	float oGain = 0;
 	verbosestream << "[AMBIANCE] playSound(" << name << ")" << std::endl;
 	std::map<std::string, int>::iterator i = m_sounds_playing.find(name);
 	if ( i != m_sounds_playing.end() ){
@@ -214,10 +217,63 @@ bool Ambiance::playSound(std::string name, float gain){
 			m_sounds_playing.erase(name);
 		}
 	}
+
+	if ( fade == true ){
+		oGain = gain;
+		gain = 0;
+	}
+
 	int id = m_sound->playSound(name, false, gain);
 	m_sounds_playing[name] = id;
+
+	if ( fade == true ){
+		fadeSound(id, 1.25, oGain);
+	}
+
 	lastPlay = 0;
 	return true;
+}
+
+void Ambiance::fadeSound(int soundid, float step, float gain){
+	float cGain = m_sound->getSoundGain(soundid);
+	fade_status f = fade_status(step,cGain,gain);
+	m_sounds_fading[soundid] = f;
+}
+
+void Ambiance::doFades(float dtime){
+	static float fadeDelay = 0;
+	fadeDelay += dtime;
+	if ( fadeDelay > 0.2 ){
+		float chkGain = 0;
+		for ( m_fading_it i = m_sounds_fading.begin(); i != m_sounds_fading.end(); i++ ){
+			if ( i->second.step < 0 )
+				chkGain = i->second.current_gain * -1;
+			else
+				chkGain = i->second.current_gain;
+
+			if ( chkGain < i->second.target_gain ){
+				i->second.current_gain += (i->second.step * fadeDelay);
+				if ( i->second.current_gain < 0 )
+					i->second.current_gain = 0;
+
+				if ( i->second.current_gain > 1 )
+					i->second.current_gain = 1;
+
+
+				m_sound->updateSoundGain(i->first,i->second.current_gain);
+			} else {
+				if ( i->second.target_gain <= 0 ){
+					m_sound->stopSound(i->first);
+				}
+				for ( m_sounds_it ii = m_sounds_playing.begin(); ii != m_sounds_playing.end(); ii++ ){
+					if ( ii->second == i->first )
+						m_sounds_playing.erase(ii->first);
+				}
+				m_sounds_fading.erase(i->first);
+			}
+		}
+		fadeDelay = 0;
+	}
 }
 
 int Ambiance::readEnvironment(){
@@ -247,7 +303,6 @@ int Ambiance::readEnvironment(){
 
 	if ( t > 19500 || t < 5000 )
 		TOD = NIGHT;
-	//verbosestream << t << std::endl;
 
 	if ( pos.Y > ( lastpos.Y + .5 ) )
 		ascending = true;
@@ -372,11 +427,14 @@ int Ambiance::getNodeId(v3s16 pos){
 void Ambiance::stopEnvironment(int env){
 	// not going to bother seeing if the sounds playing are part of a certain environment just yet, just stop all sounds
 	for ( m_sounds_it i = m_sounds_playing.begin(); i != m_sounds_playing.end(); i++ ){
-		m_sound->stopSound(i->second);
+		//m_sound->stopSound(i->second);
+		fadeSound(i->second,-1.25,0);
+		m_sounds_playing.erase(i->first);	// go ahead and erase it here so we don't get double fade outs
 	}
 
 	if ( m_background_sound != 0 ){
-		m_sound->stopSound(m_background_sound);
+		fadeSound(m_background_sound,-0.5,0);
+		//m_sound->stopSound(m_background_sound);
 		m_background_sound = 0;
 	}
 

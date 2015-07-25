@@ -48,7 +48,7 @@ class ISoundManager
 {
 public:
 	virtual ~ISoundManager(){}
-	
+
 	// Multiple sounds can be loaded per name; when played, the sound
 	// should be chosen randomly from alternatives
 	// Return value determines success/failure
@@ -69,6 +69,8 @@ public:
 	virtual void stopSound(int sound) = 0;
 	virtual bool soundExists(int sound) = 0;
 	virtual void updateSoundPosition(int sound, v3f pos) = 0;
+	virtual bool updateSoundGain(int id, float gain) = 0;
+	virtual float getSoundGain(int id) = 0;
 
 	int playSound(const SimpleSoundSpec &spec, bool loop)
 		{ return playSound(spec.name, loop, spec.gain); }
@@ -92,6 +94,8 @@ public:
 	void stopSound(int sound) {}
 	bool soundExists(int sound) {return false;}
 	void updateSoundPosition(int sound, v3f pos) {}
+	bool updateSoundGain(int id, float gain) { return false; }
+	float getSoundGain(int id) { return 0; }
 };
 
 // Global DummySoundManager singleton

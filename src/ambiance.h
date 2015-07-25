@@ -20,12 +20,14 @@ public:
 	Ambiance(ISoundManager *sound, ClientEnvironment &e);
 	void doAmbiance(float dtime, u32 tod);
 private:
-	bool playSound(std::string name, float gain);
+	bool playSound(std::string name, float gain, bool fade = false);
+	void doFades(float dtime);
 	bool nodesInRange(v3s16 pos, short searchRange, short searchAbove, short searchBelow, std::string nodeName, short accuracy, int count);
 	std::string getNodeName(v3s16 pos);
 	int getNodeId(v3s16 pos);
 	void stopEnvironment(int env);
 	int readEnvironment();
+	void fadeSound(int soundid, float step, float gain);
 
 
 	u32 m_timeOfDay;
@@ -36,6 +38,20 @@ private:
 	int m_background_sound;
 	std::map<std::string, int> m_sounds_playing;
 	typedef std::map<std::string, int>::iterator m_sounds_it;
+
+	struct fade_status {
+		fade_status() {}
+		fade_status(float step, float current_gain, float target_gain):
+			step(step),
+			current_gain(current_gain),
+			target_gain(target_gain){}
+		float step;
+		float current_gain;
+		float target_gain;
+	};
+
+	std::map<int, fade_status> m_sounds_fading;		// 0 = step, 1 = current gain, 2 = goal gain
+	typedef std::map<int, fade_status>::iterator m_fading_it;
 
 	v3f lastpos;
 	bool ascending;
