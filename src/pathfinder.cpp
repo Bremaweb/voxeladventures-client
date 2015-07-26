@@ -401,7 +401,6 @@ bool pathfinder::build_costmap()
 				MapNode current = m_env->getMap().getNodeNoEx(realpos);
 				MapNode below   = m_env->getMap().getNodeNoEx(realpos + v3s16(0,-1,0));
 
-
 				if ((current.param0 == CONTENT_IGNORE) ||
 						(below.param0 == CONTENT_IGNORE)) {
 					DEBUG_OUT("Pathfinder: " << PPOS(realpos) <<
@@ -414,11 +413,12 @@ bool pathfinder::build_costmap()
 				}
 
 				//don't add anything if it isn't an air node
-				if ((current.param0 != CONTENT_AIR) ||
+				if ((current.param0 != CONTENT_AIR ) ||
 						(below.param0 == CONTENT_AIR )) {
 						DEBUG_OUT("Pathfinder: " << PPOS(realpos)
 								<< " not on surface" << std::endl);
-						if (current.param0 != CONTENT_AIR) {
+
+						if (current.param0 != CONTENT_AIR ) {
 							m_data[x][z][y].type = 's';
 							DEBUG_OUT(x << "," << y << "," << z << ": " << 's' << std::endl);
 						}

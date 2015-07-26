@@ -579,7 +579,8 @@ GenericCAO::GenericCAO(IGameDef *gamedef, ClientEnvironment *env):
 		m_visuals_expired(false),
 		m_step_distance_counter(0),
 		m_last_light(255),
-		m_is_visible(false)
+		m_is_visible(false),
+		m_infotext("")
 {
 	if(gamedef == NULL)
 		ClientActiveObject::registerType(getType(), create);
@@ -662,6 +663,7 @@ void GenericCAO::initialize(const std::string &data)
 			assert( localplayer != NULL );
 			localplayer->setCAO(this);
 		}
+		m_infotext = m_name;
 		m_env->addPlayerName(m_name.c_str());
 	}
 }
@@ -966,6 +968,7 @@ void GenericCAO::addToScene(scene::ISceneManager *smgr, ITextureSource *tsrc,
 	}
 	updateTextures("");
 
+	/*
 	scene::ISceneNode *node = getSceneNode();
 	if (node && m_is_player && !m_is_local_player) {
 		// Add a text node for showing the name
@@ -976,6 +979,7 @@ void GenericCAO::addToScene(scene::ISceneManager *smgr, ITextureSource *tsrc,
 		m_textnode->grab();
 		m_textnode->setPosition(v3f(0, BS*1.1, 0));
 	}
+	*/
 
 	updateNodePos();
 	updateAnimation();
