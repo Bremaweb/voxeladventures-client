@@ -548,20 +548,19 @@ void Client::step(float dtime)
 				}
 
 				if (r.mesh) {
-					minimap_mapblock = r.mesh->getMinimapMapblock();
-					do_mapper_update = (minimap_mapblock != NULL);
+					minimap_mapblock = r.mesh->moveMinimapMapblock();
+					if (minimap_mapblock == NULL)
+						do_mapper_update = false;
 				}
 
 				if (r.mesh && r.mesh->getMesh()->getMeshBufferCount() == 0) {
 					delete r.mesh;
-					block->mesh = NULL;
 				} else {
 					// Replace with the new mesh
 					block->mesh = r.mesh;
 				}
 			} else {
 				delete r.mesh;
-				minimap_mapblock = NULL;
 			}
 
 			if (do_mapper_update)
@@ -982,6 +981,7 @@ void Client::deleteAuthData()
 		case AUTH_MECHANISM_NONE:
 			break;
 	}
+	m_chosen_auth_mech = AUTH_MECHANISM_NONE;
 }
 
 
@@ -1068,7 +1068,6 @@ void Client::startAuth(AuthMechanism chosen_auth_mechanism)
 
 			NetworkPacket resp_pkt(TOSERVER_SRP_BYTES_A, 0);
 			resp_pkt << std::string(bytes_A, len_A) << based_on;
-			free(bytes_A);
 			Send(&resp_pkt);
 			break;
 		}
