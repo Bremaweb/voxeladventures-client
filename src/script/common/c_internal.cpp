@@ -79,7 +79,7 @@ int script_exception_wrapper(lua_State *L, lua_CFunction f)
  * to gather a coherent backtrace.  Realistically, the best we can do here is
  * print which C function performed the failing pcall.
  */
-void script_error(lua_State *L, int pcall_result, const char *fxn)
+void script_error(lua_State *L, int pcall_result, const char *mod, const char *fxn)
 {
 	if (pcall_result == 0)
 		return;
@@ -99,19 +99,27 @@ void script_error(lua_State *L, int pcall_result, const char *fxn)
 		err_type = "Unknown";
 	}
 
+	if (!mod)
+		mod = "??";
+
+	if (!fxn)
+		fxn = "??";
+
 	const char *err_descr = lua_tostring(L, -1);
 	if (!err_descr)
 		err_descr = "<no description>";
 
-	std::string err_msg(err_type);
-	if (fxn) {
-		err_msg += " error in ";
-		err_msg += fxn;
-		err_msg += "(): ";
-	} else {
-		err_msg += " error: ";
-	}
+	char buf[256];
+	snprintf(buf, sizeof(buf), "%s error from mod '%s' in callback %s(): ",
+		err_type, mod, fxn);
+
+	std::string err_msg(buf);
 	err_msg += err_descr;
+
+	if (pcall_result == LUA_ERRMEM) {
+		err_msg += "\nCurrent Lua memory usage: "
+			+ itos(lua_gc(L, LUA_GCCOUNT, 0) >> 10) + " MB";
+	}
 
 	throw LuaError(err_msg);
 }
@@ -145,7 +153,9 @@ void script_run_callbacks_f(lua_State *L, int nargs,
 	// Stack now looks like this:
 	// ... <error handler> <run_callbacks> <table> <mode> <arg#1> <arg#2> ... <arg#n>
 
-	script_error(L, lua_pcall(L, nargs + 2, 1, errorhandler), fxn);
+	int result = lua_pcall(L, nargs + 2, 1, errorhandler);
+	if (result != 0)
+		script_error(L, result, NULL, fxn);
 
 	lua_remove(L, -2); // Remove error handler
 }
@@ -161,8 +171,7 @@ void log_deprecated(lua_State *L, const std::string &message)
 		std::string value = g_settings->get("deprecated_lua_api_handling");
 		if (value == "log") {
 			dolog = true;
-		}
-		if (value == "error") {
+		} else if (value == "error") {
 			dolog = true;
 			doerror = true;
 		}
@@ -170,7 +179,7 @@ void log_deprecated(lua_State *L, const std::string &message)
 
 	if (doerror) {
 		if (L != NULL) {
-			script_error(L, LUA_ERRRUN, NULL);
+			script_error(L, LUA_ERRRUN, NULL, NULL);
 		} else {
 			FATAL_ERROR("Can't do a scripterror for this deprecated message, "
 				"so exit completely!");
