@@ -288,7 +288,7 @@ void ParticleSpawner::step(float dtime, ClientEnvironment* env)
 			}
 			else
 			{
-				i++;
+				++i;
 			}
 		}
 	}
@@ -347,7 +347,7 @@ void ParticleManager::step(float dtime)
 
 void ParticleManager::stepSpawners (float dtime)
 {
-	JMutexAutoLock lock(m_spawner_list_lock);
+	MutexAutoLock lock(m_spawner_list_lock);
 	for(std::map<u32, ParticleSpawner*>::iterator i = 
 			m_particle_spawners.begin();
 			i != m_particle_spawners.end();)
@@ -360,14 +360,14 @@ void ParticleManager::stepSpawners (float dtime)
 		else
 		{
 			i->second->step(dtime, m_env);
-			i++;
+			++i;
 		}
 	}
 }
 
 void ParticleManager::stepParticles (float dtime)
 {
-	JMutexAutoLock lock(m_particle_list_lock);
+	MutexAutoLock lock(m_particle_list_lock);
 	for(std::vector<Particle*>::iterator i = m_particles.begin();
 			i != m_particles.end();)
 	{
@@ -380,15 +380,15 @@ void ParticleManager::stepParticles (float dtime)
 		else
 		{
 			(*i)->step(dtime);
-			i++;
+			++i;
 		}
 	}
 }
 
 void ParticleManager::clearAll ()
 {
-	JMutexAutoLock lock(m_spawner_list_lock);
-	JMutexAutoLock lock2(m_particle_list_lock);
+	MutexAutoLock lock(m_spawner_list_lock);
+	MutexAutoLock lock2(m_particle_list_lock);
 	for(std::map<u32, ParticleSpawner*>::iterator i =
 			m_particle_spawners.begin();
 			i != m_particle_spawners.end();)
@@ -411,7 +411,7 @@ void ParticleManager::handleParticleEvent(ClientEvent *event, IGameDef *gamedef,
 		scene::ISceneManager* smgr, LocalPlayer *player)
 {
 	if (event->type == CE_DELETE_PARTICLESPAWNER) {
-		JMutexAutoLock lock(m_spawner_list_lock);
+		MutexAutoLock lock(m_spawner_list_lock);
 		if (m_particle_spawners.find(event->delete_particlespawner.id) !=
 				m_particle_spawners.end())
 		{
@@ -425,7 +425,7 @@ void ParticleManager::handleParticleEvent(ClientEvent *event, IGameDef *gamedef,
 	if (event->type == CE_ADD_PARTICLESPAWNER) {
 
 		{
-			JMutexAutoLock lock(m_spawner_list_lock);
+			MutexAutoLock lock(m_spawner_list_lock);
 			if (m_particle_spawners.find(event->add_particlespawner.id) !=
 							m_particle_spawners.end())
 			{
@@ -465,7 +465,7 @@ void ParticleManager::handleParticleEvent(ClientEvent *event, IGameDef *gamedef,
 		delete event->add_particlespawner.maxacc;
 
 		{
-			JMutexAutoLock lock(m_spawner_list_lock);
+			MutexAutoLock lock(m_spawner_list_lock);
 			m_particle_spawners.insert(
 					std::pair<u32, ParticleSpawner*>(
 							event->add_particlespawner.id,
@@ -568,6 +568,6 @@ void ParticleManager::addNodeParticle(IGameDef* gamedef, scene::ISceneManager* s
 
 void ParticleManager::addParticle(Particle* toadd)
 {
-	JMutexAutoLock lock(m_particle_list_lock);
+	MutexAutoLock lock(m_particle_list_lock);
 	m_particles.push_back(toadd);
 }

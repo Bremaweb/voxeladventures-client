@@ -14,6 +14,7 @@ PATHCFGFILE = path.cfg
 ROOT = $(shell pwd)
 
 GAMES_TO_COPY = minetest_game
+MODS_TO_COPY =
 
 
 VERSION_MAJOR := $(shell cat $(ROOT)/../../CMakeLists.txt | \
@@ -753,11 +754,13 @@ assets : $(ASSETS_TIMESTAMP)
 	cp -r ${ROOT}/../../doc ${ROOT}/assets/Minetest;                           \
 	cp -r ${ROOT}/../../fonts ${ROOT}/assets/Minetest;                         \
 	mkdir ${ROOT}/assets/Minetest/games;                                       \
-	for game in ${GAMES_TO_COPY};                                              \
-	do                                                                         \
+	for game in ${GAMES_TO_COPY}; do                                           \
 	    cp -r ${ROOT}/../../games/$$game ${ROOT}/assets/Minetest/games/;       \
 	done;                                                                      \
-	cp -r ${ROOT}/../../mods ${ROOT}/assets/Minetest;                          \
+	mkdir ${ROOT}/assets/Minetest/mods;                                        \
+	for mod in ${MODS_TO_COPY}; do                                             \
+	    cp -r ${ROOT}/../../mods/$$mod ${ROOT}/assets/Minetest/mods/;          \
+	done;                                                                      \
 	cp -r ${ROOT}/../../po ${ROOT}/assets/Minetest;                            \
 	cp -r ${ROOT}/../../textures ${ROOT}/assets/Minetest;                      \
 	mkdir -p ${ROOT}/assets/Minetest/media;                                    \
@@ -867,7 +870,7 @@ $(ROOT)/jni/src/android_version.h : prep_srcdir
 	fi
 
 manifest :
-	@BASE_VERSION="${VERS_MAJOR}.${VERS_MINOR}.${VERS_PATCH}";                 \
+	@BASE_VERSION="${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}";        \
 	if [ "${NDEBUG}x" != "x" ] ; then                                          \
 		DBG='';                                                                \
 		DBG_FLAG="android:debuggable=\"false\"";                               \

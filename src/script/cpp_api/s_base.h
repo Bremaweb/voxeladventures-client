@@ -28,15 +28,14 @@ extern "C" {
 }
 
 #include "irrlichttypes.h"
-#include "jthread/jmutex.h"
-#include "jthread/jmutexautolock.h"
+#include "threading/mutex.h"
+#include "threading/mutex_auto_lock.h"
 #include "common/c_types.h"
 #include "common/c_internal.h"
 
 #define SCRIPTAPI_LOCK_DEBUG
 #define SCRIPTAPI_DEBUG
 
-#define SCRIPT_MOD_NAME_FIELD "current_mod_name"
 // MUST be an invalid mod name so that mods can't
 // use that name to bypass security!
 #define BUILTIN_MOD_NAME "*builtin*"
@@ -108,10 +107,8 @@ protected:
 	void objectrefGetOrCreate(lua_State *L, ServerActiveObject *cobj);
 	void objectrefGet(lua_State *L, u16 id);
 
-	JMutex          m_luastackmutex;
+	Mutex           m_luastackmutex;
 	std::string     m_last_run_mod;
-	// Stack index of Lua error handler
-	int             m_errorhandler;
 	bool            m_secure;
 #ifdef SCRIPTAPI_LOCK_DEBUG
 	bool            m_locked;

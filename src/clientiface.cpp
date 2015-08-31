@@ -38,10 +38,12 @@ const char *ClientInterface::statenames[] = {
 	"Disconnecting",
 	"Denied",
 	"Created",
-	"InitSent",
+	"AwaitingInit2",
+	"HelloSent",
 	"InitDone",
 	"DefinitionsSent",
-	"Active"
+	"Active",
+	"SudoMode",
 };
 
 
@@ -593,7 +595,7 @@ ClientInterface::~ClientInterface()
 		Delete clients
 	*/
 	{
-		JMutexAutoLock clientslock(m_clients_mutex);
+		MutexAutoLock clientslock(m_clients_mutex);
 
 		for(std::map<u16, RemoteClient*>::iterator
 			i = m_clients.begin();
@@ -609,7 +611,7 @@ ClientInterface::~ClientInterface()
 std::vector<u16> ClientInterface::getClientIDs(ClientState min_state)
 {
 	std::vector<u16> reply;
-	JMutexAutoLock clientslock(m_clients_mutex);
+	MutexAutoLock clientslock(m_clients_mutex);
 
 	for(std::map<u16, RemoteClient*>::iterator
 		i = m_clients.begin();
@@ -660,7 +662,7 @@ void ClientInterface::UpdatePlayerList()
 			infostream << "* " << player->getName() << "\t";
 
 			{
-				JMutexAutoLock clientslock(m_clients_mutex);
+				MutexAutoLock clientslock(m_clients_mutex);
 				RemoteClient* client = lockedGetClientNoEx(*i);
 				if(client != NULL)
 					client->PrintInfo(infostream);
@@ -680,7 +682,7 @@ void ClientInterface::send(u16 peer_id, u8 channelnum,
 void ClientInterface::sendToAll(u16 channelnum,
 		NetworkPacket* pkt, bool reliable)
 {
-	JMutexAutoLock clientslock(m_clients_mutex);
+	MutexAutoLock clientslock(m_clients_mutex);
 	for(std::map<u16, RemoteClient*>::iterator
 		i = m_clients.begin();
 		i != m_clients.end(); ++i) {
@@ -694,7 +696,7 @@ void ClientInterface::sendToAll(u16 channelnum,
 
 RemoteClient* ClientInterface::getClientNoEx(u16 peer_id, ClientState state_min)
 {
-	JMutexAutoLock clientslock(m_clients_mutex);
+	MutexAutoLock clientslock(m_clients_mutex);
 	std::map<u16, RemoteClient*>::iterator n;
 	n = m_clients.find(peer_id);
 	// The client may not exist; clients are immediately removed if their
@@ -725,7 +727,7 @@ RemoteClient* ClientInterface::lockedGetClientNoEx(u16 peer_id, ClientState stat
 
 ClientState ClientInterface::getClientState(u16 peer_id)
 {
-	JMutexAutoLock clientslock(m_clients_mutex);
+	MutexAutoLock clientslock(m_clients_mutex);
 	std::map<u16, RemoteClient*>::iterator n;
 	n = m_clients.find(peer_id);
 	// The client may not exist; clients are immediately removed if their
@@ -738,7 +740,7 @@ ClientState ClientInterface::getClientState(u16 peer_id)
 
 void ClientInterface::setPlayerName(u16 peer_id,std::string name)
 {
-	JMutexAutoLock clientslock(m_clients_mutex);
+	MutexAutoLock clientslock(m_clients_mutex);
 	std::map<u16, RemoteClient*>::iterator n;
 	n = m_clients.find(peer_id);
 	// The client may not exist; clients are immediately removed if their
@@ -749,7 +751,7 @@ void ClientInterface::setPlayerName(u16 peer_id,std::string name)
 
 void ClientInterface::DeleteClient(u16 peer_id)
 {
-	JMutexAutoLock conlock(m_clients_mutex);
+	MutexAutoLock conlock(m_clients_mutex);
 
 	// Error check
 	std::map<u16, RemoteClient*>::iterator n;
@@ -784,7 +786,7 @@ void ClientInterface::DeleteClient(u16 peer_id)
 
 void ClientInterface::CreateClient(u16 peer_id)
 {
-	JMutexAutoLock conlock(m_clients_mutex);
+	MutexAutoLock conlock(m_clients_mutex);
 
 	// Error check
 	std::map<u16, RemoteClient*>::iterator n;
@@ -801,7 +803,7 @@ void ClientInterface::CreateClient(u16 peer_id)
 void ClientInterface::event(u16 peer_id, ClientStateEvent event)
 {
 	{
-		JMutexAutoLock clientlock(m_clients_mutex);
+		MutexAutoLock clientlock(m_clients_mutex);
 
 		// Error check
 		std::map<u16, RemoteClient*>::iterator n;
@@ -823,7 +825,7 @@ void ClientInterface::event(u16 peer_id, ClientStateEvent event)
 
 u16 ClientInterface::getProtocolVersion(u16 peer_id)
 {
-	JMutexAutoLock conlock(m_clients_mutex);
+	MutexAutoLock conlock(m_clients_mutex);
 
 	// Error check
 	std::map<u16, RemoteClient*>::iterator n;
@@ -838,7 +840,7 @@ u16 ClientInterface::getProtocolVersion(u16 peer_id)
 
 void ClientInterface::setClientVersion(u16 peer_id, u8 major, u8 minor, u8 patch, std::string full)
 {
-	JMutexAutoLock conlock(m_clients_mutex);
+	MutexAutoLock conlock(m_clients_mutex);
 
 	// Error check
 	std::map<u16, RemoteClient*>::iterator n;
