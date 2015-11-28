@@ -49,10 +49,10 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #define PP(x) "("<<(x).X<<","<<(x).Y<<","<<(x).Z<<")"
 
 Environment::Environment():
+	m_time_of_day_speed(0),
 	m_time_of_day(9000),
 	m_time_of_day_f(9000./24000),
-	m_time_of_day_speed(0),
-	m_time_counter(0),
+	m_time_conversion_skew(0.0f),
 	m_enable_day_night_ratio_override(false),
 	m_day_night_ratio_override(0.0f)
 {
@@ -70,7 +70,7 @@ Environment::~Environment()
 
 void Environment::addPlayer(Player *player)
 {
-	DSTACK(__FUNCTION_NAME);
+	DSTACK(FUNCTION_NAME);
 	/*
 		Check that peer_ids are unique.
 		Also check that names are unique.
@@ -85,28 +85,11 @@ void Environment::addPlayer(Player *player)
 	m_players.push_back(player);
 }
 
-void Environment::removePlayer(u16 peer_id)
-{
-	DSTACK(__FUNCTION_NAME);
-
-	for(std::vector<Player*>::iterator i = m_players.begin();
-			i != m_players.end();)
-	{
-		Player *player = *i;
-		if(player->peer_id == peer_id) {
-			delete player;
-			i = m_players.erase(i);
-		} else {
-			++i;
-		}
-	}
-}
-
-void Environment::removePlayer(const char *name)
+void Environment::removePlayer(Player* player)
 {
 	for (std::vector<Player*>::iterator it = m_players.begin();
 			it != m_players.end(); ++it) {
-		if (strcmp((*it)->getName(), name) == 0) {
+		if ((*it) == player) {
 			delete *it;
 			m_players.erase(it);
 			return;
@@ -197,70 +180,76 @@ std::vector<Player*> Environment::getPlayers(bool ignore_disconnected)
 
 u32 Environment::getDayNightRatio()
 {
-	if(m_enable_day_night_ratio_override)
+	MutexAutoLock lock(this->m_time_lock);
+	if (m_enable_day_night_ratio_override)
 		return m_day_night_ratio_override;
-	return time_to_daynight_ratio(m_time_of_day_f*24000, m_cache_enable_shaders);
+	return time_to_daynight_ratio(m_time_of_day_f * 24000, m_cache_enable_shaders);
 }
 
 void Environment::setTimeOfDaySpeed(float speed)
 {
-	MutexAutoLock(this->m_timeofday_lock);
 	m_time_of_day_speed = speed;
 }
 
 float Environment::getTimeOfDaySpeed()
 {
-	MutexAutoLock(this->m_timeofday_lock);
-	float retval = m_time_of_day_speed;
-	return retval;
+	return m_time_of_day_speed;
+}
+
+void Environment::setDayNightRatioOverride(bool enable, u32 value)
+{
+	MutexAutoLock lock(this->m_time_lock);
+	m_enable_day_night_ratio_override = enable;
+	m_day_night_ratio_override = value;
 }
 
 void Environment::setTimeOfDay(u32 time)
 {
-	MutexAutoLock(this->m_time_lock);
+	MutexAutoLock lock(this->m_time_lock);
 	m_time_of_day = time;
 	m_time_of_day_f = (float)time / 24000.0;
 }
 
 u32 Environment::getTimeOfDay()
 {
-	MutexAutoLock(this->m_time_lock);
-	u32 retval = m_time_of_day;
-	return retval;
+	MutexAutoLock lock(this->m_time_lock);
+	return m_time_of_day;
 }
 
 float Environment::getTimeOfDayF()
 {
-	MutexAutoLock(this->m_time_lock);
-	float retval = m_time_of_day_f;
-	return retval;
+	MutexAutoLock lock(this->m_time_lock);
+	return m_time_of_day_f;
 }
 
 void Environment::stepTimeOfDay(float dtime)
 {
-	// getTimeOfDaySpeed lock the value we need to prevent MT problems
-	float day_speed = getTimeOfDaySpeed();
+	MutexAutoLock lock(this->m_time_lock);
 
-	m_time_counter += dtime;
-	f32 speed = day_speed * 24000./(24.*3600);
-	u32 units = (u32)(m_time_counter*speed);
+	// Cached in order to prevent the two reads we do to give
+	// different results (can be written by code not under the lock)
+	f32 cached_time_of_day_speed = m_time_of_day_speed;
+
+	f32 speed = cached_time_of_day_speed * 24000. / (24. * 3600);
+	m_time_conversion_skew += dtime;
+	u32 units = (u32)(m_time_conversion_skew * speed);
 	bool sync_f = false;
-	if(units > 0){
+	if (units > 0) {
 		// Sync at overflow
-		if(m_time_of_day + units >= 24000)
+		if (m_time_of_day + units >= 24000)
 			sync_f = true;
 		m_time_of_day = (m_time_of_day + units) % 24000;
-		if(sync_f)
+		if (sync_f)
 			m_time_of_day_f = (float)m_time_of_day / 24000.0;
 	}
 	if (speed > 0) {
-		m_time_counter -= (f32)units / speed;
+		m_time_conversion_skew -= (f32)units / speed;
 	}
-	if(!sync_f){
-		m_time_of_day_f += day_speed/24/3600*dtime;
-		if(m_time_of_day_f > 1.0)
+	if (!sync_f) {
+		m_time_of_day_f += cached_time_of_day_speed / 24 / 3600 * dtime;
+		if (m_time_of_day_f > 1.0)
 			m_time_of_day_f -= 1.0;
-		if(m_time_of_day_f < 0.0)
+		if (m_time_of_day_f < 0.0)
 			m_time_of_day_f += 1.0;
 	}
 }
@@ -453,15 +442,12 @@ void ServerEnvironment::saveLoadedPlayers()
 	}
 }
 
-void ServerEnvironment::savePlayer(const std::string &playername)
+void ServerEnvironment::savePlayer(RemotePlayer *player)
 {
 	std::string players_path = m_path_world + DIR_DELIM "players";
 	fs::CreateDir(players_path);
 
-	RemotePlayer *player = static_cast<RemotePlayer*>(getPlayer(playername.c_str()));
-	if (player) {
-		player->save(players_path);
-	}
+	player->save(players_path);
 }
 
 Player *ServerEnvironment::loadPlayer(const std::string &playername)
@@ -555,10 +541,10 @@ void ServerEnvironment::loadMeta()
 	}
 
 	try {
-		m_time_of_day = args.getU64("time_of_day");
+		setTimeOfDay(args.getU64("time_of_day"));
 	} catch (SettingNotFoundException &e) {
 		// This is not as important
-		m_time_of_day = 9000;
+		setTimeOfDay(9000);
 	}
 }
 
@@ -597,17 +583,21 @@ public:
 				i->timer -= trigger_interval;
 				actual_interval = trigger_interval;
 			}
-			float intervals = actual_interval / trigger_interval;
-			if(intervals == 0)
-				continue;
 			float chance = abm->getTriggerChance();
 			if(chance == 0)
 				chance = 1;
 			ActiveABM aabm;
 			aabm.abm = abm;
-			aabm.chance = chance / intervals;
-			if(aabm.chance == 0)
-				aabm.chance = 1;
+			if(abm->getSimpleCatchUp()) {
+				float intervals = actual_interval / trigger_interval;
+				if(intervals == 0)
+					continue;
+				aabm.chance = chance / intervals;
+				if(aabm.chance == 0)
+					aabm.chance = 1;
+			} else {
+				aabm.chance = chance;
+			}
 			// Trigger neighbors
 			std::set<std::string> required_neighbors_s
 					= abm->getRequiredNeighbors();
@@ -1002,7 +992,7 @@ void ServerEnvironment::clearAllObjects()
 
 void ServerEnvironment::step(float dtime)
 {
-	DSTACK(__FUNCTION_NAME);
+	DSTACK(FUNCTION_NAME);
 
 	//TimeTaker timer("ServerEnv step");
 
@@ -1208,7 +1198,7 @@ void ServerEnvironment::step(float dtime)
 		u32 time_ms = timer.stop(true);
 		u32 max_time_ms = 200;
 		if(time_ms > max_time_ms){
-			infostream<<"WARNING: active block modifiers took "
+			warningstream<<"active block modifiers took "
 					<<time_ms<<"ms (longer than "
 					<<max_time_ms<<"ms)"<<std::endl;
 			m_active_block_interval_overload_skip = (time_ms / max_time_ms) + 1;
@@ -1318,12 +1308,11 @@ u16 ServerEnvironment::addActiveObject(ServerActiveObject *object)
 	Finds out what new objects have been added to
 	inside a radius around a position
 */
-void ServerEnvironment::getAddedActiveObjects(v3s16 pos, s16 radius,
+void ServerEnvironment::getAddedActiveObjects(Player *player, s16 radius,
 		s16 player_radius,
 		std::set<u16> &current_objects,
-		std::set<u16> &added_objects)
+		std::queue<u16> &added_objects)
 {
-	v3f pos_f = intToFloat(pos, BS);
 	f32 radius_f = radius * BS;
 	f32 player_radius_f = player_radius * BS;
 
@@ -1339,18 +1328,19 @@ void ServerEnvironment::getAddedActiveObjects(v3s16 pos, s16 radius,
 	*/
 	for(std::map<u16, ServerActiveObject*>::iterator
 			i = m_active_objects.begin();
-			i != m_active_objects.end(); ++i)
-	{
+			i != m_active_objects.end(); ++i) {
 		u16 id = i->first;
+
 		// Get object
 		ServerActiveObject *object = i->second;
 		if(object == NULL)
 			continue;
+
 		// Discard if removed or deactivating
 		if(object->m_removed || object->m_pending_deactivation)
 			continue;
 
-		f32 distance_f = object->getBasePosition().getDistanceFrom(pos_f);
+		f32 distance_f = object->getBasePosition().getDistanceFrom(player->getPosition());
 		if (object->getType() == ACTIVEOBJECT_TYPE_PLAYER) {
 			// Discard if too far
 			if (distance_f > player_radius_f && player_radius_f != 0)
@@ -1364,7 +1354,7 @@ void ServerEnvironment::getAddedActiveObjects(v3s16 pos, s16 radius,
 		if(n != current_objects.end())
 			continue;
 		// Add to added_objects
-		added_objects.insert(id);
+		added_objects.push(id);
 	}
 }
 
@@ -1372,12 +1362,11 @@ void ServerEnvironment::getAddedActiveObjects(v3s16 pos, s16 radius,
 	Finds out what objects have been removed from
 	inside a radius around a position
 */
-void ServerEnvironment::getRemovedActiveObjects(v3s16 pos, s16 radius,
+void ServerEnvironment::getRemovedActiveObjects(Player *player, s16 radius,
 		s16 player_radius,
 		std::set<u16> &current_objects,
-		std::set<u16> &removed_objects)
+		std::queue<u16> &removed_objects)
 {
-	v3f pos_f = intToFloat(pos, BS);
 	f32 radius_f = radius * BS;
 	f32 player_radius_f = player_radius * BS;
 
@@ -1399,20 +1388,19 @@ void ServerEnvironment::getRemovedActiveObjects(v3s16 pos, s16 radius,
 		u16 id = *i;
 		ServerActiveObject *object = getActiveObject(id);
 
-		if(object == NULL){
-			infostream<<"ServerEnvironment::getRemovedActiveObjects():"
-					<<" object in current_objects is NULL"<<std::endl;
-			removed_objects.insert(id);
+		if (object == NULL) {
+			infostream << "ServerEnvironment::getRemovedActiveObjects():"
+				<< " object in current_objects is NULL" << std::endl;
+			removed_objects.push(id);
 			continue;
 		}
 
-		if(object->m_removed || object->m_pending_deactivation)
-		{
-			removed_objects.insert(id);
+		if (object->m_removed || object->m_pending_deactivation) {
+			removed_objects.push(id);
 			continue;
 		}
 
-		f32 distance_f = object->getBasePosition().getDistanceFrom(pos_f);
+		f32 distance_f = object->getBasePosition().getDistanceFrom(player->getPosition());
 		if (object->getType() == ACTIVEOBJECT_TYPE_PLAYER) {
 			if (distance_f <= player_radius_f || player_radius_f == 0)
 				continue;
@@ -1420,7 +1408,7 @@ void ServerEnvironment::getRemovedActiveObjects(v3s16 pos, s16 radius,
 			continue;
 
 		// Object is no longer visible
-		removed_objects.insert(id);
+		removed_objects.push(id);
 	}
 }
 
@@ -1493,6 +1481,17 @@ u16 ServerEnvironment::addActiveObjectRaw(ServerActiveObject *object,
 			delete object;
 		return 0;
 	}
+
+	if (objectpos_over_limit(object->getBasePosition())) {
+		v3f p = object->getBasePosition();
+		errorstream << "ServerEnvironment::addActiveObjectRaw(): "
+			<< "object position (" << p.X << "," << p.Y << "," << p.Z
+			<< ") outside maximum range" << std::endl;
+		if (object->environmentDeletes())
+			delete object;
+		return 0;
+	}
+
 	/*infostream<<"ServerEnvironment::addActiveObjectRaw(): "
 			<<"added (id="<<object->getId()<<")"<<std::endl;*/
 
@@ -1921,7 +1920,7 @@ void ServerEnvironment::deactivateFarObjects(bool force_delete)
 					// reason. Unsuccessful attempts have been made to find
 					// said reason.
 					if(id && block->m_static_objects.m_active.find(id) != block->m_static_objects.m_active.end()){
-						infostream<<"ServerEnv: WARNING: Performing hack #83274"
+						warningstream<<"ServerEnv: Performing hack #83274"
 								<<std::endl;
 						block->m_static_objects.remove(id);
 					}
@@ -2039,7 +2038,7 @@ ClientMap & ClientEnvironment::getClientMap()
 
 void ClientEnvironment::addPlayer(Player *player)
 {
-	DSTACK(__FUNCTION_NAME);
+	DSTACK(FUNCTION_NAME);
 	/*
 		It is a failure if player is local and there already is a local
 		player
@@ -2063,7 +2062,7 @@ LocalPlayer * ClientEnvironment::getLocalPlayer()
 
 void ClientEnvironment::step(float dtime)
 {
-	DSTACK(__FUNCTION_NAME);
+	DSTACK(FUNCTION_NAME);
 
 	/* Step time of day */
 	stepTimeOfDay(dtime);
@@ -2562,7 +2561,7 @@ void ClientEnvironment::damageLocalPlayer(u8 damage, bool handle_hp)
 	event.type = CEE_PLAYER_DAMAGE;
 	event.player_damage.amount = damage;
 	event.player_damage.send_to_server = handle_hp;
-	m_client_event_queue.push_back(event);
+	m_client_event_queue.push(event);
 }
 
 void ClientEnvironment::updateLocalPlayerBreath(u16 breath)
@@ -2570,7 +2569,7 @@ void ClientEnvironment::updateLocalPlayerBreath(u16 breath)
 	ClientEnvEvent event;
 	event.type = CEE_PLAYER_BREATH;
 	event.player_breath.amount = breath;
-	m_client_event_queue.push_back(event);
+	m_client_event_queue.push(event);
 }
 
 /*
@@ -2604,7 +2603,7 @@ ClientEnvEvent ClientEnvironment::getClientEvent()
 		event.type = CEE_NONE;
 	else {
 		event = m_client_event_queue.front();
-		m_client_event_queue.pop_front();
+		m_client_event_queue.pop();
 	}
 	return event;
 }

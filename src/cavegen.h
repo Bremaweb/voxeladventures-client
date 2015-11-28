@@ -21,6 +21,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #define CAVEGEN_HEADER
 
 #define VMANIP_FLAG_CAVE VOXELFLAG_CHECKED1
+#define MGV5_LAVA_DEPTH -256
 #define MGV7_LAVA_DEPTH -256
 
 class MapgenV5;
@@ -29,7 +30,7 @@ class MapgenV7;
 
 class CaveV5 {
 public:
-	MapgenV5 *mg;
+	Mapgen *mg;
 	MMVManip *vm;
 	INodeDefManager *ndef;
 
@@ -64,9 +65,10 @@ public:
 	content_t c_ice;
 
 	int water_level;
+	int ystride;
 
 	CaveV5() {}
-	CaveV5(MapgenV5 *mg, PseudoRandom *ps);
+	CaveV5(Mapgen *mg, PseudoRandom *ps);
 	void makeCave(v3s16 nmin, v3s16 nmax, int max_stone_height);
 	void makeTunnel(bool dirswitch);
 	void carveRoute(v3f vec, float f, bool randomize_xz);

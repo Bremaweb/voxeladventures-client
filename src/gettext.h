@@ -32,12 +32,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #define gettext_noop(String) (String)
 #define N_(String) gettext_noop((String))
 
-#ifdef _MSC_VER
 void init_gettext(const char *path, const std::string &configured_language,
-		int argc, char** argv);
-#else
-void init_gettext(const char *path, const std::string &configured_language);
-#endif
+	int argc, char *argv[]);
 
 extern wchar_t *utf8_to_wide_c(const char *str);
 
@@ -46,14 +42,6 @@ extern wchar_t *utf8_to_wide_c(const char *str);
 inline const wchar_t *wgettext(const char *str)
 {
 	return utf8_to_wide_c(gettext(str));
-}
-
-inline std::wstring wstrgettext(const std::string &text)
-{
-	const wchar_t *tmp = wgettext(text.c_str());
-	std::wstring retval = (std::wstring)tmp;
-	delete[] tmp;
-	return retval;
 }
 
 inline std::string strgettext(const std::string &text)

@@ -1,6 +1,6 @@
 /*
 Minetest
-Copyright (C) 2010-2013 celeron55, Perttu Ahola <celeron55@gmail.com>
+Copyright (C) 2010-2015 celeron55, Perttu Ahola <celeron55@gmail.com>
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by
@@ -26,8 +26,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 //#include "serverobject.h"
 #include "content_sao.h"
 #include "nodedef.h"
-#include "content_mapnode.h" // For content_mapnode_get_new_name
 #include "voxelalgorithms.h"
+//#include "profiler.h" // For TimeTaker
 #include "settings.h" // For g_settings
 #include "emerge.h"
 #include "dungeongen.h"
@@ -42,6 +42,8 @@ FlagDesc flagdesc_mapgen_v6[] = {
 	{"biomeblend", MGV6_BIOMEBLEND},
 	{"mudflow",    MGV6_MUDFLOW},
 	{"snowbiomes", MGV6_SNOWBIOMES},
+	{"flat",       MGV6_FLAT},
+	{"trees",      MGV6_TREES},
 	{NULL,         0}
 };
 
@@ -175,7 +177,7 @@ void MapgenV6Params::readParams(const Settings *settings)
 
 void MapgenV6Params::writeParams(Settings *settings) const
 {
-	settings->setFlagStr("mgv6_spflags", spflags, flagdesc_mapgen_v6, (u32)-1);
+	settings->setFlagStr("mgv6_spflags", spflags, flagdesc_mapgen_v6, U32_MAX);
 	settings->setFloat("mgv6_freq_desert", freq_desert);
 	settings->setFloat("mgv6_freq_beach",  freq_beach);
 
@@ -263,7 +265,7 @@ float MapgenV6::baseTerrainLevel(float terrain_base, float terrain_higher,
 
 float MapgenV6::baseTerrainLevelFromNoise(v2s16 p)
 {
-	if (flags & MG_FLAT)
+	if ((spflags & MGV6_FLAT) || (flags & MG_FLAT))
 		return water_level;
 
 	float terrain_base   = NoisePerlin2D_PO(&noise_terrain_base->np,
@@ -289,7 +291,7 @@ float MapgenV6::baseTerrainLevelFromMap(v2s16 p)
 
 float MapgenV6::baseTerrainLevelFromMap(int index)
 {
-	if (flags & MG_FLAT)
+	if ((spflags & MGV6_FLAT) || (flags & MG_FLAT))
 		return water_level;
 
 	float terrain_base   = noise_terrain_base->result[index];
@@ -304,13 +306,13 @@ float MapgenV6::baseTerrainLevelFromMap(int index)
 
 s16 MapgenV6::find_ground_level_from_noise(u64 seed, v2s16 p2d, s16 precision)
 {
-	return baseTerrainLevelFromNoise(p2d) + AVERAGE_MUD_AMOUNT;
+	return baseTerrainLevelFromNoise(p2d) + MGV6_AVERAGE_MUD_AMOUNT;
 }
 
 
 int MapgenV6::getGroundLevelAtPoint(v2s16 p)
 {
-	return baseTerrainLevelFromNoise(p) + AVERAGE_MUD_AMOUNT;
+	return baseTerrainLevelFromNoise(p) + MGV6_AVERAGE_MUD_AMOUNT;
 }
 
 
@@ -386,8 +388,8 @@ bool MapgenV6::getHaveAppleTree(v2s16 p)
 
 float MapgenV6::getMudAmount(int index)
 {
-	if (flags & MG_FLAT)
-		return AVERAGE_MUD_AMOUNT;
+	if ((spflags & MGV6_FLAT) || (flags & MG_FLAT))
+		return MGV6_AVERAGE_MUD_AMOUNT;
 
 	/*return ((float)AVERAGE_MUD_AMOUNT + 2.0 * noise2d_perlin(
 			0.5+(float)p.X/200, 0.5+(float)p.Y/200,
@@ -422,13 +424,13 @@ BiomeV6Type MapgenV6::getBiome(int index, v2s16 p)
 	if (spflags & MGV6_SNOWBIOMES) {
 		float blend = (spflags & MGV6_BIOMEBLEND) ? noise2d(p.X, p.Y, seed) / 40 : 0;
 
-		if (d > FREQ_HOT + blend) {
-			if (h > FREQ_JUNGLE + blend)
+		if (d > MGV6_FREQ_HOT + blend) {
+			if (h > MGV6_FREQ_JUNGLE + blend)
 				return BT_JUNGLE;
 			else
 				return BT_DESERT;
-		} else if (d < FREQ_SNOW + blend) {
-			if (h > FREQ_TAIGA + blend)
+		} else if (d < MGV6_FREQ_SNOW + blend) {
+			if (h > MGV6_FREQ_TAIGA + blend)
 				return BT_TAIGA;
 			else
 				return BT_TUNDRA;
@@ -579,11 +581,12 @@ void MapgenV6::makeChunk(BlockMakeData *data)
 	growGrass();
 
 	// Generate some trees, and add grass, if a jungle
-	if (flags & MG_TREES)
+	if ((spflags & MGV6_TREES) || (flags & MG_TREES))
 		placeTreesAndJungleGrass();
 
 	// Generate the registered decorations
-	m_emerge->decomgr->placeAllDecos(this, blockseed, node_min, node_max);
+	if (flags & MG_DECORATIONS)
+		m_emerge->decomgr->placeAllDecos(this, blockseed, node_min, node_max);
 
 	// Generate the registered ores
 	m_emerge->oremgr->placeAllOres(this, blockseed, node_min, node_max);
@@ -603,7 +606,7 @@ void MapgenV6::calculateNoise()
 	int fx = full_node_min.X;
 	int fz = full_node_min.Z;
 
-	if (!(flags & MG_FLAT)) {
+	if (!((spflags & MGV6_FLAT) || (flags & MG_FLAT))) {
 		noise_terrain_base->perlinMap2D_PO(x, 0.5, z, 0.5);
 		noise_terrain_higher->perlinMap2D_PO(x, 0.5, z, 0.5);
 		noise_steepness->perlinMap2D_PO(x, 0.5, z, 0.5);
@@ -646,11 +649,11 @@ int MapgenV6::generateGround()
 		for (s16 y = node_min.Y; y <= node_max.Y; y++) {
 			if (vm->m_data[i].getContent() == CONTENT_IGNORE) {
 				if (y <= surface_y) {
-					vm->m_data[i] = (y >= DESERT_STONE_BASE
+					vm->m_data[i] = (y >= MGV6_DESERT_STONE_BASE
 							&& bt == BT_DESERT) ?
 						n_desert_stone : n_stone;
 				} else if (y <= water_level) {
-					vm->m_data[i] = (y >= ICE_BASE
+					vm->m_data[i] = (y >= MGV6_ICE_BASE
 							&& bt == BT_TUNDRA) ?
 						n_ice : n_water_source;
 				} else {

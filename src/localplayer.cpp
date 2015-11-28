@@ -42,6 +42,7 @@ LocalPlayer::LocalPlayer(IGameDef *gamedef, const char *name):
 	last_pitch(0),
 	last_yaw(0),
 	last_keyPressed(0),
+	camera_impact(0.f),
 	last_animation(NO_ANIM),
 	hotbar_image(""),
 	hotbar_selected_image(""),
@@ -344,7 +345,7 @@ void LocalPlayer::move(f32 dtime, Environment *env, f32 pos_max_d,
 		}
 	}
 
-	if(!touching_ground_was && touching_ground){
+	if(!result.standing_on_object && !touching_ground_was && touching_ground) {
 		MtEvent *e = new SimpleTriggerEvent("PlayerRegainGround");
 		m_gamedef->event()->put(e);
 
@@ -512,15 +513,16 @@ void LocalPlayer::applyControl(float dtime)
 		}
 	}
 
-	if(continuous_forward)
+	if (continuous_forward)
 		speedH += move_direction;
 
-	if(control.up)
-	{
-		if(continuous_forward)
-			superspeed = true;
-		else
+	if (control.up) {
+		if (continuous_forward) {
+			if (fast_move)
+				superspeed = true;
+		} else {
 			speedH += move_direction;
+		}
 	}
 	if(control.down)
 	{

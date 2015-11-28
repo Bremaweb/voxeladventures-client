@@ -31,17 +31,18 @@ NoiseParams nparams_caveliquids(0, 1, v3f(150.0, 150.0, 150.0), 776, 3, 0.6, 2.0
 ///////////////////////////////////////// Caves V5
 
 
-CaveV5::CaveV5(MapgenV5 *mg, PseudoRandom *ps)
+CaveV5::CaveV5(Mapgen *mg, PseudoRandom *ps)
 {
 	this->mg             = mg;
 	this->vm             = mg->vm;
 	this->ndef           = mg->ndef;
 	this->water_level    = mg->water_level;
 	this->ps             = ps;
-	this->c_water_source = mg->c_water_source;
-	this->c_lava_source  = mg->c_lava_source;
-	this->c_ice          = mg->c_ice;
+	c_water_source       = ndef->getId("mapgen_water_source");
+	c_lava_source        = ndef->getId("mapgen_lava_source");
+	c_ice                = ndef->getId("mapgen_ice");
 	this->np_caveliquids = &nparams_caveliquids;
+	this->ystride        = mg->csize.X;
 
 	dswitchint = ps->range(1, 14);
 	flooded    = ps->range(1, 2) == 2;
@@ -149,7 +150,7 @@ void CaveV5::makeTunnel(bool dirswitch)
 	p = orpi + veci + of + rs / 2;
 	if (p.Z >= node_min.Z && p.Z <= node_max.Z &&
 			p.X >= node_min.X && p.X <= node_max.X) {
-		u32 index = (p.Z - node_min.Z) * mg->ystride + (p.X - node_min.X);
+		u32 index = (p.Z - node_min.Z) * ystride + (p.X - node_min.X);
 		s16 h = mg->heightmap[index];
 		if (h < p.Y)
 			return;
@@ -160,7 +161,7 @@ void CaveV5::makeTunnel(bool dirswitch)
 	p = orpi + of + rs / 2;
 	if (p.Z >= node_min.Z && p.Z <= node_max.Z &&
 			p.X >= node_min.X && p.X <= node_max.X) {
-		u32 index = (p.Z - node_min.Z) * mg->ystride + (p.X - node_min.X);
+		u32 index = (p.Z - node_min.Z) * ystride + (p.X - node_min.X);
 		s16 h = mg->heightmap[index];
 		if (h < p.Y)
 			return;
@@ -214,7 +215,8 @@ void CaveV5::carveRoute(v3f vec, float f, bool randomize_xz)
 
 	float nval = NoisePerlin3D(np_caveliquids, startp.X,
 		startp.Y, startp.Z, mg->seed);
-	MapNode liquidnode = nval < 0.40 ? lavanode : waternode;
+	MapNode liquidnode = (nval < 0.40 && node_max.Y < MGV5_LAVA_DEPTH) ?
+		lavanode : waternode;
 
 	v3f fp = orp + vec * f;
 	fp.X += 0.1 * ps->range(-10, 10);

@@ -29,7 +29,6 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "content_sao.h"
 #include "nodedef.h"
 #include "emerge.h"
-#include "content_mapnode.h" // For content_mapnode_get_new_name
 #include "voxelalgorithms.h"
 #include "porting.h"
 #include "profiler.h"
@@ -42,11 +41,12 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "log.h"
 
 FlagDesc flagdesc_mapgen[] = {
-	{"trees",    MG_TREES},
-	{"caves",    MG_CAVES},
-	{"dungeons", MG_DUNGEONS},
-	{"flat",     MG_FLAT},
-	{"light",    MG_LIGHT},
+	{"trees",       MG_TREES},
+	{"caves",       MG_CAVES},
+	{"dungeons",    MG_DUNGEONS},
+	{"flat",        MG_FLAT},
+	{"light",       MG_LIGHT},
+	{"decorations", MG_DECORATIONS},
 	{NULL,       0}
 };
 
@@ -62,8 +62,9 @@ FlagDesc flagdesc_gennotify[] = {
 };
 
 
-///////////////////////////////////////////////////////////////////////////////
-
+////
+//// Mapgen
+////
 
 Mapgen::Mapgen()
 {
@@ -153,6 +154,26 @@ s16 Mapgen::findGroundLevel(v2s16 p2d, s16 ymin, s16 ymax)
 	for (y = ymax; y >= ymin; y--) {
 		MapNode &n = vm->m_data[i];
 		if (ndef->get(n).walkable)
+			break;
+
+		vm->m_area.add_y(em, i, -1);
+	}
+	return (y >= ymin) ? y : -MAX_MAP_GENERATION_LIMIT;
+}
+
+
+// Returns -MAX_MAP_GENERATION_LIMIT if not found or if ground is found first
+s16 Mapgen::findLiquidSurface(v2s16 p2d, s16 ymin, s16 ymax)
+{
+	v3s16 em = vm->m_area.getExtent();
+	u32 i = vm->m_area.index(p2d.X, ymax, p2d.Y);
+	s16 y;
+
+	for (y = ymax; y >= ymin; y--) {
+		MapNode &n = vm->m_data[i];
+		if (ndef->get(n).walkable)
+			return -MAX_MAP_GENERATION_LIMIT;
+		else if (ndef->get(n).isLiquid())
 			break;
 
 		vm->m_area.add_y(em, i, -1);
@@ -341,8 +362,9 @@ void Mapgen::spreadLight(v3s16 nmin, v3s16 nmax)
 }
 
 
-
-///////////////////////////////////////////////////////////////////////////////
+////
+//// GenerateNotifier
+////
 
 GenerateNotifier::GenerateNotifier()
 {
@@ -408,7 +430,10 @@ void GenerateNotifier::getEvents(
 		m_notify_events.clear();
 }
 
-///////////////////////////////////////////////////////////////////////////////
+
+////
+//// MapgenParams
+////
 
 void MapgenParams::load(const Settings &settings)
 {
@@ -430,9 +455,11 @@ void MapgenParams::load(const Settings &settings)
 	settings.getNoiseParams("mg_biome_np_humidity_blend", np_biome_humidity_blend);
 
 	delete sparams;
-	sparams = EmergeManager::createMapgenParams(mg_name);
-	if (sparams)
+	MapgenFactory *mgfactory = EmergeManager::getMapgenFactory(mg_name);
+	if (mgfactory) {
+		sparams = mgfactory->createMapgenParams();
 		sparams->readParams(&settings);
+	}
 }
 
 
@@ -442,7 +469,7 @@ void MapgenParams::save(Settings &settings) const
 	settings.setU64("seed", seed);
 	settings.setS16("water_level", water_level);
 	settings.setS16("chunksize", chunksize);
-	settings.setFlagStr("mg_flags", flags, flagdesc_mapgen, (u32)-1);
+	settings.setFlagStr("mg_flags", flags, flagdesc_mapgen, U32_MAX);
 	settings.setNoiseParams("mg_biome_np_heat", np_biome_heat);
 	settings.setNoiseParams("mg_biome_np_heat_blend", np_biome_heat_blend);
 	settings.setNoiseParams("mg_biome_np_humidity", np_biome_humidity);

@@ -6,7 +6,16 @@
 --
 
 -- Initialize some very basic things
-print = core.debug
+function core.debug(...) core.log(table.concat({...}, "\t")) end
+if core.print then
+	local core_print = core.print
+	-- Override native print and use
+	-- terminal if that's turned on
+	function print(...)
+		core_print(table.concat({...}, "\t"))
+	end
+	core.print = nil -- don't pollute our namespace
+end
 math.randomseed(os.time())
 os.setlocale("C", "numeric")
 minetest = core

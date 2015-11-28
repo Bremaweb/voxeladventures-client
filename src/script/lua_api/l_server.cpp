@@ -30,6 +30,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 // request_shutdown()
 int ModApiServer::l_request_shutdown(lua_State *L)
 {
+	NO_MAP_LOCK_REQUIRED;
 	const char *msg = lua_tolstring(L, 1, NULL);
 	bool reconnect = lua_toboolean(L, 2);
 	getServer(L)->requestShutdown(msg ? msg : "", reconnect);
@@ -42,6 +43,16 @@ int ModApiServer::l_get_server_status(lua_State *L)
 	NO_MAP_LOCK_REQUIRED;
 	lua_pushstring(L, wide_to_narrow(getServer(L)->getStatusString()).c_str());
 	return 1;
+}
+
+// print(text)
+int ModApiServer::l_print(lua_State *L)
+{
+	NO_MAP_LOCK_REQUIRED;
+	std::string text;
+	text = luaL_checkstring(L, 1);
+	getServer(L)->printToConsoleOnly(text);
+	return 0;
 }
 
 // chat_send_all(text)
@@ -110,7 +121,7 @@ int ModApiServer::l_get_player_ip(lua_State *L)
 	}
 	catch(con::PeerNotFoundException) // unlikely
 	{
-		dstream << __FUNCTION_NAME << ": peer was not found" << std::endl;
+		dstream << FUNCTION_NAME << ": peer was not found" << std::endl;
 		lua_pushnil(L); // error
 		return 1;
 	}
@@ -136,7 +147,7 @@ int ModApiServer::l_get_player_information(lua_State *L)
 	}
 	catch(con::PeerNotFoundException) // unlikely
 	{
-		dstream << __FUNCTION_NAME << ": peer was not found" << std::endl;
+		dstream << FUNCTION_NAME << ": peer was not found" << std::endl;
 		lua_pushnil(L); // error
 		return 1;
 	}
@@ -150,7 +161,7 @@ int ModApiServer::l_get_player_information(lua_State *L)
 
 #define ERET(code)                                                             \
 	if (!(code)) {                                                             \
-		dstream << __FUNCTION_NAME << ": peer was not found" << std::endl;     \
+		dstream << FUNCTION_NAME << ": peer was not found" << std::endl;     \
 		lua_pushnil(L); /* error */                                            \
 		return 1;                                                              \
 	}
@@ -281,7 +292,7 @@ int ModApiServer::l_ban_player(lua_State *L)
 	}
 	catch(con::PeerNotFoundException) // unlikely
 	{
-		dstream << __FUNCTION_NAME << ": peer was not found" << std::endl;
+		dstream << FUNCTION_NAME << ": peer was not found" << std::endl;
 		lua_pushboolean(L, false); // error
 		return 1;
 	}
@@ -503,6 +514,8 @@ void ModApiServer::Initialize(lua_State *L, int top)
 	API_FCT(get_current_modname);
 	API_FCT(get_modpath);
 	API_FCT(get_modnames);
+
+	API_FCT(print);
 
 	API_FCT(chat_send_all);
 	API_FCT(chat_send_player);

@@ -18,8 +18,6 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 */
 
 #include "minimap.h"
-#include <math.h>
-#include "logoutputbuffer.h"
 #include "threading/mutex_auto_lock.h"
 #include "threading/semaphore.h"
 #include "clientmap.h"
@@ -28,6 +26,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "porting.h"
 #include "util/numeric.h"
 #include "util/string.h"
+#include <math.h>
 
 
 ////
@@ -216,6 +215,8 @@ Mapper::Mapper(IrrlichtDevice *device, Client *client)
 	this->m_tsrc    = client->getTextureSource();
 	this->m_shdrsrc = client->getShaderSource();
 	this->m_ndef    = client->getNodeDefManager();
+
+	m_angle = 0.f;
 
 	// Initialize static settings
 	m_enable_shaders = g_settings->getBool("enable_shaders");

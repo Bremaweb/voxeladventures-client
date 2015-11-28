@@ -673,7 +673,7 @@ void Map::updateLighting(enum LightBank bank,
 {
 	INodeDefManager *nodemgr = m_gamedef->ndef();
 
-	/*m_dout<<DTIME<<"Map::updateLighting(): "
+	/*m_dout<<"Map::updateLighting(): "
 			<<a_blocks.size()<<" blocks."<<std::endl;*/
 
 	//TimeTaker timer("updateLighting");
@@ -928,7 +928,7 @@ void Map::addNodeAndUpdate(v3s16 p, MapNode n,
 	INodeDefManager *ndef = m_gamedef->ndef();
 
 	/*PrintInfo(m_dout);
-	m_dout<<DTIME<<"Map::addNodeAndUpdate(): p=("
+	m_dout<<"Map::addNodeAndUpdate(): p=("
 			<<p.X<<","<<p.Y<<","<<p.Z<<")"<<std::endl;*/
 
 	/*
@@ -1028,7 +1028,7 @@ void Map::addNodeAndUpdate(v3s16 p, MapNode n,
 	{
 		s16 y = p.Y - 1;
 		for(;; y--){
-			//m_dout<<DTIME<<"y="<<y<<std::endl;
+			//m_dout<<"y="<<y<<std::endl;
 			v3s16 n2pos(p.X, y, p.Z);
 
 			MapNode n2;
@@ -1115,7 +1115,7 @@ void Map::removeNodeAndUpdate(v3s16 p,
 	INodeDefManager *ndef = m_gamedef->ndef();
 
 	/*PrintInfo(m_dout);
-	m_dout<<DTIME<<"Map::removeNodeAndUpdate(): p=("
+	m_dout<<"Map::removeNodeAndUpdate(): p=("
 			<<p.X<<","<<p.Y<<","<<p.Z<<")"<<std::endl;*/
 
 	bool node_under_sunlight = true;
@@ -1197,14 +1197,14 @@ void Map::removeNodeAndUpdate(v3s16 p,
 	if(node_under_sunlight)
 	{
 		s16 ybottom = propagateSunlight(p, modified_blocks);
-		/*m_dout<<DTIME<<"Node was under sunlight. "
+		/*m_dout<<"Node was under sunlight. "
 				"Propagating sunlight";
-		m_dout<<DTIME<<" -> ybottom="<<ybottom<<std::endl;*/
+		m_dout<<" -> ybottom="<<ybottom<<std::endl;*/
 		s16 y = p.Y;
 		for(; y >= ybottom; y--)
 		{
 			v3s16 p2(p.X, y, p.Z);
-			/*m_dout<<DTIME<<"lighting neighbors of node ("
+			/*m_dout<<"lighting neighbors of node ("
 					<<p2.X<<","<<p2.Y<<","<<p2.Z<<")"
 					<<std::endl;*/
 			lightNeighbors(LIGHTBANK_DAY, p2, modified_blocks);
@@ -1434,7 +1434,7 @@ void Map::timerUpdate(float dtime, float unload_timeout, u32 max_loaded_blocks,
 	beginSave();
 
 	// If there is no practical limit, we spare creation of mapblock_queue
-	if (max_loaded_blocks == (u32)-1) {
+	if (max_loaded_blocks == U32_MAX) {
 		for (std::map<v2s16, MapSector*>::iterator si = m_sectors.begin();
 				si != m_sectors.end(); ++si) {
 			MapSector *sector = si->second;
@@ -1619,7 +1619,7 @@ void Map::transformLiquids(std::map<v3s16, MapBlock*> & modified_blocks)
 
 	INodeDefManager *nodemgr = m_gamedef->ndef();
 
-	DSTACK(__FUNCTION_NAME);
+	DSTACK(FUNCTION_NAME);
 	//TimeTaker timer("transformLiquids()");
 
 	u32 loopcount = 0;
@@ -2018,7 +2018,7 @@ NodeMetadata *Map::getNodeMetadata(v3s16 p)
 		block = emergeBlock(blockpos, false);
 	}
 	if(!block){
-		infostream<<"WARNING: Map::getNodeMetadata(): Block not found"
+		warningstream<<"Map::getNodeMetadata(): Block not found"
 				<<std::endl;
 		return NULL;
 	}
@@ -2037,7 +2037,7 @@ bool Map::setNodeMetadata(v3s16 p, NodeMetadata *meta)
 		block = emergeBlock(blockpos, false);
 	}
 	if(!block){
-		infostream<<"WARNING: Map::setNodeMetadata(): Block not found"
+		warningstream<<"Map::setNodeMetadata(): Block not found"
 				<<std::endl;
 		return false;
 	}
@@ -2052,7 +2052,7 @@ void Map::removeNodeMetadata(v3s16 p)
 	MapBlock *block = getBlockNoCreateNoEx(blockpos);
 	if(block == NULL)
 	{
-		infostream<<"WARNING: Map::removeNodeMetadata(): Block not found"
+		warningstream<<"Map::removeNodeMetadata(): Block not found"
 				<<std::endl;
 		return;
 	}
@@ -2070,7 +2070,7 @@ NodeTimer Map::getNodeTimer(v3s16 p)
 		block = emergeBlock(blockpos, false);
 	}
 	if(!block){
-		infostream<<"WARNING: Map::getNodeTimer(): Block not found"
+		warningstream<<"Map::getNodeTimer(): Block not found"
 				<<std::endl;
 		return NodeTimer();
 	}
@@ -2089,7 +2089,7 @@ void Map::setNodeTimer(v3s16 p, NodeTimer t)
 		block = emergeBlock(blockpos, false);
 	}
 	if(!block){
-		infostream<<"WARNING: Map::setNodeTimer(): Block not found"
+		warningstream<<"Map::setNodeTimer(): Block not found"
 				<<std::endl;
 		return;
 	}
@@ -2103,7 +2103,7 @@ void Map::removeNodeTimer(v3s16 p)
 	MapBlock *block = getBlockNoCreateNoEx(blockpos);
 	if(block == NULL)
 	{
-		infostream<<"WARNING: Map::removeNodeTimer(): Block not found"
+		warningstream<<"Map::removeNodeTimer(): Block not found"
 				<<std::endl;
 		return;
 	}
@@ -2118,7 +2118,7 @@ ServerMap::ServerMap(std::string savedir, IGameDef *gamedef, EmergeManager *emer
 	m_emerge(emerge),
 	m_map_metadata_changed(true)
 {
-	verbosestream<<__FUNCTION_NAME<<std::endl;
+	verbosestream<<FUNCTION_NAME<<std::endl;
 
 	/*
 		Try to load map; if not found, create a new one.
@@ -2164,7 +2164,7 @@ ServerMap::ServerMap(std::string savedir, IGameDef *gamedef, EmergeManager *emer
 							  <<" Using default settings."<<std::endl;
 				}
 				catch(FileNotGoodException &e){
-					infostream<<"WARNING: Could not load map metadata"
+					warningstream<<"Could not load map metadata"
 							//<<" Disabling chunk-based generator."
 							<<std::endl;
 					//m_chunksize = 0;
@@ -2188,10 +2188,10 @@ ServerMap::ServerMap(std::string savedir, IGameDef *gamedef, EmergeManager *emer
 	}
 	catch(std::exception &e)
 	{
-		infostream<<"WARNING: ServerMap: Failed to load map from "<<savedir
+		warningstream<<"ServerMap: Failed to load map from "<<savedir
 				<<", exception: "<<e.what()<<std::endl;
 		infostream<<"Please remove the map or fix it."<<std::endl;
-		infostream<<"WARNING: Map saving will be disabled."<<std::endl;
+		warningstream<<"Map saving will be disabled."<<std::endl;
 	}
 
 	infostream<<"Initializing new map."<<std::endl;
@@ -2205,7 +2205,7 @@ ServerMap::ServerMap(std::string savedir, IGameDef *gamedef, EmergeManager *emer
 
 ServerMap::~ServerMap()
 {
-	verbosestream<<__FUNCTION_NAME<<std::endl;
+	verbosestream<<FUNCTION_NAME<<std::endl;
 
 	try
 	{
@@ -2254,75 +2254,51 @@ s16 ServerMap::getWaterLevel()
 	return m_emerge->params.water_level;
 }
 
-bool ServerMap::initBlockMake(BlockMakeData *data, v3s16 blockpos)
+bool ServerMap::initBlockMake(v3s16 blockpos, BlockMakeData *data)
 {
-	bool enable_mapgen_debug_info = m_emerge->mapgen_debug_info;
-	EMERGE_DBG_OUT("initBlockMake(): " PP(blockpos) " - " PP(blockpos));
+	s16 csize = m_emerge->params.chunksize;
+	v3s16 bpmin = EmergeManager::getContainingChunk(blockpos, csize);
+	v3s16 bpmax = bpmin + v3s16(1, 1, 1) * (csize - 1);
 
-	s16 chunksize = m_emerge->params.chunksize;
-	s16 coffset = -chunksize / 2;
-	v3s16 chunk_offset(coffset, coffset, coffset);
-	v3s16 blockpos_div = getContainerPos(blockpos - chunk_offset, chunksize);
-	v3s16 blockpos_min = blockpos_div * chunksize;
-	v3s16 blockpos_max = blockpos_div * chunksize + v3s16(1,1,1)*(chunksize-1);
-	blockpos_min += chunk_offset;
-	blockpos_max += chunk_offset;
+	bool enable_mapgen_debug_info = m_emerge->enable_mapgen_debug_info;
+	EMERGE_DBG_OUT("initBlockMake(): " PP(bpmin) " - " PP(bpmax));
 
-	v3s16 extra_borders(1,1,1);
+	v3s16 extra_borders(1, 1, 1);
+	v3s16 full_bpmin = bpmin - extra_borders;
+	v3s16 full_bpmax = bpmax + extra_borders;
 
 	// Do nothing if not inside limits (+-1 because of neighbors)
-	if(blockpos_over_limit(blockpos_min - extra_borders) ||
-		blockpos_over_limit(blockpos_max + extra_borders))
+	if (blockpos_over_limit(full_bpmin) ||
+		blockpos_over_limit(full_bpmax))
 		return false;
 
 	data->seed = m_emerge->params.seed;
-	data->blockpos_min = blockpos_min;
-	data->blockpos_max = blockpos_max;
+	data->blockpos_min = bpmin;
+	data->blockpos_max = bpmax;
 	data->blockpos_requested = blockpos;
 	data->nodedef = m_gamedef->ndef();
 
 	/*
 		Create the whole area of this and the neighboring blocks
 	*/
-	{
-		//TimeTaker timer("initBlockMake() create area");
+	for (s16 x = full_bpmin.X; x <= full_bpmax.X; x++)
+	for (s16 z = full_bpmin.Z; z <= full_bpmax.Z; z++) {
+		v2s16 sectorpos(x, z);
+		// Sector metadata is loaded from disk if not already loaded.
+		ServerMapSector *sector = createSector(sectorpos);
+		FATAL_ERROR_IF(sector == NULL, "createSector() failed");
 
-		for(s16 x=blockpos_min.X-extra_borders.X;
-				x<=blockpos_max.X+extra_borders.X; x++)
-		for(s16 z=blockpos_min.Z-extra_borders.Z;
-				z<=blockpos_max.Z+extra_borders.Z; z++)
-		{
-			v2s16 sectorpos(x, z);
-			// Sector metadata is loaded from disk if not already loaded.
-			ServerMapSector *sector = createSector(sectorpos);
-			FATAL_ERROR_IF(sector == NULL, "createSector() failed");
-			(void) sector;
+		for (s16 y = full_bpmin.Y; y <= full_bpmax.Y; y++) {
+			v3s16 p(x, y, z);
 
-			for(s16 y=blockpos_min.Y-extra_borders.Y;
-					y<=blockpos_max.Y+extra_borders.Y; y++)
-			{
-				v3s16 p(x,y,z);
-				//MapBlock *block = createBlock(p);
-				// 1) get from memory, 2) load from disk
-				MapBlock *block = emergeBlock(p, false);
-				// 3) create a blank one
-				if(block == NULL)
-				{
-					block = createBlock(p);
+			MapBlock *block = emergeBlock(p, false);
+			if (block == NULL) {
+				block = createBlock(p);
 
-					/*
-						Block gets sunlight if this is true.
-
-						Refer to the map generator heuristics.
-					*/
-					bool ug = m_emerge->isBlockUnderground(p);
-					block->setIsUnderground(ug);
-				}
-
-				// Lighting will not be valid after make_chunk is called
-				block->setLightingExpired(true);
-				// Lighting will be calculated
-				//block->setLightingExpired(false);
+				// Block gets sunlight if this is true.
+				// Refer to the map generator heuristics.
+				bool ug = m_emerge->isBlockUnderground(p);
+				block->setIsUnderground(ug);
 			}
 		}
 	}
@@ -2334,21 +2310,14 @@ bool ServerMap::initBlockMake(BlockMakeData *data, v3s16 blockpos)
 		neighboring blocks
 	*/
 
-	// The area that contains this block and it's neighbors
-	v3s16 bigarea_blocks_min = blockpos_min - extra_borders;
-	v3s16 bigarea_blocks_max = blockpos_max + extra_borders;
-
 	data->vmanip = new MMVManip(this);
-	//data->vmanip->setMap(this);
+	data->vmanip->initialEmerge(full_bpmin, full_bpmax);
 
-	// Add the area
-	{
-		//TimeTaker timer("initBlockMake() initialEmerge");
-		data->vmanip->initialEmerge(bigarea_blocks_min, bigarea_blocks_max);
-	}
-
-	// Ensure none of the blocks to be generated were marked as containing CONTENT_IGNORE
-/*	for (s16 z = blockpos_min.Z; z <= blockpos_max.Z; z++) {
+	// Note: we may need this again at some point.
+#if 0
+	// Ensure none of the blocks to be generated were marked as
+	// containing CONTENT_IGNORE
+	for (s16 z = blockpos_min.Z; z <= blockpos_max.Z; z++) {
 		for (s16 y = blockpos_min.Y; y <= blockpos_max.Y; y++) {
 			for (s16 x = blockpos_min.X; x <= blockpos_max.X; x++) {
 				core::map<v3s16, u8>::Node *n;
@@ -2360,124 +2329,62 @@ bool ServerMap::initBlockMake(BlockMakeData *data, v3s16 blockpos)
 				n->setValue(flags);
 			}
 		}
-	}*/
+	}
+#endif
 
 	// Data is ready now.
 	return true;
 }
 
 void ServerMap::finishBlockMake(BlockMakeData *data,
-		std::map<v3s16, MapBlock*> &changed_blocks)
+	std::map<v3s16, MapBlock*> *changed_blocks)
 {
-	v3s16 blockpos_min = data->blockpos_min;
-	v3s16 blockpos_max = data->blockpos_max;
-	v3s16 blockpos_requested = data->blockpos_requested;
-	/*infostream<<"finishBlockMake(): ("<<blockpos_requested.X<<","
-			<<blockpos_requested.Y<<","
-			<<blockpos_requested.Z<<")"<<std::endl;*/
+	v3s16 bpmin = data->blockpos_min;
+	v3s16 bpmax = data->blockpos_max;
 
-	v3s16 extra_borders(1,1,1);
+	v3s16 extra_borders(1, 1, 1);
+	v3s16 full_bpmin = bpmin - extra_borders;
+	v3s16 full_bpmax = bpmax + extra_borders;
 
-	bool enable_mapgen_debug_info = m_emerge->mapgen_debug_info;
+	bool enable_mapgen_debug_info = m_emerge->enable_mapgen_debug_info;
+	EMERGE_DBG_OUT("finishBlockMake(): " PP(bpmin) " - " PP(bpmax));
 
-	/*infostream<<"Resulting vmanip:"<<std::endl;
-	data->vmanip.print(infostream);*/
+	/*
+		Set lighting to non-expired state in all of them.
+		This is cheating, but it is not fast enough if all of them
+		would actually be updated.
+	*/
+	for (s16 x = full_bpmin.X; x <= full_bpmax.X; x++)
+	for (s16 z = full_bpmin.Z; z <= full_bpmax.Z; z++)
+	for (s16 y = full_bpmin.Y; y <= full_bpmax.Y; y++) {
+		MapBlock *block = emergeBlock(v3s16(x, y, z), false);
+		if (!block)
+			continue;
 
-	// Make sure affected blocks are loaded
-	for(s16 x=blockpos_min.X-extra_borders.X;
-			x<=blockpos_max.X+extra_borders.X; x++)
-	for(s16 z=blockpos_min.Z-extra_borders.Z;
-			z<=blockpos_max.Z+extra_borders.Z; z++)
-	for(s16 y=blockpos_min.Y-extra_borders.Y;
-			y<=blockpos_max.Y+extra_borders.Y; y++)
-	{
-		v3s16 p(x, y, z);
-		// Load from disk if not already in memory
-		emergeBlock(p, false);
+		block->setLightingExpired(false);
 	}
 
 	/*
 		Blit generated stuff to map
 		NOTE: blitBackAll adds nearly everything to changed_blocks
 	*/
-	{
-		// 70ms @cs=8
-		//TimeTaker timer("finishBlockMake() blitBackAll");
-		data->vmanip->blitBackAll(&changed_blocks);
-	}
+	data->vmanip->blitBackAll(changed_blocks);
 
-	EMERGE_DBG_OUT("finishBlockMake: changed_blocks.size()=" << changed_blocks.size());
+	EMERGE_DBG_OUT("finishBlockMake: changed_blocks.size()="
+		<< changed_blocks->size());
 
 	/*
 		Copy transforming liquid information
 	*/
-	while(data->transforming_liquid.size() > 0)
-	{
+	while (data->transforming_liquid.size()) {
 		m_transforming_liquid.push_back(data->transforming_liquid.front());
 		data->transforming_liquid.pop_front();
 	}
 
-	/*
-		Do stuff in central blocks
-	*/
-
-	/*
-		Update lighting
-	*/
-	{
-#if 0
-		TimeTaker t("finishBlockMake lighting update");
-
-		core::map<v3s16, MapBlock*> lighting_update_blocks;
-
-		// Center blocks
-		for(s16 x=blockpos_min.X-extra_borders.X;
-				x<=blockpos_max.X+extra_borders.X; x++)
-		for(s16 z=blockpos_min.Z-extra_borders.Z;
-				z<=blockpos_max.Z+extra_borders.Z; z++)
-		for(s16 y=blockpos_min.Y-extra_borders.Y;
-				y<=blockpos_max.Y+extra_borders.Y; y++)
-		{
-			v3s16 p(x, y, z);
-			MapBlock *block = getBlockNoCreateNoEx(p);
-			assert(block);
-			lighting_update_blocks.insert(block->getPos(), block);
-		}
-
-		updateLighting(lighting_update_blocks, changed_blocks);
-#endif
-
-		/*
-			Set lighting to non-expired state in all of them.
-			This is cheating, but it is not fast enough if all of them
-			would actually be updated.
-		*/
-		for(s16 x=blockpos_min.X-extra_borders.X;
-				x<=blockpos_max.X+extra_borders.X; x++)
-		for(s16 z=blockpos_min.Z-extra_borders.Z;
-				z<=blockpos_max.Z+extra_borders.Z; z++)
-		for(s16 y=blockpos_min.Y-extra_borders.Y;
-				y<=blockpos_max.Y+extra_borders.Y; y++)
-		{
-			v3s16 p(x, y, z);
-			MapBlock * block = getBlockNoCreateNoEx(p);
-			if (block != NULL)
-				block->setLightingExpired(false);
-		}
-
-#if 0
-		if(enable_mapgen_debug_info == false)
-			t.stop(true); // Hide output
-#endif
-	}
-
-	/*
-		Go through changed blocks
-	*/
-	for(std::map<v3s16, MapBlock*>::iterator i = changed_blocks.begin();
-			i != changed_blocks.end(); ++i)
-	{
-		MapBlock *block = i->second;
+	for (std::map<v3s16, MapBlock *>::iterator
+			it = changed_blocks->begin();
+			it != changed_blocks->end(); ++it) {
+		MapBlock *block = it->second;
 		if (!block)
 			continue;
 		/*
@@ -2494,14 +2401,13 @@ void ServerMap::finishBlockMake(BlockMakeData *data,
 	/*
 		Set central blocks as generated
 	*/
-	for(s16 x=blockpos_min.X; x<=blockpos_max.X; x++)
-	for(s16 z=blockpos_min.Z; z<=blockpos_max.Z; z++)
-	for(s16 y=blockpos_min.Y; y<=blockpos_max.Y; y++)
-	{
-		v3s16 p(x, y, z);
-		MapBlock *block = getBlockNoCreateNoEx(p);
+	for (s16 x = bpmin.X; x <= bpmax.X; x++)
+	for (s16 z = bpmin.Z; z <= bpmax.Z; z++)
+	for (s16 y = bpmin.Y; y <= bpmax.Y; y++) {
+		MapBlock *block = getBlockNoCreateNoEx(v3s16(x, y, z));
 		if (!block)
 			continue;
+
 		block->setGenerated(true);
 	}
 
@@ -2510,42 +2416,12 @@ void ServerMap::finishBlockMake(BlockMakeData *data,
 		NOTE: Will be saved later.
 	*/
 	//save(MOD_STATE_WRITE_AT_UNLOAD);
-
-	/*infostream<<"finishBlockMake() done for ("<<blockpos_requested.X
-			<<","<<blockpos_requested.Y<<","
-			<<blockpos_requested.Z<<")"<<std::endl;*/
-
-
-#if 0
-	if(enable_mapgen_debug_info)
-	{
-		/*
-			Analyze resulting blocks
-		*/
-		/*for(s16 x=blockpos_min.X-1; x<=blockpos_max.X+1; x++)
-		for(s16 z=blockpos_min.Z-1; z<=blockpos_max.Z+1; z++)
-		for(s16 y=blockpos_min.Y-1; y<=blockpos_max.Y+1; y++)*/
-		for(s16 x=blockpos_min.X-0; x<=blockpos_max.X+0; x++)
-		for(s16 z=blockpos_min.Z-0; z<=blockpos_max.Z+0; z++)
-		for(s16 y=blockpos_min.Y-0; y<=blockpos_max.Y+0; y++)
-		{
-			v3s16 p = v3s16(x,y,z);
-			MapBlock *block = getBlockNoCreateNoEx(p);
-			char spos[20];
-			snprintf(spos, 20, "(%2d,%2d,%2d)", x, y, z);
-			infostream<<"Generated "<<spos<<": "
-					<<analyze_block(block)<<std::endl;
-		}
-	}
-#endif
-
-	getBlockNoCreateNoEx(blockpos_requested);
 }
 
-ServerMapSector * ServerMap::createSector(v2s16 p2d)
+ServerMapSector *ServerMap::createSector(v2s16 p2d)
 {
 	DSTACKF("%s: p2d=(%d,%d)",
-			__FUNCTION_NAME,
+			FUNCTION_NAME,
 			p2d.X, p2d.Y);
 
 	/*
@@ -2612,7 +2488,7 @@ MapBlock * ServerMap::generateBlock(
 		std::map<v3s16, MapBlock*> &modified_blocks
 )
 {
-	DSTACKF("%s: p=(%d,%d,%d)", __FUNCTION_NAME, p.X, p.Y, p.Z);
+	DSTACKF("%s: p=(%d,%d,%d)", FUNCTION_NAME, p.X, p.Y, p.Z);
 
 	/*infostream<<"generateBlock(): "
 			<<"("<<p.X<<","<<p.Y<<","<<p.Z<<")"
@@ -2632,7 +2508,7 @@ MapBlock * ServerMap::generateBlock(
 	*/
 	if(blockpos_over_limit(p))
 	{
-		infostream<<__FUNCTION_NAME<<": Block position over limit"<<std::endl;
+		infostream<<FUNCTION_NAME<<": Block position over limit"<<std::endl;
 		throw InvalidPositionException("generateBlock(): pos. over limit");
 	}
 
@@ -2722,7 +2598,7 @@ MapBlock * ServerMap::generateBlock(
 MapBlock * ServerMap::createBlock(v3s16 p)
 {
 	DSTACKF("%s: p=(%d,%d,%d)",
-			__FUNCTION_NAME, p.X, p.Y, p.Z);
+			FUNCTION_NAME, p.X, p.Y, p.Z);
 
 	/*
 		Do not create over-limit
@@ -2781,7 +2657,7 @@ MapBlock * ServerMap::createBlock(v3s16 p)
 MapBlock * ServerMap::emergeBlock(v3s16 p, bool create_blank)
 {
 	DSTACKF("%s: p=(%d,%d,%d), create_blank=%d",
-			__FUNCTION_NAME,
+			FUNCTION_NAME,
 			p.X, p.Y, p.Z, create_blank);
 
 	{
@@ -2922,7 +2798,7 @@ void ServerMap::createDirs(std::string path)
 {
 	if(fs::CreateAllDirs(path) == false)
 	{
-		m_dout<<DTIME<<"ServerMap: Failed to create directory "
+		m_dout<<"ServerMap: Failed to create directory "
 				<<"\""<<path<<"\""<<std::endl;
 		throw BaseException("ServerMap failed to create directory");
 	}
@@ -3004,9 +2880,9 @@ std::string ServerMap::getBlockFilename(v3s16 p)
 
 void ServerMap::save(ModifiedState save_level)
 {
-	DSTACK(__FUNCTION_NAME);
+	DSTACK(FUNCTION_NAME);
 	if(m_map_saving_enabled == false) {
-		infostream<<"WARNING: Not saving map, saving disabled."<<std::endl;
+		warningstream<<"Not saving map, saving disabled."<<std::endl;
 		return;
 	}
 
@@ -3116,7 +2992,7 @@ void ServerMap::listAllLoadedBlocks(std::vector<v3s16> &dst)
 
 void ServerMap::saveMapMeta()
 {
-	DSTACK(__FUNCTION_NAME);
+	DSTACK(FUNCTION_NAME);
 
 	createDirs(m_savedir);
 
@@ -3140,7 +3016,7 @@ void ServerMap::saveMapMeta()
 
 void ServerMap::loadMapMeta()
 {
-	DSTACK(__FUNCTION_NAME);
+	DSTACK(FUNCTION_NAME);
 
 	Settings conf;
 	std::string fullpath = m_savedir + DIR_DELIM + "map_meta.txt";
@@ -3165,7 +3041,7 @@ void ServerMap::loadMapMeta()
 
 void ServerMap::saveSectorMeta(ServerMapSector *sector)
 {
-	DSTACK(__FUNCTION_NAME);
+	DSTACK(FUNCTION_NAME);
 	// Format used for writing
 	u8 version = SER_FMT_VER_HIGHEST_WRITE;
 	// Get destination
@@ -3186,7 +3062,7 @@ void ServerMap::saveSectorMeta(ServerMapSector *sector)
 
 MapSector* ServerMap::loadSectorMeta(std::string sectordir, bool save_after_load)
 {
-	DSTACK(__FUNCTION_NAME);
+	DSTACK(FUNCTION_NAME);
 	// Get destination
 	v2s16 p2d = getSectorPos(sectordir);
 
@@ -3227,7 +3103,7 @@ MapSector* ServerMap::loadSectorMeta(std::string sectordir, bool save_after_load
 
 bool ServerMap::loadSectorMeta(v2s16 p2d)
 {
-	DSTACK(__FUNCTION_NAME);
+	DSTACK(FUNCTION_NAME);
 
 	// The directory layout we're going to load from.
 	//  1 - original sectors/xxxxzzzz/
@@ -3269,7 +3145,7 @@ bool ServerMap::loadSectorMeta(v2s16 p2d)
 #if 0
 bool ServerMap::loadSectorFull(v2s16 p2d)
 {
-	DSTACK(__FUNCTION_NAME);
+	DSTACK(FUNCTION_NAME);
 
 	MapSector *sector = NULL;
 
@@ -3338,7 +3214,10 @@ bool ServerMap::loadSectorFull(v2s16 p2d)
 }
 #endif
 
-Database *ServerMap::createDatabase(const std::string &name, const std::string &savedir, Settings &conf)
+Database *ServerMap::createDatabase(
+	const std::string &name,
+	const std::string &savedir,
+	Settings &conf)
 {
 	if (name == "sqlite3")
 		return new Database_SQLite3(savedir);
@@ -3377,7 +3256,7 @@ bool ServerMap::saveBlock(MapBlock *block, Database *db)
 
 	// Dummy blocks are not written
 	if (block->isDummy()) {
-		errorstream << "WARNING: saveBlock: Not writing dummy block "
+		warningstream << "saveBlock: Not writing dummy block "
 			<< PP(p3d) << std::endl;
 		return true;
 	}
@@ -3405,7 +3284,7 @@ bool ServerMap::saveBlock(MapBlock *block, Database *db)
 void ServerMap::loadBlock(std::string sectordir, std::string blockfile,
 		MapSector *sector, bool save_after_load)
 {
-	DSTACK(__FUNCTION_NAME);
+	DSTACK(FUNCTION_NAME);
 
 	std::string fullpath = sectordir + DIR_DELIM + blockfile;
 	try {
@@ -3467,7 +3346,7 @@ void ServerMap::loadBlock(std::string sectordir, std::string blockfile,
 	}
 	catch(SerializationError &e)
 	{
-		infostream<<"WARNING: Invalid block data on disk "
+		warningstream<<"Invalid block data on disk "
 				<<"fullpath="<<fullpath
 				<<" (SerializationError). "
 				<<"what()="<<e.what()
@@ -3481,7 +3360,7 @@ void ServerMap::loadBlock(std::string sectordir, std::string blockfile,
 
 void ServerMap::loadBlock(std::string *blob, v3s16 p3d, MapSector *sector, bool save_after_load)
 {
-	DSTACK(__FUNCTION_NAME);
+	DSTACK(FUNCTION_NAME);
 
 	try {
 		std::istringstream is(*blob, std::ios_base::binary);
@@ -3549,7 +3428,7 @@ void ServerMap::loadBlock(std::string *blob, v3s16 p3d, MapSector *sector, bool 
 
 MapBlock* ServerMap::loadBlock(v3s16 blockpos)
 {
-	DSTACK(__FUNCTION_NAME);
+	DSTACK(FUNCTION_NAME);
 
 	v2s16 p2d(blockpos.X, blockpos.Z);
 
@@ -3583,6 +3462,7 @@ MapBlock* ServerMap::loadBlock(v3s16 blockpos)
 	/*
 		Make sure sector is loaded
 	*/
+
 	MapSector *sector = getSectorNoGenerateNoEx(p2d);
 	if(sector == NULL)
 	{

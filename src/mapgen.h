@@ -29,11 +29,12 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #define DEFAULT_MAPGEN "v6"
 
 /////////////////// Mapgen flags
-#define MG_TREES         0x01
-#define MG_CAVES         0x02
-#define MG_DUNGEONS      0x04
-#define MG_FLAT          0x08
-#define MG_LIGHT         0x10
+#define MG_TREES       0x01
+#define MG_CAVES       0x02
+#define MG_DUNGEONS    0x04
+#define MG_FLAT        0x08
+#define MG_LIGHT       0x10
+#define MG_DECORATIONS 0x20
 
 class Settings;
 class MMVManip;
@@ -126,10 +127,10 @@ struct MapgenParams {
 		chunksize(5),
 		seed(0),
 		water_level(1),
-		flags(MG_TREES | MG_CAVES | MG_LIGHT),
-		np_biome_heat(NoiseParams(50, 50, v3f(1000.0, 1000.0, 1000.0), 5349, 3, 0.5, 2.0)),
+		flags(MG_CAVES | MG_LIGHT | MG_DECORATIONS),
+		np_biome_heat(NoiseParams(50, 50, v3f(750.0, 750.0, 750.0), 5349, 3, 0.5, 2.0)),
 		np_biome_heat_blend(NoiseParams(0, 1.5, v3f(8.0, 8.0, 8.0), 13, 2, 1.0, 2.0)),
-		np_biome_humidity(NoiseParams(50, 50, v3f(1000.0, 1000.0, 1000.0), 842, 3, 0.5, 2.0)),
+		np_biome_humidity(NoiseParams(50, 50, v3f(750.0, 750.0, 750.0), 842, 3, 0.5, 2.0)),
 		np_biome_humidity_blend(NoiseParams(0, 1.5, v3f(8.0, 8.0, 8.0), 90003, 2, 1.0, 2.0)),
 		sparams(NULL)
 	{}
@@ -166,6 +167,7 @@ public:
 	static u32 getBlockSeed2(v3s16 p, int seed);
 	s16 findGroundLevelFull(v2s16 p2d);
 	s16 findGroundLevel(v2s16 p2d, s16 ymin, s16 ymax);
+	s16 findLiquidSurface(v2s16 p2d, s16 ymin, s16 ymax);
 	void updateHeightmap(v3s16 nmin, v3s16 nmax);
 	void updateLiquid(UniqueQueue<v3s16> *trans_liquid, v3s16 nmin, v3s16 nmax);
 
@@ -181,6 +183,9 @@ public:
 
 	virtual void makeChunk(BlockMakeData *data) {}
 	virtual int getGroundLevelAtPoint(v2s16 p) { return 0; }
+
+private:
+	DISABLE_CLASS_COPY(Mapgen);
 };
 
 struct MapgenFactory {

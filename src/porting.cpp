@@ -29,6 +29,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 	#include <sys/types.h>
 	#include <sys/sysctl.h>
 #elif defined(_WIN32)
+	#include <windows.h>
+	#include <wincrypt.h>
 	#include <algorithm>
 #endif
 #if !defined(_WIN32)
@@ -75,13 +77,13 @@ bool * signal_handler_killstatus(void)
 
 void sigint_handler(int sig)
 {
-	if(!g_killed) {
-		dstream<<DTIME<<"INFO: sigint_handler(): "
-				<<"Ctrl-C pressed, shutting down."<<std::endl;
+	if (!g_killed) {
+		dstream << "INFO: sigint_handler(): "
+			<< "Ctrl-C pressed, shutting down." << std::endl;
 
 		// Comment out for less clutter when testing scripts
-		/*dstream<<DTIME<<"INFO: sigint_handler(): "
-				<<"Printing debug stacks"<<std::endl;
+		/*dstream << "INFO: sigint_handler(): "
+				<< "Printing debug stacks" << std::endl;
 		debug_stacks_print();*/
 
 		g_killed = true;
@@ -105,8 +107,8 @@ BOOL WINAPI event_handler(DWORD sig)
 	case CTRL_CLOSE_EVENT:
 	case CTRL_LOGOFF_EVENT:
 	case CTRL_SHUTDOWN_EVENT:
-		if (g_killed == false) {
-			dstream << DTIME << "INFO: event_handler(): "
+		if (!g_killed) {
+			dstream << "INFO: event_handler(): "
 				<< "Ctrl+C, Close Event, Logoff Event or Shutdown Event,"
 				" shutting down." << std::endl;
 			g_killed = true;
@@ -136,6 +138,8 @@ void signal_handler_init(void)
 // Default to RUN_IN_PLACE style relative paths
 std::string path_share = "..";
 std::string path_user = "..";
+std::string path_locale = path_share + DIR_DELIM + "locale";
+
 
 std::string getDataPath(const char *subpath)
 {
@@ -399,14 +403,14 @@ bool setSystemPaths()
 		const std::string &trypath = *i;
 		if (!fs::PathExists(trypath) ||
 			!fs::PathExists(trypath + DIR_DELIM + "builtin")) {
-			dstream << "WARNING: system-wide share not found at \""
+			warningstream << "system-wide share not found at \""
 					<< trypath << "\""<< std::endl;
 			continue;
 		}
 
 		// Warn if was not the first alternative
 		if (i != trylist.begin()) {
-			dstream << "WARNING: system-wide share found at \""
+			warningstream << "system-wide share found at \""
 					<< trypath << "\"" << std::endl;
 		}
 
@@ -435,7 +439,7 @@ bool setSystemPaths()
 			TRUE, (UInt8 *)path, PATH_MAX)) {
 		path_share = std::string(path);
 	} else {
-		dstream << "WARNING: Could not determine bundle resource path" << std::endl;
+		warningstream << "Could not determine bundle resource path" << std::endl;
 	}
 	CFRelease(resources_url);
 
@@ -503,7 +507,6 @@ void initializePaths()
 		path_share = execpath;
 		path_user  = execpath;
 	}
-
 #else
 	infostream << "Using system-wide paths (NOT RUN_IN_PLACE)" << std::endl;
 
@@ -514,6 +517,32 @@ void initializePaths()
 
 	infostream << "Detected share path: " << path_share << std::endl;
 	infostream << "Detected user path: " << path_user << std::endl;
+
+	bool found_localedir = false;
+#ifdef STATIC_LOCALEDIR
+	if (STATIC_LOCALEDIR[0] && fs::PathExists(STATIC_LOCALEDIR)) {
+		found_localedir = true;
+		path_locale = STATIC_LOCALEDIR;
+		infostream << "Using locale directory " << STATIC_LOCALEDIR << std::endl;
+	} else {
+		path_locale = getDataPath("locale");
+		if (fs::PathExists(path_locale)) {
+			found_localedir = true;
+			infostream << "Using in-place locale directory " << path_locale
+				<< " even though a static one was provided "
+				<< "(RUN_IN_PLACE or CUSTOM_LOCALEDIR)." << std::endl;
+		}
+	}
+#else
+	path_locale = getDataPath("locale");
+	if (fs::PathExists(path_locale)) {
+		found_localedir = true;
+	}
+#endif
+	if (!found_localedir) {
+		errorstream << "Couldn't find a locale directory!" << std::endl;
+	}
+
 }
 
 
@@ -674,5 +703,44 @@ v2u32 getDisplaySize()
 #	endif // __ANDROID__
 #endif // SERVER
 
-} //namespace porting
 
+////
+//// OS-specific Secure Random
+////
+
+#ifdef WIN32
+
+bool secure_rand_fill_buf(void *buf, size_t len)
+{
+	HCRYPTPROV wctx;
+
+	if (!CryptAcquireContext(&wctx, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT))
+		return false;
+
+	CryptGenRandom(wctx, len, (BYTE *)buf);
+	CryptReleaseContext(wctx, 0);
+	return true;
+}
+
+#else
+
+bool secure_rand_fill_buf(void *buf, size_t len)
+{
+	// N.B.  This function checks *only* for /dev/urandom, because on most
+	// common OSes it is non-blocking, whereas /dev/random is blocking, and it
+	// is exceptionally uncommon for there to be a situation where /dev/random
+	// exists but /dev/urandom does not.  This guesswork is necessary since
+	// random devices are not covered by any POSIX standard...
+	FILE *fp = fopen("/dev/urandom", "rb");
+	if (!fp)
+		return false;
+
+	bool success = fread(buf, len, 1, fp) == 1;
+
+	fclose(fp);
+	return success;
+}
+
+#endif
+
+} //namespace porting

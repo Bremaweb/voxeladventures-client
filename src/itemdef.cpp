@@ -80,6 +80,7 @@ ItemDefinition& ItemDefinition::operator=(const ItemDefinition &def)
 	groups = def.groups;
 	node_placement_prediction = def.node_placement_prediction;
 	sound_place = def.sound_place;
+	sound_place_failed = def.sound_place_failed;
 	range = def.range;
 	return *this;
 }
@@ -114,6 +115,7 @@ void ItemDefinition::reset()
 	}
 	groups.clear();
 	sound_place = SimpleSoundSpec();
+	sound_place_failed = SimpleSoundSpec();
 	range = -1;
 
 	node_placement_prediction = "";
@@ -155,8 +157,10 @@ void ItemDefinition::serialize(std::ostream &os, u16 protocol_version) const
 		os<<serializeString(sound_place.name);
 		writeF1000(os, sound_place.gain);
 	}
-	if(protocol_version > 20){
+	if (protocol_version > 20) {
 		writeF1000(os, range);
+		os << serializeString(sound_place_failed.name);
+		writeF1000(os, sound_place_failed.gain);
 	}
 }
 
@@ -211,8 +215,10 @@ void ItemDefinition::deSerialize(std::istream &is)
 	}
 	// If you add anything here, insert it primarily inside the try-catch
 	// block to not need to increase the version.
-	try{
-	}catch(SerializationError &e) {};
+	try {
+		sound_place_failed.name = deSerializeString(is);
+		sound_place_failed.gain = readF1000(is);
+	} catch(SerializationError &e) {};
 }
 
 /*
@@ -241,7 +247,7 @@ public:
 	{
 
 #ifndef SERVER
-		m_main_thread = get_current_thread_id();
+		m_main_thread = thr_get_current_thread_id();
 #endif
 		clear();
 	}
@@ -317,7 +323,7 @@ public:
 				<<name<<"\""<<std::endl;
 
 		// This is not thread-safe
-		sanity_check(get_current_thread_id() == m_main_thread);
+		sanity_check(thr_is_current_thread(m_main_thread));
 
 		// Skip if already in cache
 		ClientCached *cc = NULL;
@@ -448,7 +454,7 @@ public:
 		if(cc)
 			return cc;
 
-		if(get_current_thread_id() == m_main_thread)
+		if(thr_is_current_thread(m_main_thread))
 		{
 			return createClientCachedDirect(name, gamedef);
 		}

@@ -1,6 +1,7 @@
 /*
 Minetest
-Copyright (C) 2010-2013 kwolekr, Ryan Kwolek <kwolekr@minetest.net>
+Copyright (C) 2010-2015 kwolekr, Ryan Kwolek <kwolekr@minetest.net>
+Copyright (C) 2010-2015 paramat, Matt Gregory
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by
@@ -27,6 +28,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "content_sao.h"
 #include "nodedef.h"
 #include "voxelalgorithms.h"
+//#include "profiler.h" // For TimeTaker
 #include "settings.h" // For g_settings
 #include "emerge.h"
 #include "dungeongen.h"
@@ -159,7 +161,7 @@ void MapgenV5Params::readParams(const Settings *settings)
 
 void MapgenV5Params::writeParams(Settings *settings) const
 {
-	settings->setFlagStr("mgv5_spflags", spflags, flagdesc_mapgen_v5, (u32)-1);
+	settings->setFlagStr("mgv5_spflags", spflags, flagdesc_mapgen_v5, U32_MAX);
 
 	settings->setNoiseParams("mgv5_np_filler_depth", np_filler_depth);
 	settings->setNoiseParams("mgv5_np_factor",       np_factor);
@@ -181,23 +183,24 @@ int MapgenV5::getGroundLevelAtPoint(v2s16 p)
 		f *= 1.6;
 	float h = NoisePerlin2D(&noise_height->np, p.X, p.Y, seed);
 
-	s16 search_top = water_level + 15;
-	s16 search_base = water_level;
+	s16 search_start = 128; // Only bother searching this range, actual
+	s16 search_end = -128;  // ground level is rarely higher or lower.
 
-	s16 level = -31000;
-	for (s16 y = search_top; y >= search_base; y--) {
+	for (s16 y = search_start; y >= search_end; y--) {
 		float n_ground = NoisePerlin3D(&noise_ground->np, p.X, y, p.Y, seed);
+		// If solid
 		if (n_ground * f > y - h) {
-			if (y >= search_top - 7)
-				break;
+			// If either top 2 nodes of search are solid this is inside a
+			// mountain or floatland with no space for the player to spawn.
+			if (y >= search_start - 1)
+				return MAX_MAP_GENERATION_LIMIT;
 			else
-				level = y;
-				break;
+				return y; // Ground below at least 2 nodes of space
 		}
 	}
 
 	//printf("getGroundLevelAtPoint: %dus\n", t.stop());
-	return level;
+	return -MAX_MAP_GENERATION_LIMIT;
 }
 
 
@@ -293,7 +296,8 @@ void MapgenV5::makeChunk(BlockMakeData *data)
 	}
 
 	// Generate the registered decorations
-	m_emerge->decomgr->placeAllDecos(this, blockseed, node_min, node_max);
+	if (flags & MG_DECORATIONS)
+		m_emerge->decomgr->placeAllDecos(this, blockseed, node_min, node_max);
 
 	// Generate the registered ores
 	m_emerge->oremgr->placeAllOres(this, blockseed, node_min, node_max);
@@ -428,7 +432,7 @@ MgStoneType MapgenV5::generateBiomes(float *heat_map, float *humidity_map)
 
 		// If there is air or water above enable top/filler placement, otherwise force
 		// nplaced to stone level by setting a number exceeding any possible filler depth.
-		u16 nplaced = (air_above || water_above) ? 0 : (u16)-1;
+		u16 nplaced = (air_above || water_above) ? 0 : U16_MAX;
 
 		for (s16 y = node_max.Y; y >= node_min.Y; y--) {
 			content_t c = vm->m_data[vi].getContent();
@@ -465,7 +469,7 @@ MgStoneType MapgenV5::generateBiomes(float *heat_map, float *humidity_map)
 				// This is done by aborting the cycle of top/filler placement
 				// immediately by forcing nplaced to stone level.
 				if (c_below == CONTENT_AIR || c_below == c_water_source)
-					nplaced = (u16)-1;
+					nplaced = U16_MAX;
 
 				if (nplaced < depth_top) {
 					vm->m_data[vi] = MapNode(biome->c_top);
@@ -490,7 +494,7 @@ MgStoneType MapgenV5::generateBiomes(float *heat_map, float *humidity_map)
 				air_above = true;
 				water_above = false;
 			} else {  // Possible various nodes overgenerated from neighbouring mapchunks
-				nplaced = (u16)-1;  // Disable top/filler placement
+				nplaced = U16_MAX;  // Disable top/filler placement
 				air_above = false;
 				water_above = false;
 			}
@@ -525,7 +529,7 @@ void MapgenV5::generateCaves(int max_stone_y)
 		}
 	}
 
-	if (node_max.Y > LARGE_CAVE_DEPTH)
+	if (node_max.Y > MGV5_LARGE_CAVE_DEPTH)
 		return;
 
 	PseudoRandom ps(blockseed + 21343);

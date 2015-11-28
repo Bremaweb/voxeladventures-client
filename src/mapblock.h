@@ -504,7 +504,7 @@ public:
 
 	// These don't write or read version by itself
 	// Set disk to true for on-disk format, false for over-the-network format
-	// Precondition: version >= SER_FMT_CLIENT_VER_LOWEST
+	// Precondition: version >= SER_FMT_VER_LOWEST_WRITE
 	void serialize(std::ostream &os, u8 version, bool disk);
 	// If disk == true: In addition to doing other things, will add
 	// unknown blocks from id-name mapping to wndef
@@ -636,6 +636,18 @@ private:
 };
 
 typedef std::vector<MapBlock*> MapBlockVect;
+
+inline bool objectpos_over_limit(v3f p)
+{
+	const static float map_gen_limit_bs = MYMIN(MAX_MAP_GENERATION_LIMIT,
+		g_settings->getU16("map_generation_limit")) * BS;
+	return (p.X < -map_gen_limit_bs
+		|| p.X >  map_gen_limit_bs
+		|| p.Y < -map_gen_limit_bs
+		|| p.Y >  map_gen_limit_bs
+		|| p.Z < -map_gen_limit_bs
+		|| p.Z >  map_gen_limit_bs);
+}
 
 inline bool blockpos_over_limit(v3s16 p)
 {

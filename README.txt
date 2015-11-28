@@ -159,6 +159,7 @@ CMAKE_BUILD_TYPE    - Type of build (Release vs. Debug)
     RelWithDebInfo  - Release build with Debug information
     MinSizeRel      - Release build with -Os passed to compiler to make executable as small as possible
 ENABLE_CURL         - Build with cURL; Enables use of online mod repo, public serverlist and remote media fetching via http
+ENABLE_CURSES       - Build with (n)curses; Enables a server side terminal (command line option: --terminal)
 ENABLE_FREETYPE     - Build with FreeType2; Allows using TTF fonts
 ENABLE_GETTEXT      - Build with Gettext; Allows using translations
 ENABLE_GLES         - Search for Open GLES headers & libraries and use them
@@ -381,7 +382,7 @@ BlockMen:
 erlehmann:
   misc/minetest-icon-24x24.png
   misc/minetest-icon.ico
-  misc/minetest-icon.svg
+  misc/minetest.svg
   textures/base/pack/logo.png
 
 License of Minetest source code

@@ -40,6 +40,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "mapnode.h"
 #include "mapblock.h"
 #include "threading/mutex.h"
+#include "threading/atomic.h"
 #include "network/networkprotocol.h" // for AccessDeniedCode
 
 class ServerEnvironment;
@@ -52,6 +53,7 @@ class ServerMap;
 class ClientMap;
 class GameScripting;
 class Player;
+class RemotePlayer;
 
 class Environment
 {
@@ -71,8 +73,7 @@ public:
 	virtual Map & getMap() = 0;
 
 	virtual void addPlayer(Player *player);
-	void removePlayer(u16 peer_id);
-	void removePlayer(const char *name);
+	void removePlayer(Player *player);
 	Player * getPlayer(u16 peer_id);
 	Player * getPlayer(const char *name);
 	Player * getRandomConnectedPlayer();
@@ -92,11 +93,7 @@ public:
 	void setTimeOfDaySpeed(float speed);
 	float getTimeOfDaySpeed();
 
-	void setDayNightRatioOverride(bool enable, u32 value)
-	{
-		m_enable_day_night_ratio_override = enable;
-		m_day_night_ratio_override = value;
-	}
+	void setDayNightRatioOverride(bool enable, u32 value);
 
 	// counter used internally when triggering ABMs
 	u32 m_added_objects;
@@ -104,16 +101,25 @@ public:
 protected:
 	// peer_ids in here should be unique, except that there may be many 0s
 	std::vector<Player*> m_players;
+
+	GenericAtomic<float> m_time_of_day_speed;
+
+	/*
+	 * Below: values managed by m_time_lock
+	*/
 	// Time of day in milli-hours (0-23999); determines day and night
 	u32 m_time_of_day;
 	// Time of day in 0...1
 	float m_time_of_day_f;
-	float m_time_of_day_speed;
-	// Used to buffer dtime for adding to m_time_of_day
-	float m_time_counter;
+	// Stores the skew created by the float -> u32 conversion
+	// to be applied at next conversion, so that there is no real skew.
+	float m_time_conversion_skew;
 	// Overriding the day-night ratio is useful for custom sky visuals
 	bool m_enable_day_night_ratio_override;
 	u32 m_day_night_ratio_override;
+	/*
+	 * Above: values managed by m_time_lock
+	*/
 
 	/* TODO: Add a callback function so these can be updated when a setting
 	 *       changes.  At this point in time it doesn't matter (e.g. /set
@@ -127,9 +133,9 @@ protected:
 	bool m_cache_enable_shaders;
 
 private:
-	Mutex m_timeofday_lock;
 	Mutex m_time_lock;
 
+	DISABLE_CLASS_COPY(Environment);
 };
 
 /*
@@ -155,6 +161,8 @@ public:
 	virtual float getTriggerInterval() = 0;
 	// Random chance of (1 / return value), 0 is disallowed
 	virtual u32 getTriggerChance() = 0;
+	// Whether to modify chance to simulate time lost by an unnattended block
+	virtual bool getSimpleCatchUp() = 0;
 	// This is called usually at interval for 1/chance of the nodes
 	virtual void trigger(ServerEnvironment *env, v3s16 p, MapNode n){};
 	virtual void trigger(ServerEnvironment *env, v3s16 p, MapNode n,
@@ -226,7 +234,7 @@ public:
 		const std::string &str_reason, bool reconnect);
 	// Save players
 	void saveLoadedPlayers();
-	void savePlayer(const std::string &playername);
+	void savePlayer(RemotePlayer *player);
 	Player *loadPlayer(const std::string &playername);
 
 	/*
@@ -265,19 +273,19 @@ public:
 		Find out what new objects have been added to
 		inside a radius around a position
 	*/
-	void getAddedActiveObjects(v3s16 pos, s16 radius,
+	void getAddedActiveObjects(Player *player, s16 radius,
 			s16 player_radius,
 			std::set<u16> &current_objects,
-			std::set<u16> &added_objects);
+			std::queue<u16> &added_objects);
 
 	/*
 		Find out what new objects have been removed from
 		inside a radius around a position
 	*/
-	void getRemovedActiveObjects(v3s16 pos, s16 radius,
+	void getRemovedActiveObjects(Player* player, s16 radius,
 			s16 player_radius,
 			std::set<u16> &current_objects,
-			std::set<u16> &removed_objects);
+			std::queue<u16> &removed_objects);
 
 	/*
 		Get the next message emitted by some active object.
@@ -534,7 +542,7 @@ private:
 	IrrlichtDevice *m_irr;
 	std::map<u16, ClientActiveObject*> m_active_objects;
 	std::vector<ClientSimpleObject*> m_simple_objects;
-	std::list<ClientEnvEvent> m_client_event_queue;
+	std::queue<ClientEnvEvent> m_client_event_queue;
 	IntervalLimiter m_active_object_light_update_interval;
 	IntervalLimiter m_lava_hurt_interval;
 	IntervalLimiter m_drowning_interval;

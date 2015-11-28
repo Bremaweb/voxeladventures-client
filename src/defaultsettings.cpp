@@ -33,6 +33,7 @@ void set_default_settings(Settings *settings)
 	// Client stuff
 	settings->setDefault("remote_port", "30000");
 	settings->setDefault("keymap_forward", "KEY_KEY_W");
+	settings->setDefault("keymap_autorun", "");
 	settings->setDefault("keymap_backward", "KEY_KEY_S");
 	settings->setDefault("keymap_left", "KEY_KEY_A");
 	settings->setDefault("keymap_right", "KEY_KEY_D");
@@ -246,6 +247,7 @@ void set_default_settings(Settings *settings)
 	settings->setDefault("default_privs", "interact, shout");
 	settings->setDefault("player_transfer_distance", "0");
 	settings->setDefault("enable_pvp", "true");
+	settings->setDefault("vertical_spawn_range", "16");
 	settings->setDefault("disallow_empty_password", "false");
 	settings->setDefault("disable_anticheat", "false");
 	settings->setDefault("enable_rollback_recording", "false");
@@ -280,7 +282,7 @@ void set_default_settings(Settings *settings)
 	settings->setDefault("dedicated_server_step", "0.1");
 	settings->setDefault("ignore_world_load_errors", "false");
 	settings->setDefault("remote_media", "");
-	settings->setDefault("debug_log_level", "2");
+	settings->setDefault("debug_log_level", "action");
 	settings->setDefault("emergequeue_limit_total", "256");
 	settings->setDefault("emergequeue_limit_diskonly", "32");
 	settings->setDefault("emergequeue_limit_generate", "32");
@@ -312,7 +314,7 @@ void set_default_settings(Settings *settings)
 	settings->setDefault("water_level", "1");
 	settings->setDefault("chunksize", "5");
 	settings->setDefault("mg_flags", "dungeons");
-	settings->setDefault("mgv6_spflags", "jungles, snowbiomes");
+	settings->setDefault("mgv6_spflags", "jungles, snowbiomes, trees");
 
 	// IPv6
 	settings->setDefault("enable_ipv6", "true");

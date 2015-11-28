@@ -512,6 +512,9 @@ public:
 	Mapper* getMapper ()
 	{ return m_mapper; }
 
+	bool isMinimapDisabledByServer()
+	{ return m_minimap_disabled_by_server; }
+
 	// IGameDef interface
 	virtual IItemDefManager* getItemDefManager();
 	virtual INodeDefManager* getNodeDefManager();
@@ -593,6 +596,7 @@ private:
 	con::Connection m_con;
 	IrrlichtDevice *m_device;
 	Mapper *m_mapper;
+	bool m_minimap_disabled_by_server;
 	// Server serialization version
 	u8 m_server_ser_ver;
 
@@ -681,6 +685,8 @@ private:
 	// TODO: Add callback to update these when g_settings changes
 	bool m_cache_smooth_lighting;
 	bool m_cache_enable_shaders;
+
+	DISABLE_CLASS_COPY(Client);
 };
 
 #endif // !CLIENT_HEADER

@@ -393,7 +393,7 @@ std::string LuaEntitySAO::getClientInitializationData(u16 protocol_version)
 
 std::string LuaEntitySAO::getStaticData()
 {
-	verbosestream<<__FUNCTION_NAME<<std::endl;
+	verbosestream<<FUNCTION_NAME<<std::endl;
 	std::ostringstream os(std::ios::binary);
 	// version
 	writeU8(os, 1);
@@ -821,8 +821,8 @@ void PlayerSAO::removingFromEnvironment()
 	{
 		m_player->setPlayerSAO(NULL);
 		m_player->peer_id = 0;
-		m_env->savePlayer(m_player->getName());
-		m_env->removePlayer(m_player->getName());
+		m_env->savePlayer((RemotePlayer*)m_player);
+		m_env->removePlayer(m_player);
 	}
 }
 
