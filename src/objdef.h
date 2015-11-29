@@ -93,7 +93,7 @@ protected:
 	ObjDefType m_objtype;
 
 private:
-	DISABLE_CLASS_COPY(ObjDefManager);
+	//DISABLE_CLASS_COPY(ObjDefManager);
 };
 
 #endif

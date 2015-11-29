@@ -61,7 +61,7 @@ private:
 	pthread_mutex_t mutex;
 #endif
 
-	DISABLE_CLASS_COPY(Mutex);
+	//DISABLE_CLASS_COPY(Mutex);
 };
 
 #endif  // C++11

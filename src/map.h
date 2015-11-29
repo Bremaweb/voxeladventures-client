@@ -366,7 +366,7 @@ private:
 	u32 m_inc_trending_up_start_time; // milliseconds
 	bool m_queue_size_timer_started;
 
-	DISABLE_CLASS_COPY(Map);
+	//DISABLE_CLASS_COPY(Map);
 };
 
 /*

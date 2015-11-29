@@ -48,7 +48,7 @@ private:
 	sem_t semaphore;
 #endif
 
-	DISABLE_CLASS_COPY(Semaphore);
+	//DISABLE_CLASS_COPY(Semaphore);
 };
 
 #endif

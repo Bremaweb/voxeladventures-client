@@ -165,7 +165,7 @@ private:
 
 	friend class EmergeThread;
 
-	DISABLE_CLASS_COPY(EmergeManager);
+	//DISABLE_CLASS_COPY(EmergeManager);
 };
 
 #endif

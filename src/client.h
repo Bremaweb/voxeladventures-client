@@ -686,7 +686,7 @@ private:
 	bool m_cache_smooth_lighting;
 	bool m_cache_enable_shaders;
 
-	DISABLE_CLASS_COPY(Client);
+	//DISABLE_CLASS_COPY(Client);
 };
 
 #endif // !CLIENT_HEADER

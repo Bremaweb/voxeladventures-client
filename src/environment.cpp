@@ -1114,11 +1114,15 @@ void ServerEnvironment::step(float dtime)
 	/*
 		Mess around in active blocks
 	*/
+	const float abm_interval = 1.0;
 	if(m_active_blocks_nodemetadata_interval.step(dtime, 1.0))
 	{
 		ScopeProfiler sp(g_profiler, "SEnv: mess in act. blocks avg /1s", SPT_AVG);
 
 		float dtime = 1.0;
+
+		// Initialize handling of ActiveBlockModifiers
+		ABMHandler abmhandler(m_abms, abm_interval, this, true);
 
 		for(std::set<v3s16>::iterator
 				i = m_active_blocks.m_list.begin();
@@ -1138,6 +1142,9 @@ void ServerEnvironment::step(float dtime)
 
 			// Set current time as timestamp
 			block->setTimestampNoChangedFlag(m_game_time);
+
+			abmhandler.apply(block);
+
 			// If time has changed much from the one on disk,
 			// set block to be saved when it is unloaded
 			if(block->getTimestamp() > block->getDiskTimestamp() + 60)
@@ -1160,50 +1167,6 @@ void ServerEnvironment::step(float dtime)
 			}
 		}
 	}
-
-	const float abm_interval = 1.0;
-	if(m_active_block_modifier_interval.step(dtime, abm_interval))
-	do{ // breakable
-		if(m_active_block_interval_overload_skip > 0){
-			ScopeProfiler sp(g_profiler, "SEnv: ABM overload skips");
-			m_active_block_interval_overload_skip--;
-			break;
-		}
-		ScopeProfiler sp(g_profiler, "SEnv: modify in blocks avg /1s", SPT_AVG);
-		TimeTaker timer("modify in active blocks");
-
-		// Initialize handling of ActiveBlockModifiers
-		ABMHandler abmhandler(m_abms, abm_interval, this, true);
-
-		for(std::set<v3s16>::iterator
-				i = m_active_blocks.m_list.begin();
-				i != m_active_blocks.m_list.end(); ++i)
-		{
-			v3s16 p = *i;
-
-			/*infostream<<"Server: Block ("<<p.X<<","<<p.Y<<","<<p.Z
-					<<") being handled"<<std::endl;*/
-
-			MapBlock *block = m_map->getBlockNoCreateNoEx(p);
-			if(block == NULL)
-				continue;
-
-			// Set current time as timestamp
-			block->setTimestampNoChangedFlag(m_game_time);
-
-			/* Handle ActiveBlockModifiers */
-			abmhandler.apply(block);
-		}
-
-		u32 time_ms = timer.stop(true);
-		u32 max_time_ms = 200;
-		if(time_ms > max_time_ms){
-			warningstream<<"active block modifiers took "
-					<<time_ms<<"ms (longer than "
-					<<max_time_ms<<"ms)"<<std::endl;
-			m_active_block_interval_overload_skip = (time_ms / max_time_ms) + 1;
-		}
-	}while(0);
 
 	/*
 		Step script environment (run global on_step())

@@ -185,7 +185,7 @@ public:
 	virtual int getGroundLevelAtPoint(v2s16 p) { return 0; }
 
 private:
-	DISABLE_CLASS_COPY(Mapgen);
+	//DISABLE_CLASS_COPY(Mapgen);
 };
 
 struct MapgenFactory {

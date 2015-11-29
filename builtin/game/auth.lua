@@ -48,7 +48,7 @@ local function read_auth_file()
 				error("Invalid line in auth.txt: "..dump(line))
 			end
 			local privileges = core.string_to_privs(privilege_string)
-			newtable[name] = {password=password, privileges=privileges, last_login=last_login}
+			newtable[string.lower(name)] = {password=password, privileges=privileges, last_login=last_login}
 		end
 	end
 	io.close(file)
@@ -88,6 +88,7 @@ core.builtin_auth_handler = {
 		-- always has an empty password, otherwise use default, which is
 		-- usually empty too)
 		local new_password_hash = ""
+		name = string.lower(name)
 		-- If not in authentication table, return nil
 		if not core.auth_table[name] then
 			return nil
@@ -119,9 +120,10 @@ core.builtin_auth_handler = {
 			last_login = core.auth_table[name].last_login,
 		}
 	end,
-	create_auth = function(name, password)
+	create_auth = function(name, password)		
 		assert(type(name) == "string")
 		assert(type(password) == "string")
+		name = string.lower(name)
 		core.log('info', "Built-in authentication handler adding player '"..name.."'")
 		core.auth_table[name] = {
 			password = password,
@@ -133,6 +135,7 @@ core.builtin_auth_handler = {
 	set_password = function(name, password)
 		assert(type(name) == "string")
 		assert(type(password) == "string")
+		name = string.lower(name)
 		if not core.auth_table[name] then
 			core.builtin_auth_handler.create_auth(name, password)
 		else
@@ -145,6 +148,7 @@ core.builtin_auth_handler = {
 	set_privileges = function(name, privileges)
 		assert(type(name) == "string")
 		assert(type(privileges) == "table")
+		name = string.lower(name)
 		if not core.auth_table[name] then
 			core.builtin_auth_handler.create_auth(name,
 				core.get_password_hash(name,
@@ -159,6 +163,7 @@ core.builtin_auth_handler = {
 		return true
 	end,
 	record_login = function(name)
+		name = string.lower(name)
 		assert(type(name) == "string")
 		assert(core.auth_table[name]).last_login = os.time()
 		save_auth_file()
