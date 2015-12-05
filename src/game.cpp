@@ -1525,6 +1525,7 @@ protected:
 	void processPlayerInteraction(std::vector<aabb3f> &highlight_boxes,
 			GameRunData *runData, f32 dtime, bool show_hud,
 			bool show_debug);
+	void handlePointingAtNothing(GameRunData *runData, const ItemStack &playerItem);
 	void handlePointingAtNode(GameRunData *runData,
 			const PointedThing &pointed, const ItemDefinition &playeritem_def,
 			const ToolCapabilities &playeritem_toolcap, f32 dtime);
@@ -3661,6 +3662,8 @@ void Game::processPlayerInteraction(std::vector<aabb3f> &highlight_boxes,
 	} else if (input->getLeftState()) {
 		// When button is held down in air, show continuous animation
 		runData->left_punch = true;
+	} else if (input->getRightClicked()) {
+		handlePointingAtNothing(runData, playeritem);
 	}
 
 	runData->pointed_old = pointed;
@@ -3673,6 +3676,15 @@ void Game::processPlayerInteraction(std::vector<aabb3f> &highlight_boxes,
 
 	input->resetLeftReleased();
 	input->resetRightReleased();
+}
+
+
+void Game::handlePointingAtNothing(GameRunData *runData, const ItemStack &playerItem)
+{
+	infostream << "Right Clicked in Air" << std::endl;
+	PointedThing fauxPointed;
+	fauxPointed.type = POINTEDTHING_NOTHING;
+	client->interact(5, fauxPointed);
 }
 
 
