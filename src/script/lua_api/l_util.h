@@ -99,7 +99,7 @@ private:
 	// request_insecure_environment()
 	static int l_request_insecure_environment(lua_State *L);
 
-#if USE_CURL
+#ifdef USE_CURL
 	// Helpers for HTTP fetch functions
 	static void read_http_fetch_request(lua_State *L, HTTPFetchRequest &req);
 	static void push_http_fetch_result(lua_State *L, HTTPFetchResult &res);

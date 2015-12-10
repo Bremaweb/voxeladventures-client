@@ -374,7 +374,7 @@ int ModApiUtil::l_request_insecure_environment(lua_State *L)
 }
 
 
-#if USE_CURL
+#ifdef USE_CURL
 void ModApiUtil::read_http_fetch_request(lua_State *L, HTTPFetchRequest &req)
 {
 	luaL_checktype(L, 1, LUA_TTABLE);
@@ -500,7 +500,7 @@ void ModApiUtil::Initialize(lua_State *L, int top)
 
 	API_FCT(request_insecure_environment);
 
-#if USE_CURL
+#ifdef USE_CURL
 	API_FCT(http_fetch_async);
 	API_FCT(http_fetch_async_get);
 	API_FCT(http_fetch_sync);
@@ -534,7 +534,7 @@ void ModApiUtil::InitializeAsync(AsyncEngine& engine)
 	ASYNC_API_FCT(mkdir);
 	ASYNC_API_FCT(get_dir_list);
 
-#if USE_CURL
+#ifdef USE_CURL
 	ASYNC_API_FCT(http_fetch_async);
 	ASYNC_API_FCT(http_fetch_async_get);
 	ASYNC_API_FCT(http_fetch_sync);
