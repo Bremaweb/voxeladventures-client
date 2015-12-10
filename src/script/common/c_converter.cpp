@@ -544,6 +544,15 @@ void setboolfield(lua_State *L, int table,
 	lua_setfield(L, table, fieldname);
 }
 
+void setstringfield(lua_State *L, int table,
+		const char *fieldname, const char *value)
+{
+	lua_pushstring(L, value);
+	if(table < 0)
+		table -= 1;
+	lua_setfield(L, table, fieldname);
+}
+
 
 ////
 //// Array table slices

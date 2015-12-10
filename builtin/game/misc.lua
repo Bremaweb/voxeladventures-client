@@ -204,3 +204,22 @@ function core.raillike_group(name)
 	end
 	return id
 end
+
+-- If built with cURL
+if core.http_fetch_async then
+	core.http_requests = {}
+	function core.http_fetch(req, callback)
+		local handle = core.http_fetch_async(req)
+		table.insert(core.http_requests, {handle = handle, callback = callback})
+	end
+
+	core.register_globalstep(function()
+		for i, req in ipairs(core.http_requests) do
+			local res = core.http_fetch_async_get(req.handle)
+			if res.code ~= 0 then
+				table.remove(core.http_requests, i)
+				req.callback(res)
+			end
+		end
+	end)
+end
