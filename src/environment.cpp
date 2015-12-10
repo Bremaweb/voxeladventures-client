@@ -1119,8 +1119,6 @@ void ServerEnvironment::step(float dtime)
 	{
 		ScopeProfiler sp(g_profiler, "SEnv: mess in act. blocks avg /1s", SPT_AVG);
 
-		float dtime = 1.0;
-
 		// Initialize handling of ActiveBlockModifiers
 		ABMHandler abmhandler(m_abms, abm_interval, this, true);
 
