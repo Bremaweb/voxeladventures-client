@@ -1816,7 +1816,9 @@ void Game::run()
 			&& client->checkPrivilege("fast");
 #endif
 
-	while (device->run() && !(*kill || g_gamecallback->shutdown_requested)) {
+	while (device->run()
+			&& !(*kill || g_gamecallback->shutdown_requested
+			|| (server && server->getShutdownRequested()))) {
 
 		/* Must be called immediately after a device->run() call because it
 		 * uses device->getTimer()->getTime()
@@ -2173,7 +2175,7 @@ bool Game::initGui()
 #ifdef HAVE_TOUCHSCREENGUI
 
 	if (g_touchscreengui)
-		g_touchscreengui->init(texture_src, porting::getDisplayDensity());
+		g_touchscreengui->init(texture_src);
 
 #endif
 
@@ -2569,7 +2571,17 @@ void Game::processUserInput(VolatileRunFlags *flags,
 			|| noMenuActive() == false
 			|| guienv->hasFocus(gui_chat_console)) {
 		input->clear();
+#ifdef HAVE_TOUCHSCREENGUI
+		g_touchscreengui->hide();
+#endif
 	}
+#ifdef HAVE_TOUCHSCREENGUI
+	else if (g_touchscreengui) {
+		/* on touchscreengui step may generate own input events which ain't
+		 * what we want in case we just did clear them */
+		g_touchscreengui->step(dtime);
+	}
+#endif
 
 	if (!guienv->hasFocus(gui_chat_console) && gui_chat_console->isOpen()) {
 		gui_chat_console->closeConsoleAtOnce();
@@ -2578,13 +2590,6 @@ void Game::processUserInput(VolatileRunFlags *flags,
 	// Input handler step() (used by the random input generator)
 	input->step(dtime);
 
-#ifdef HAVE_TOUCHSCREENGUI
-
-	if (g_touchscreengui) {
-		g_touchscreengui->step(dtime);
-	}
-
-#endif
 #ifdef __ANDROID__
 
 	if (current_formspec != 0)

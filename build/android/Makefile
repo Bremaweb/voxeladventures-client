@@ -168,7 +168,7 @@ endif
 	$(ASSETS_TIMESTAMP) $(LEVELDB_TIMESTAMP) \
 	$(OPENAL_TIMESTAMP) $(OGG_TIMESTAMP) \
 	$(IRRLICHT_TIMESTAMP) $(CURL_TIMESTAMP) \
-	$(OPENSSL_TIMESTAMP) curl_binary \
+	$(OPENSSL_TIMESTAMP) \
 	$(ROOT)/jni/src/android_version.h \
 	$(ROOT)/jni/src/android_version_githash.h
 
@@ -229,7 +229,7 @@ openal_download :
 openal : $(OPENAL_LIB)
 
 $(OPENAL_LIB): $(OPENAL_TIMESTAMP)
-	@REFRESH=0;                                                                \
+	+ @REFRESH=0;                                                                \
 	if [ ! -e ${OPENAL_TIMESTAMP_INT} ] ; then                                 \
 		REFRESH=1;                                                             \
 	fi;                                                                        \
@@ -274,7 +274,7 @@ ogg_download :
 ogg : $(OGG_LIB)
 
 $(OGG_LIB): $(OGG_TIMESTAMP)
-	@REFRESH=0;                                                                \
+	+ @REFRESH=0;                                                                \
 	if [ ! -e ${OGG_TIMESTAMP_INT} ] ; then                                    \
 		echo "${OGG_TIMESTAMP_INT} doesn't exist";                             \
 		REFRESH=1;                                                             \
@@ -419,7 +419,7 @@ freetype_download :
 freetype : $(FREETYPE_LIB)
 
 $(FREETYPE_LIB) : $(FREETYPE_TIMESTAMP)
-	@REFRESH=0;                                                                \
+	+ @REFRESH=0;                                                                \
 	if [ ! -e ${FREETYPE_TIMESTAMP_INT} ] ; then                               \
 		REFRESH=1;                                                             \
 	fi;                                                                        \
@@ -535,7 +535,7 @@ $(IRRLICHT_TIMESTAMP) : irrlicht_download
 irrlicht : $(IRRLICHT_LIB)
 
 $(IRRLICHT_LIB): $(IRRLICHT_TIMESTAMP) $(FREETYPE_LIB)
-	@REFRESH=0;                                                                \
+	+ @REFRESH=0;                                                                \
 	if [ ! -e ${IRRLICHT_TIMESTAMP_INT} ] ; then                               \
 		REFRESH=1;                                                             \
 	fi;                                                                        \
@@ -624,18 +624,6 @@ $(CURL_LIB): $(CURL_TIMESTAMP) $(OPENSSL_LIB)
 clean_curl :
 	$(RM) -rf deps/curl-${CURL_VERSION}                                        \
 	$(RM) -f deps/curl
-
-
-curl_binary:
-	@if [ ! -d "deps/curl-${CURL_VERSION_BINARY}" ] ; then                     \
-		echo "curl binary missing, downloading...";                           \
-		mkdir -p ${ROOT}/deps;                                                 \
-		cd deps;                                                               \
-		wget http://curl.haxx.se/gknw.net/7.34.0/dist-android/curl-7.34.0-rtmp-ssh2-ssl-zlib-static-bin-android.tar.gz || exit 1;\
-		tar -xzf curl-7.34.0-rtmp-ssh2-ssl-zlib-static-bin-android.tar.gz || exit 1;\
-		mv curl-7.34.0-rtmp-ssh2-ssl-zlib-static-bin-android curl-${CURL_VERSION_BINARY};\
-		rm curl-7.34.0-rtmp-ssh2-ssl-zlib-static-bin-android.tar.gz;           \
-	fi
 
 $(GMP_TIMESTAMP) : gmp_download
 	@LAST_MODIF=$$(find ${GMP_DIR} -type f -printf '%T@ %p\n' | sort -n | tail -1 | cut -f2- -d" "); \
@@ -751,9 +739,11 @@ assets : $(ASSETS_TIMESTAMP)
 	cp ${ROOT}/../../minetest.conf.example ${ROOT}/assets/Minetest;            \
 	cp ${ROOT}/../../README.txt ${ROOT}/assets/Minetest;                       \
 	cp -r ${ROOT}/../../builtin ${ROOT}/assets/Minetest;                       \
-	cp -r ${ROOT}/../../client ${ROOT}/assets/Minetest;                        \
-	cp -r ${ROOT}/../../doc ${ROOT}/assets/Minetest;                           \
-	cp -r ${ROOT}/../../fonts ${ROOT}/assets/Minetest;                         \
+	mkdir ${ROOT}/assets/Minetest/client;                                      \
+	cp -r ${ROOT}/../../client/shaders ${ROOT}/assets/Minetest/client;         \
+	cp ${ROOT}/../../doc/lgpl-2.1.txt ${ROOT}/assets/Minetest/LICENSE.txt;     \
+	mkdir ${ROOT}/assets/Minetest/fonts;                                       \
+	cp -r ${ROOT}/../../fonts/*.ttf ${ROOT}/assets/Minetest/fonts/;            \
 	mkdir ${ROOT}/assets/Minetest/games;                                       \
 	for game in ${GAMES_TO_COPY}; do                                           \
 	    cp -r ${ROOT}/../../games/$$game ${ROOT}/assets/Minetest/games/;       \
