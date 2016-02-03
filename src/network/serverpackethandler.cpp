@@ -233,9 +233,12 @@ void Server::handleCommand_Init(NetworkPacket* pkt)
 	client->chosen_mech = AUTH_MECHANISM_NONE;
 
 	if (has_auth) {
+		verbosestream << "has_auth";
 		std::vector<std::string> pwd_components = str_split(encpwd, '#');
 		if (pwd_components.size() == 4) {
+			verbosestream << "pwd_components == 4";
 			if (pwd_components[1] == "1") { // 1 means srp
+				verbosestream << "srp";
 				auth_mechs |= AUTH_MECHANISM_SRP;
 				client->enc_pwd = encpwd;
 			} else {
@@ -246,6 +249,7 @@ void Server::handleCommand_Init(NetworkPacket* pkt)
 				return;
 			}
 		} else if (base64_is_valid(encpwd)) {
+			verbosestream << "valid base64";
 			auth_mechs |= AUTH_MECHANISM_LEGACY_PASSWORD;
 			client->enc_pwd = encpwd;
 		} else {
@@ -256,6 +260,7 @@ void Server::handleCommand_Init(NetworkPacket* pkt)
 			return;
 		}
 	} else {
+		verbosestream << "no auth";
 		std::string default_password = g_settings->get("default_password");
 		if (default_password.length() == 0) {
 			auth_mechs |= AUTH_MECHANISM_FIRST_SRP;
@@ -1655,16 +1660,16 @@ void Server::handleCommand_Interact(NetworkPacket* pkt)
 		}
 
 	} // action == 4
-	
+
 	/*
 		5: rightclick air
 	*/
 	else if (action == 5) {
 		ItemStack item = playersao->getWieldedItem();
-		
-		actionstream << player->getName() << " activates " 
+
+		actionstream << player->getName() << " activates "
 				<< item.name << std::endl;
-		
+
 		if (m_script->item_OnSecondaryUse(
 				item, playersao)) {
 			if( playersao->setWieldedItem(item)) {
