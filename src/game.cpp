@@ -1872,6 +1872,10 @@ void Game::run()
 
 void Game::shutdown()
 {
+	if (g_settings->get("3d_mode") == "pageflip") {
+		driver->setRenderTarget(irr::video::ERT_STEREO_BOTH_BUFFERS);
+	}
+
 	showOverlayMessage(wgettext("Shutting down..."), 0, 0, false);
 
 	if (clouds)
@@ -3786,8 +3790,11 @@ void Game::handlePointingAtObject(GameRunData *runData,
 {
 	infotext = utf8_to_wide(runData->selected_object->infoText());
 
-	if (infotext == L"" && show_debug) {
-		infotext = utf8_to_wide(runData->selected_object->debugInfoText());
+	if (show_debug) {
+		if (infotext != L"") {
+			infotext += L"\n";
+		}
+		infotext += utf8_to_wide(runData->selected_object->debugInfoText());
 	}
 
 	if (input->getLeftState()) {

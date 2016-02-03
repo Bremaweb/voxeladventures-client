@@ -216,6 +216,7 @@ void read_object_properties(lua_State *L, int index,
 		prop->automatic_face_movement_max_rotation_per_sec = luaL_checknumber(L, -1);
 	}
 	lua_pop(L, 1);
+	getstringfield(L, -1, "infotext", prop->infotext);
 }
 
 /******************************************************************************/
@@ -282,6 +283,8 @@ void push_object_properties(lua_State *L, ObjectProperties *prop)
 	lua_setfield(L, -2, "nametag_color");
 	lua_pushnumber(L, prop->automatic_face_movement_max_rotation_per_sec);
 	lua_setfield(L, -2, "automatic_face_movement_max_rotation_per_sec");
+	lua_pushlstring(L, prop->infotext.c_str(), prop->infotext.size());
+	lua_setfield(L, -2, "infotext");
 }
 
 /******************************************************************************/
@@ -291,14 +294,31 @@ TileDef read_tiledef(lua_State *L, int index, u8 drawtype)
 		index = lua_gettop(L) + 1 + index;
 
 	TileDef tiledef;
-	bool default_tiling = (drawtype == NDT_PLANTLIKE || drawtype == NDT_FIRELIKE)
-		? false : true;
+
+	bool default_tiling = true;
+	bool default_culling = true;
+	switch (drawtype) {
+		case NDT_PLANTLIKE:
+		case NDT_FIRELIKE:
+			default_tiling = false;
+			// "break" is omitted here intentionaly, as PLANTLIKE
+			// FIRELIKE drawtype both should default to having
+			// backface_culling to false.
+		case NDT_MESH:
+		case NDT_LIQUID:
+			default_culling = false;
+			break;
+		default:
+			break;
+	}
+
 	// key at index -2 and value at index
 	if(lua_isstring(L, index)){
 		// "default_lava.png"
 		tiledef.name = lua_tostring(L, index);
 		tiledef.tileable_vertical = default_tiling;
 		tiledef.tileable_horizontal = default_tiling;
+		tiledef.backface_culling = default_culling;
 	}
 	else if(lua_istable(L, index))
 	{
@@ -307,7 +327,7 @@ TileDef read_tiledef(lua_State *L, int index, u8 drawtype)
 		getstringfield(L, index, "name", tiledef.name);
 		getstringfield(L, index, "image", tiledef.name); // MaterialSpec compat.
 		tiledef.backface_culling = getboolfield_default(
-			L, index, "backface_culling", true);
+			L, index, "backface_culling", default_culling);
 		tiledef.tileable_horizontal = getboolfield_default(
 			L, index, "tileable_horizontal", default_tiling);
 		tiledef.tileable_vertical = getboolfield_default(
@@ -481,6 +501,8 @@ ContentFeatures read_content_features(lua_State *L, int index)
 	getboolfield(L, index, "climbable", f.climbable);
 	// Player can build on these
 	getboolfield(L, index, "buildable_to", f.buildable_to);
+	// Liquids flow into and replace node
+	getboolfield(L, index, "floodable", f.floodable);
 	// Whether the node is non-liquid, source liquid or flowing liquid
 	f.liquid_type = (LiquidType)getenumfield(L, index, "liquidtype",
 			ScriptApiNode::es_LiquidType, LIQUID_NONE);

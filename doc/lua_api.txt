@@ -264,15 +264,15 @@ Example:
 
     default_cobble.png^[crack:10:1
 
-#### `[combine:<w>x<h>:<x1>,<y1>=<file1>:<x2>,<y2>=<file2>`
+#### `[combine:<w>x<h>:<x1>,<y1>=<file1>:<x2>,<y2>=<file2>:...`
 * `<w>` = width
 * `<h>` = height
-* `<x1>`/`<x2>` = x positions
-* `<y1>`/`<y1>` = y positions
-* `<file1>`/`<file2>` = textures to combine
+* `<x>` = x position
+* `<y>` = y position
+* `<file>` = texture to combine
 
-Create a texture of size `<w>` times `<h>` and blit `<file1>` to (`<x1>`,`<y1>`)
-and blit `<file2>` to (`<x2>`,`<y2>`).
+Creates a texture of size `<w>` times `<h>` and blits the listed files to their
+specified coordinates.
 
 Example:
 
@@ -1616,7 +1616,7 @@ examples.
 * types: `text`, `image`, `color`, `indent`, `tree`
     * `text`:   show cell contents as text
     * `image`:  cell contents are an image index, use column options to define images
-    * `colo`:   cell contents are a ColorString and define color of following cell
+    * `color`:   cell contents are a ColorString and define color of following cell
     * `indent`: cell contents are a number and define indentation of following cell
     * `tree`:   same as indent, but user can open and close subtrees (treeview-like)
 * column options:
@@ -1715,8 +1715,9 @@ Helper functions
     * e.g. `string:split("a,b", ",") == {"a","b"}`
 * `string:trim()`
     * e.g. `string.trim("\n \t\tfoo bar\t ") == "foo bar"`
-* `minetest.pos_to_string({x=X,y=Y,z=Z})`: returns `"(X,Y,Z)"`
+* `minetest.pos_to_string({x=X,y=Y,z=Z}, decimal_places))`: returns `"(X,Y,Z)"`
     * Convert position to a printable string
+      Optional: 'decimal_places' will round the x, y and z of the pos to the given decimal place.
 * `minetest.string_to_pos(string)`: returns a position
     * Same but in reverse. Returns `nil` if the string can't be parsed to a position.
 * `minetest.string_to_area("(X1, Y1, Z1) (X2, Y2, Z2)")`: returns two positions
@@ -1726,7 +1727,7 @@ Helper functions
 * `minetest.is_yes(arg)`
     * returns whether `arg` can be interpreted as yes
 * `minetest.get_us_time()`
-    * returns time with microsecond precision
+    * returns time with microsecond precision. May not return wall time.
 * `table.copy(table)`: returns a table
     * returns a deep copy of `table`
 
@@ -1958,9 +1959,11 @@ and `minetest.auth_reload` call the authetification handler.
 * `minetest.remove_node(pos)`
     * Equivalent to `set_node(pos, "air")`
 * `minetest.get_node(pos)`
-    * Returns `{name="ignore", ...}` for unloaded area
+    * Returns the node at the given position as table in the format
+      `{name="node_name", param1=0, param2=0}`, returns `{name="ignore", param1=0, param2=0}`
+      for unloaded areas.
 * `minetest.get_node_or_nil(pos)`
-    * Returns `nil` for unloaded area
+    * Same as `get_node` but returns `nil` for unloaded areas.
 * `minetest.get_node_light(pos, timeofday)`
     * Gets the light value at the given position. Note that the light value
       "inside" the node at the given position is returned, so you usually want
@@ -2239,7 +2242,7 @@ These functions return the leftover itemstack.
 
 ### Timing
 * `minetest.after(time, func, ...)`
-    * Call the function `func` after `time` seconds
+    * Call the function `func` after `time` seconds, may be fractional
     * Optional: Variable number of arguments that are passed to `func`
 
 ### Server
@@ -2473,6 +2476,8 @@ These functions only exist if minetest was built with cURL support.
     * Map of Lua entities, indexed by active object id
 * `minetest.registered_ores`
     * List of registered ore definitions.
+* `minetest.registered_biomes`
+    * List of registered biome definitions.
 * `minetest.registered_decorations`
     * List of registered decoration definitions.
 
@@ -2650,8 +2655,6 @@ This is basically a reference to a C++ `ServerActiveObject`
         * `"regular"`: Uses 0 textures, `bgcolor` ignored
         * `"skybox"`: Uses 6 textures, `bgcolor` used
         * `"plain"`: Uses 0 textures, `bgcolor` used
-    * **Note**: currently does not work directly in `on_joinplayer`; use
-      `minetest.after(0)` in there.
 * `get_sky()`: returns bgcolor, type and a table with the textures
 * `override_day_night_ratio(ratio or nil)`
     * `0`...`1`: Overrides day-night ratio, controlling sunlight to a specific amount
@@ -3252,6 +3255,7 @@ Definition tables
         backface_culling = true, -- false to disable backface_culling for model
         nametag = "", -- by default empty, for players their name is shown if empty
         nametag_color = <color>, -- sets color of nametag as ColorSpec
+        infotext = "", -- by default empty, text to be shown when pointed at object
     }
 
 ### Entity definition (`register_entity`)
@@ -3368,7 +3372,7 @@ Definition tables
 * `{name="image.png", animation={Tile Animation definition}}`
 * `{name="image.png", backface_culling=bool, tileable_vertical=bool,
     tileable_horizontal=bool}`
-    * backface culling only supported in special tiles.
+    * backface culling enabled by default for most nodes
     * tileable flags are info for shaders, how they should treat texture
 	  when displacement mapping is used
 	  Directions are from the point of view of the tile texture,
@@ -3410,6 +3414,7 @@ Definition tables
         diggable = true, -- If false, can never be dug
         climbable = false, -- If true, can be climbed on (ladder)
         buildable_to = false, -- If true, placed nodes can replace this node
+        floodable = false, -- If true, liquids flow into and replace this node
         liquidtype = "none", -- "none"/"source"/"flowing"
         liquid_alternative_flowing = "", -- Flowing version of source liquid
         liquid_alternative_source = "", -- Source version of flowing liquid

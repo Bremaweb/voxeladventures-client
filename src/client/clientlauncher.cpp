@@ -512,6 +512,9 @@ bool ClientLauncher::create_engine_device()
 	u16 bits = g_settings->getU16("fullscreen_bpp");
 	u16 fsaa = g_settings->getU16("fsaa");
 
+	// stereo buffer required for pageflip stereo
+	bool stereo_buffer = g_settings->get("3d_mode") == "pageflip";
+
 	// Determine driver
 	video::E_DRIVER_TYPE driverType = video::EDT_OPENGL;
 	std::string driverstring = g_settings->get("video_driver");
@@ -537,9 +540,11 @@ bool ClientLauncher::create_engine_device()
 	params.AntiAlias     = fsaa;
 	params.Fullscreen    = fullscreen;
 	params.Stencilbuffer = false;
+	params.Stereobuffer  = stereo_buffer;
 	params.Vsync         = vsync;
 	params.EventReceiver = receiver;
 	params.HighPrecisionFPU = g_settings->getBool("high_precision_fpu");
+	params.ZBufferBits   = 24;
 #ifdef __ANDROID__
 	params.PrivateData = porting::app_global;
 	params.OGLES2ShaderPath = std::string(porting::path_user + DIR_DELIM +
