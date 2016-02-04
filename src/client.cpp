@@ -406,8 +406,8 @@ void Client::step(float dtime)
 			snprintf(pPassword, PASSWORD_SIZE, "%s", hashed_password.c_str());
 
 			sendLegacyInit(pName, pPassword);
-			if (LATEST_PROTOCOL_VERSION >= 25)
-				sendInit(myplayer->getName());
+			//if (LATEST_PROTOCOL_VERSION >= 25)
+			//	sendInit(myplayer->getName());
 		}
 
 		// Not connected, return
@@ -1057,7 +1057,7 @@ void Client::startAuth(AuthMechanism chosen_auth_mechanism)
 			u8 based_on = 1;
 
 			if (chosen_auth_mechanism == AUTH_MECHANISM_LEGACY_PASSWORD) {
-				verbosestream << "legacy auth" << std::endl;
+				verbosestream << "legacy auth" << std:endl;
 				m_password = translatePassword(getPlayerName(), m_password);
 				based_on = 0;
 			}
