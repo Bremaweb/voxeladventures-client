@@ -183,7 +183,7 @@ void LocalPlayer::move(f32 dtime, Environment *env, f32 pos_max_d,
 	*/
 	if (control.sneak && m_sneak_node_exists &&
 			!(fly_allowed && g_settings->getBool("free_move")) && !in_liquid &&
-			physics_override_sneak) {
+			physics_override_sneak && !got_teleported) {
 		f32 maxd = 0.5 * BS + sneak_max;
 		v3f lwn_f = intToFloat(m_sneak_node, BS);
 		position.X = rangelim(position.X, lwn_f.X-maxd, lwn_f.X+maxd);
@@ -203,6 +203,9 @@ void LocalPlayer::move(f32 dtime, Environment *env, f32 pos_max_d,
 				m_speed.Y = 0;
 		}
 	}
+
+	if (got_teleported)
+		got_teleported = false;
 
 	// this shouldn't be hardcoded but transmitted from server
 	float player_stepheight = touching_ground ? (BS*0.6) : (BS*0.2);
@@ -310,7 +313,8 @@ void LocalPlayer::move(f32 dtime, Environment *env, f32 pos_max_d,
 		if (sneak_node_found) {
 			f32 cb_max = 0;
 			MapNode n = map->getNodeNoEx(m_sneak_node);
-			std::vector<aabb3f> nodeboxes = n.getCollisionBoxes(nodemgr);
+			std::vector<aabb3f> nodeboxes;
+			n.getCollisionBoxes(nodemgr, &nodeboxes);
 			for (std::vector<aabb3f>::iterator it = nodeboxes.begin();
 					it != nodeboxes.end(); ++it) {
 				aabb3f box = *it;
@@ -620,5 +624,38 @@ v3s16 LocalPlayer::getStandingNodePos()
 	if(m_sneak_node_exists)
 		return m_sneak_node;
 	return floatToInt(getPosition() - v3f(0, BS, 0), BS);
+}
+
+// Horizontal acceleration (X and Z), Y direction is ignored
+void LocalPlayer::accelerateHorizontal(const v3f &target_speed, const f32 max_increase)
+{
+        if (max_increase == 0)
+                return;
+
+        v3f d_wanted = target_speed - m_speed;
+        d_wanted.Y = 0;
+        f32 dl = d_wanted.getLength();
+        if (dl > max_increase)
+                dl = max_increase;
+
+        v3f d = d_wanted.normalize() * dl;
+
+        m_speed.X += d.X;
+        m_speed.Z += d.Z;
+}
+
+// Vertical acceleration (Y), X and Z directions are ignored
+void LocalPlayer::accelerateVertical(const v3f &target_speed, const f32 max_increase)
+{
+        if (max_increase == 0)
+                return;
+
+        f32 d_wanted = target_speed.Y - m_speed.Y;
+        if (d_wanted > max_increase)
+                d_wanted = max_increase;
+        else if (d_wanted < -max_increase)
+                d_wanted = -max_increase;
+
+        m_speed.Y += d_wanted;
 }
 

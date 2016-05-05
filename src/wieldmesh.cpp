@@ -283,7 +283,7 @@ void WieldMeshSceneNode::setExtruded(const std::string &imagename,
 	video::SMaterial &material = m_meshnode->getMaterial(0);
 	material.setTexture(0, tsrc->getTextureForMesh(imagename));
 	material.TextureLayer[0].TextureWrapU = video::ETC_CLAMP_TO_EDGE;
-	material.TextureLayer[0].TextureWrapV = video::ETC_CLAMP_TO_EDGE; 
+	material.TextureLayer[0].TextureWrapV = video::ETC_CLAMP_TO_EDGE;
 	material.MaterialType = m_material_type;
 	material.setFlag(video::EMF_BACK_FACE_CULLING, true);
 	// Enable bi/trilinear filtering only for high resolution textures
@@ -435,7 +435,7 @@ void WieldMeshSceneNode::changeToMesh(scene::IMesh *mesh)
 	m_meshnode->setVisible(true);
 }
 
-scene::IMesh * getItemMesh(IGameDef *gamedef, const ItemStack &item)
+scene::IMesh *getItemMesh(IGameDef *gamedef, const ItemStack &item)
 {
 	ITextureSource *tsrc = gamedef->getTextureSource();
 	IItemDefManager *idef = gamedef->getItemDefManager();
@@ -452,11 +452,8 @@ scene::IMesh * getItemMesh(IGameDef *gamedef, const ItemStack &item)
 
 	scene::IMesh *mesh;
 
-	// If wield_image is defined, it overrides everything else
-	if (def.wield_image != "") {
-		mesh = getExtrudedMesh(tsrc, def.wield_image);
-		return mesh;
-	} else if (def.inventory_image != "") {
+	// If inventory_image is defined, it overrides everything else
+	if (def.inventory_image != "") {
 		mesh = getExtrudedMesh(tsrc, def.inventory_image);
 		return mesh;
 	} else if (def.type == ITEM_NODE) {
@@ -483,7 +480,7 @@ scene::IMesh * getItemMesh(IGameDef *gamedef, const ItemStack &item)
 			rotateMeshXZby(mesh, -45);
 			rotateMeshYZby(mesh, -30);
 
-			u32 mc = mesh->getMeshBufferCount();		
+			u32 mc = mesh->getMeshBufferCount();
 			for (u32 i = 0; i < mc; ++i) {
 				video::SMaterial &material1 =
 					mesh->getMeshBuffer(i)->getMaterial();
@@ -507,7 +504,7 @@ scene::IMesh * getItemMesh(IGameDef *gamedef, const ItemStack &item)
 			video::SMaterial &material = mesh->getMeshBuffer(i)->getMaterial();
 			material.MaterialType = video::EMT_TRANSPARENT_ALPHA_CHANNEL;
 			material.setFlag(video::EMF_BILINEAR_FILTER, false);
-			material.setFlag(video::EMF_TRILINEAR_FILTER, false);		
+			material.setFlag(video::EMF_TRILINEAR_FILTER, false);
 			material.setFlag(video::EMF_BACK_FACE_CULLING, true);
 			material.setFlag(video::EMF_LIGHTING, false);
 			if (f.tiles[i].animation_frame_count > 1) {
@@ -537,9 +534,9 @@ scene::IMesh * getExtrudedMesh(ITextureSource *tsrc,
 	video::SMaterial &material = mesh->getMeshBuffer(0)->getMaterial();
 	material.setTexture(0, tsrc->getTexture(imagename));
 	material.TextureLayer[0].TextureWrapU = video::ETC_CLAMP_TO_EDGE;
-	material.TextureLayer[0].TextureWrapV = video::ETC_CLAMP_TO_EDGE; 
+	material.TextureLayer[0].TextureWrapV = video::ETC_CLAMP_TO_EDGE;
 	material.setFlag(video::EMF_BILINEAR_FILTER, false);
-	material.setFlag(video::EMF_TRILINEAR_FILTER, false);		
+	material.setFlag(video::EMF_TRILINEAR_FILTER, false);
 	material.setFlag(video::EMF_BACK_FACE_CULLING, true);
 	material.setFlag(video::EMF_LIGHTING, false);
 	material.MaterialType = video::EMT_TRANSPARENT_ALPHA_CHANNEL;

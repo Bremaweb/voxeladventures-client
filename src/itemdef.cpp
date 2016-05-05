@@ -346,7 +346,6 @@ public:
 		item.name = def.name;
 
 		scene::IMesh *mesh = getItemMesh(gamedef, item);
-		//scaleMesh(mesh, v3f(2.0, 2.0, 2.0));
 
 		cc->wield_mesh = mesh;
 		// Put in cache

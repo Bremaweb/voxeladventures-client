@@ -119,9 +119,6 @@ public:
 		m_speed = speed;
 	}
 
-	void accelerateHorizontal(v3f target_speed, f32 max_increase);
-	void accelerateVertical(v3f target_speed, f32 max_increase);
-
 	v3f getPosition()
 	{
 		return m_position;
@@ -198,7 +195,7 @@ public:
 		return m_name;
 	}
 
-	core::aabbox3d<f32> getCollisionbox()
+	aabb3f getCollisionbox()
 	{
 		return m_collisionbox;
 	}
@@ -321,6 +318,7 @@ public:
 	// Use a function, if isDead can be defined by other conditions
 	bool isDead() { return hp == 0; }
 
+	bool got_teleported;
 	bool touching_ground;
 	// This oscillates so that the player jumps a bit above the surface
 	bool in_liquid;
@@ -398,7 +396,7 @@ protected:
 	f32 m_yaw;
 	v3f m_speed;
 	v3f m_position;
-	core::aabbox3d<f32> m_collisionbox;
+	aabb3f m_collisionbox;
 
 	bool m_dirty;
 

@@ -185,6 +185,13 @@ bool wouldCollideWithCeiling(
 	return false;
 }
 
+static inline void getNeighborConnectingFace(v3s16 p, INodeDefManager *nodedef,
+		Map *map, MapNode n, int v, int *neighbors)
+{
+	MapNode n2 = map->getNodeNoEx(p);
+	if (nodedef->nodeboxConnects(n, n2, v))
+		*neighbors |= v;
+}
 
 collisionMoveResult collisionMoveSimple(Environment *env, IGameDef *gamedef,
 		f32 pos_max_d, const aabb3f &box_0,
@@ -235,7 +242,7 @@ collisionMoveResult collisionMoveSimple(Environment *env, IGameDef *gamedef,
 	std::vector<v3s16> node_positions;
 	{
 	//TimeTaker tt2("collisionMoveSimple collect boxes");
-    ScopeProfiler sp(g_profiler, "collisionMoveSimple collect boxes avg", SPT_AVG);
+	ScopeProfiler sp(g_profiler, "collisionMoveSimple collect boxes avg", SPT_AVG);
 
 	v3s16 oldpos_i = floatToInt(*pos_f, BS);
 	v3s16 newpos_i = floatToInt(*pos_f + *speed_f * dtime, BS);
@@ -261,12 +268,41 @@ collisionMoveResult collisionMoveSimple(Environment *env, IGameDef *gamedef,
 			// Object collides into walkable nodes
 
 			any_position_valid = true;
-			const ContentFeatures &f = gamedef->getNodeDefManager()->get(n);
+			INodeDefManager *nodedef = gamedef->getNodeDefManager();
+			const ContentFeatures &f = nodedef->get(n);
 			if(f.walkable == false)
 				continue;
 			int n_bouncy_value = itemgroup_get(f.groups, "bouncy");
 
-			std::vector<aabb3f> nodeboxes = n.getCollisionBoxes(gamedef->ndef());
+			int neighbors = 0;
+			if (f.drawtype == NDT_NODEBOX && f.node_box.type == NODEBOX_CONNECTED) {
+				v3s16 p2 = p;
+
+				p2.Y++;
+				getNeighborConnectingFace(p2, nodedef, map, n, 1, &neighbors);
+
+				p2 = p;
+				p2.Y--;
+				getNeighborConnectingFace(p2, nodedef, map, n, 2, &neighbors);
+
+				p2 = p;
+				p2.Z--;
+				getNeighborConnectingFace(p2, nodedef, map, n, 4, &neighbors);
+
+				p2 = p;
+				p2.X--;
+				getNeighborConnectingFace(p2, nodedef, map, n, 8, &neighbors);
+
+				p2 = p;
+				p2.Z++;
+				getNeighborConnectingFace(p2, nodedef, map, n, 16, &neighbors);
+
+				p2 = p;
+				p2.X++;
+				getNeighborConnectingFace(p2, nodedef, map, n, 32, &neighbors);
+			}
+			std::vector<aabb3f> nodeboxes;
+			n.getCollisionBoxes(gamedef->ndef(), &nodeboxes, neighbors);
 			for(std::vector<aabb3f>::iterator
 					i = nodeboxes.begin();
 					i != nodeboxes.end(); ++i)
@@ -296,8 +332,10 @@ collisionMoveResult collisionMoveSimple(Environment *env, IGameDef *gamedef,
 
 	// Do not move if world has not loaded yet, since custom node boxes
 	// are not available for collision detection.
-	if (!any_position_valid)
+	if (!any_position_valid) {
+		*speed_f = v3f(0, 0, 0);
 		return result;
+	}
 
 	} // tt2
 
@@ -382,13 +420,12 @@ collisionMoveResult collisionMoveSimple(Environment *env, IGameDef *gamedef,
 
 	while(dtime > BS * 1e-10) {
 		//TimeTaker tt3("collisionMoveSimple dtime loop");
-        ScopeProfiler sp(g_profiler, "collisionMoveSimple dtime loop avg", SPT_AVG);
+        	ScopeProfiler sp(g_profiler, "collisionMoveSimple dtime loop avg", SPT_AVG);
 
 		// Avoid infinite loop
 		loopcount++;
 		if (loopcount >= 100) {
 			warningstream << "collisionMoveSimple: Loop count exceeded, aborting to avoid infiniite loop" << std::endl;
-			dtime = 0;
 			break;
 		}
 
@@ -398,7 +435,7 @@ collisionMoveResult collisionMoveSimple(Environment *env, IGameDef *gamedef,
 
 		int nearest_collided = -1;
 		f32 nearest_dtime = dtime;
-		u32 nearest_boxindex = -1;
+		int nearest_boxindex = -1;
 
 		/*
 			Go through every nodebox, find nearest collision

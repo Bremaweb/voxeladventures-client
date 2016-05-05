@@ -25,10 +25,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "serialization.h"
 #include "json/json.h"
 #include "cpp_api/s_security.h"
-#include "areastore.h"
-#include "httpfetch.h"
-#include "debug.h"
 #include "porting.h"
+#include "debug.h"
 #include "log.h"
 #include "tool.h"
 #include "filesys.h"
@@ -76,9 +74,9 @@ int ModApiUtil::l_get_us_time(lua_State *L)
 }
 
 #define CHECK_SECURE_SETTING(L, name) \
-	if (name.compare(0, 7, "secure.") == 0) {\
-		lua_pushliteral(L, "Attempt to set secure setting.");\
-		lua_error(L);\
+	if (ScriptApiSecurity::isSecure(L) && \
+			name.compare(0, 7, "secure.") == 0) { \
+		throw LuaError("Attempt to set secure setting."); \
 	}
 
 // setting_set(name, value)
@@ -253,7 +251,7 @@ int ModApiUtil::l_get_password_hash(lua_State *L)
 	NO_MAP_LOCK_REQUIRED;
 	std::string name = luaL_checkstring(L, 1);
 	std::string raw_password = luaL_checkstring(L, 2);
-	std::string hash = translatePassword(name, raw_password);
+	std::string hash = translate_password(name, raw_password);
 	lua_pushstring(L, hash.c_str());
 	return 1;
 }
@@ -359,119 +357,50 @@ int ModApiUtil::l_get_dir_list(lua_State *L)
 int ModApiUtil::l_request_insecure_environment(lua_State *L)
 {
 	NO_MAP_LOCK_REQUIRED;
+
+	// Just return _G if security is disabled
 	if (!ScriptApiSecurity::isSecure(L)) {
 		lua_getglobal(L, "_G");
 		return 1;
 	}
+
+	// We have to make sure that this function is being called directly by
+	// a mod, otherwise a malicious mod could override this function and
+	// steal its return value.
+	lua_Debug info;
+	// Make sure there's only one item below this function on the stack...
+	if (lua_getstack(L, 2, &info)) {
+		return 0;
+	}
+	FATAL_ERROR_IF(!lua_getstack(L, 1, &info), "lua_getstack() failed");
+	FATAL_ERROR_IF(!lua_getinfo(L, "S", &info), "lua_getinfo() failed");
+	// ...and that that item is the main file scope.
+	if (strcmp(info.what, "main") != 0) {
+		return 0;
+	}
+
+	// Get mod name
 	lua_rawgeti(L, LUA_REGISTRYINDEX, CUSTOM_RIDX_CURRENT_MOD_NAME);
 	if (!lua_isstring(L, -1)) {
-		lua_pushnil(L);
-		return 1;
+		return 0;
 	}
+
+	// Check secure.trusted_mods
 	const char *mod_name = lua_tostring(L, -1);
 	std::string trusted_mods = g_settings->get("secure.trusted_mods");
+	trusted_mods.erase(std::remove(trusted_mods.begin(),
+			trusted_mods.end(), ' '), trusted_mods.end());
 	std::vector<std::string> mod_list = str_split(trusted_mods, ',');
-	if (std::find(mod_list.begin(), mod_list.end(), mod_name) == mod_list.end()) {
-		lua_pushnil(L);
-		return 1;
+	if (std::find(mod_list.begin(), mod_list.end(), mod_name) ==
+			mod_list.end()) {
+		return 0;
 	}
+
+	// Push insecure environment
 	lua_rawgeti(L, LUA_REGISTRYINDEX, CUSTOM_RIDX_GLOBALS_BACKUP);
 	return 1;
 }
 
-
-#ifdef USE_CURL
-void ModApiUtil::read_http_fetch_request(lua_State *L, HTTPFetchRequest &req)
-{
-	luaL_checktype(L, 1, LUA_TTABLE);
-
-	req.caller = httpfetch_caller_alloc();
-	getstringfield(L, 1, "url", req.url);
-	req.post_data = getstringfield_default(L, 1, "post_data", "");
-	lua_getfield(L, 1, "useragent");
-	if (lua_isstring(L, -1))
-		req.useragent = getstringfield_default(L, 1, "useragent", "");
-	lua_pop(L, 1);
-	req.multipart = getboolfield_default(L, 1, "multipart", false);
-	req.timeout = getintfield_default(L, 1, "timeout", 1) * 1000;
-
-	lua_getfield(L, 1, "post_fields");
-	if (lua_istable(L, 2)) {
-		lua_pushnil(L);
-		while (lua_next(L, 2) != 0)
-		{
-			req.post_fields[luaL_checkstring(L, -2)] = luaL_checkstring(L, -1);
-			lua_pop(L, 1);
-		}
-	}
-	lua_pop(L, 1);
-
-	lua_getfield(L, 1, "extra_headers");
-	if (lua_istable(L, 2)) {
-		lua_pushnil(L);
-		while (lua_next(L, 2) != 0)
-		{
-			req.extra_headers.push_back(luaL_checkstring(L, -1));
-			lua_pop(L, 1);
-		}
-	}
-	lua_pop(L, 1);
-}
-
-void ModApiUtil::push_http_fetch_result(lua_State *L, HTTPFetchResult &res)
-{
-	lua_newtable(L);
-	setboolfield(L, -1, "succeeded", res.succeeded);
-	setboolfield(L, -1, "timeout", res.timeout);
-	setintfield(L, -1, "code", res.response_code);
-	setstringfield(L, -1, "data", res.data.c_str());
-}
-
-// http_fetch_async({url=, timeout=, post_data=})
-int ModApiUtil::l_http_fetch_async(lua_State *L)
-{
-	NO_MAP_LOCK_REQUIRED;
-
-	HTTPFetchRequest req;
-	read_http_fetch_request(L, req);
-
-	actionstream<<"Mod performs HTTP request with URL "<<req.url<<std::endl;
-	httpfetch_async(req);
-
-	lua_pushnumber(L, req.caller);
-	return 1;
-}
-
-// http_fetch_async_get(handle)
-int ModApiUtil::l_http_fetch_async_get(lua_State *L)
-{
-	NO_MAP_LOCK_REQUIRED;
-
-	int handle = luaL_checknumber(L, 1);
-
-	HTTPFetchResult res;
-	httpfetch_async_get(handle, res);
-
-	push_http_fetch_result(L, res);
-	return 1;
-}
-
-// http_fetch_sync({url=, timeout=, post_data=})
-int ModApiUtil::l_http_fetch_sync(lua_State *L)
-{
-	NO_MAP_LOCK_REQUIRED;
-
-	HTTPFetchRequest req;
-	HTTPFetchResult res;
-	read_http_fetch_request(L, req);
-
-	actionstream<<"Mod performs HTTP request with URL "<<req.url<<std::endl;
-	httpfetch_sync(req, res);
-
-	push_http_fetch_result(L, res);
-	return 1;
-}
-#endif
 
 void ModApiUtil::Initialize(lua_State *L, int top)
 {
@@ -500,18 +429,10 @@ void ModApiUtil::Initialize(lua_State *L, int top)
 	API_FCT(compress);
 	API_FCT(decompress);
 
-
 	API_FCT(mkdir);
 	API_FCT(get_dir_list);
 
 	API_FCT(request_insecure_environment);
-
-#ifdef USE_CURL
-	API_FCT(http_fetch_async);
-	API_FCT(http_fetch_async_get);
-	API_FCT(http_fetch_sync);
-#endif
-
 }
 
 void ModApiUtil::InitializeAsync(AsyncEngine& engine)
@@ -536,15 +457,6 @@ void ModApiUtil::InitializeAsync(AsyncEngine& engine)
 	ASYNC_API_FCT(compress);
 	ASYNC_API_FCT(decompress);
 
-
 	ASYNC_API_FCT(mkdir);
 	ASYNC_API_FCT(get_dir_list);
-
-#ifdef USE_CURL
-	ASYNC_API_FCT(http_fetch_async);
-	ASYNC_API_FCT(http_fetch_async_get);
-	ASYNC_API_FCT(http_fetch_sync);
-#endif
-
 }
-

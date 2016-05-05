@@ -370,17 +370,21 @@ queue_full_break:
 
 void RemoteClient::GotBlock(v3s16 p)
 {
-	if(m_blocks_sending.find(p) != m_blocks_sending.end())
-		m_blocks_sending.erase(p);
-	else
-	{
-		m_excess_gotblocks++;
+	if (m_blocks_modified.find(p) == m_blocks_modified.end()) {
+		if (m_blocks_sending.find(p) != m_blocks_sending.end())
+			m_blocks_sending.erase(p);
+		else
+			m_excess_gotblocks++;
+
+		m_blocks_sent.insert(p);
 	}
-	m_blocks_sent.insert(p);
 }
 
 void RemoteClient::SentBlock(v3s16 p)
 {
+	if (m_blocks_modified.find(p) != m_blocks_modified.end())
+		m_blocks_modified.erase(p);
+
 	if(m_blocks_sending.find(p) == m_blocks_sending.end())
 		m_blocks_sending[p] = 0.0;
 	else
@@ -391,22 +395,26 @@ void RemoteClient::SentBlock(v3s16 p)
 void RemoteClient::SetBlockNotSent(v3s16 p)
 {
 	m_nearest_unsent_d = 0;
+	m_nothing_to_send_pause_timer = 0;
 
 	if(m_blocks_sending.find(p) != m_blocks_sending.end())
 		m_blocks_sending.erase(p);
 	if(m_blocks_sent.find(p) != m_blocks_sent.end())
 		m_blocks_sent.erase(p);
+	m_blocks_modified.insert(p);
 }
 
 void RemoteClient::SetBlocksNotSent(std::map<v3s16, MapBlock*> &blocks)
 {
 	m_nearest_unsent_d = 0;
+	m_nothing_to_send_pause_timer = 0;
 
 	for(std::map<v3s16, MapBlock*>::iterator
 			i = blocks.begin();
 			i != blocks.end(); ++i)
 	{
 		v3s16 p = i->first;
+		m_blocks_modified.insert(p);
 
 		if(m_blocks_sending.find(p) != m_blocks_sending.end())
 			m_blocks_sending.erase(p);

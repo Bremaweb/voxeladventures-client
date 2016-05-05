@@ -48,6 +48,11 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #define PP(x) "("<<(x).X<<","<<(x).Y<<","<<(x).Z<<")"
 
+#define LBM_NAME_ALLOWED_CHARS "abcdefghijklmnopqrstuvwxyz0123456789_:"
+
+// A number that is much smaller than the timeout for particle spawners should/could ever be
+#define PARTICLE_SPAWNER_NO_EXPIRY -1024.f
+
 Environment::Environment():
 	m_time_of_day_speed(0),
 	m_time_of_day(9000),
@@ -57,6 +62,9 @@ Environment::Environment():
 	m_day_night_ratio_override(0.0f)
 {
 	m_cache_enable_shaders = g_settings->getBool("enable_shaders");
+	m_cache_active_block_mgmt_interval = g_settings->getFloat("active_block_mgmt_interval");
+	m_cache_abm_interval = g_settings->getFloat("abm_interval");
+	m_cache_nodetimer_interval = g_settings->getFloat("nodetimer_interval");
 }
 
 Environment::~Environment()
@@ -206,6 +214,8 @@ void Environment::setDayNightRatioOverride(bool enable, u32 value)
 void Environment::setTimeOfDay(u32 time)
 {
 	MutexAutoLock lock(this->m_time_lock);
+	if (m_time_of_day > time)
+		m_day_count++;
 	m_time_of_day = time;
 	m_time_of_day_f = (float)time / 24000.0;
 }
@@ -236,8 +246,10 @@ void Environment::stepTimeOfDay(float dtime)
 	bool sync_f = false;
 	if (units > 0) {
 		// Sync at overflow
-		if (m_time_of_day + units >= 24000)
+		if (m_time_of_day + units >= 24000) {
 			sync_f = true;
+			m_day_count++;
+		}
 		m_time_of_day = (m_time_of_day + units) % 24000;
 		if (sync_f)
 			m_time_of_day_f = (float)m_time_of_day / 24000.0;
@@ -254,6 +266,13 @@ void Environment::stepTimeOfDay(float dtime)
 	}
 }
 
+u32 Environment::getDayCount()
+{
+	// Atomic<u32> counter
+	return m_day_count;
+}
+
+
 /*
 	ABMWithState
 */
@@ -268,6 +287,223 @@ ABMWithState::ABMWithState(ActiveBlockModifier *abm_):
 	int minval = MYMAX(-0.51*itv, -60); // Clamp to
 	int maxval = MYMIN(0.51*itv, 60);   // +-60 seconds
 	timer = myrand_range(minval, maxval);
+}
+
+/*
+	LBMManager
+*/
+
+void LBMContentMapping::deleteContents()
+{
+	for (std::vector<LoadingBlockModifierDef *>::iterator it = lbm_list.begin();
+			it != lbm_list.end(); ++it) {
+		delete *it;
+	}
+}
+
+void LBMContentMapping::addLBM(LoadingBlockModifierDef *lbm_def, IGameDef *gamedef)
+{
+	// Add the lbm_def to the LBMContentMapping.
+	// Unknown names get added to the global NameIdMapping.
+	INodeDefManager *nodedef = gamedef->ndef();
+
+	lbm_list.push_back(lbm_def);
+
+	for (std::set<std::string>::const_iterator it = lbm_def->trigger_contents.begin();
+			it != lbm_def->trigger_contents.end(); ++it) {
+		std::set<content_t> c_ids;
+		bool found = nodedef->getIds(*it, c_ids);
+		if (!found) {
+			content_t c_id = gamedef->allocateUnknownNodeId(*it);
+			if (c_id == CONTENT_IGNORE) {
+				// Seems it can't be allocated.
+				warningstream << "Could not internalize node name \"" << *it
+					<< "\" while loading LBM \"" << lbm_def->name << "\"." << std::endl;
+				continue;
+			}
+			c_ids.insert(c_id);
+		}
+
+		for (std::set<content_t>::const_iterator iit =
+				c_ids.begin(); iit != c_ids.end(); ++iit) {
+			content_t c_id = *iit;
+			map[c_id].push_back(lbm_def);
+		}
+	}
+}
+
+const std::vector<LoadingBlockModifierDef *> *
+		LBMContentMapping::lookup(content_t c) const
+{
+	container_map::const_iterator it = map.find(c);
+	if (it == map.end())
+		return NULL;
+	// This first dereferences the iterator, returning
+	// a std::vector<LoadingBlockModifierDef *>
+	// reference, then we convert it to a pointer.
+	return &(it->second);
+}
+
+LBMManager::~LBMManager()
+{
+	for (std::map<std::string, LoadingBlockModifierDef *>::iterator it =
+			m_lbm_defs.begin(); it != m_lbm_defs.end(); ++it) {
+		delete it->second;
+	}
+	for (lbm_lookup_map::iterator it = m_lbm_lookup.begin();
+			it != m_lbm_lookup.end(); ++it) {
+		(it->second).deleteContents();
+	}
+}
+
+void LBMManager::addLBMDef(LoadingBlockModifierDef *lbm_def)
+{
+	// Precondition, in query mode the map isn't used anymore
+	FATAL_ERROR_IF(m_query_mode == true,
+		"attempted to modify LBMManager in query mode");
+
+	if (!string_allowed(lbm_def->name, LBM_NAME_ALLOWED_CHARS)) {
+		throw ModError("Error adding LBM \"" + lbm_def->name +
+			"\": Does not follow naming conventions: "
+			"Only chararacters [a-z0-9_:] are allowed.");
+	}
+
+	m_lbm_defs[lbm_def->name] = lbm_def;
+}
+
+void LBMManager::loadIntroductionTimes(const std::string &times,
+		IGameDef *gamedef, u32 now)
+{
+	m_query_mode = true;
+
+	// name -> time map.
+	// Storing it in a map first instead of
+	// handling the stuff directly in the loop
+	// removes all duplicate entries.
+	// TODO make this std::unordered_map
+	std::map<std::string, u32> introduction_times;
+
+	/*
+	The introduction times string consists of name~time entries,
+	with each entry terminated by a semicolon. The time is decimal.
+	 */
+
+	size_t idx = 0;
+	size_t idx_new;
+	while ((idx_new = times.find(";", idx)) != std::string::npos) {
+		std::string entry = times.substr(idx, idx_new - idx);
+		std::vector<std::string> components = str_split(entry, '~');
+		if (components.size() != 2)
+			throw SerializationError("Introduction times entry \""
+				+ entry + "\" requires exactly one '~'!");
+		const std::string &name = components[0];
+		u32 time = from_string<u32>(components[1]);
+		introduction_times[name] = time;
+		idx = idx_new + 1;
+	}
+
+	// Put stuff from introduction_times into m_lbm_lookup
+	for (std::map<std::string, u32>::const_iterator it = introduction_times.begin();
+			it != introduction_times.end(); ++it) {
+		const std::string &name = it->first;
+		u32 time = it->second;
+
+		std::map<std::string, LoadingBlockModifierDef *>::iterator def_it =
+			m_lbm_defs.find(name);
+		if (def_it == m_lbm_defs.end()) {
+			// This seems to be an LBM entry for
+			// an LBM we haven't loaded. Discard it.
+			continue;
+		}
+		LoadingBlockModifierDef *lbm_def = def_it->second;
+		if (lbm_def->run_at_every_load) {
+			// This seems to be an LBM entry for
+			// an LBM that runs at every load.
+			// Don't add it just yet.
+			continue;
+		}
+
+		m_lbm_lookup[time].addLBM(lbm_def, gamedef);
+
+		// Erase the entry so that we know later
+		// what elements didn't get put into m_lbm_lookup
+		m_lbm_defs.erase(name);
+	}
+
+	// Now also add the elements from m_lbm_defs to m_lbm_lookup
+	// that weren't added in the previous step.
+	// They are introduced first time to this world,
+	// or are run at every load (introducement time hardcoded to U32_MAX).
+
+	LBMContentMapping &lbms_we_introduce_now = m_lbm_lookup[now];
+	LBMContentMapping &lbms_running_always = m_lbm_lookup[U32_MAX];
+
+	for (std::map<std::string, LoadingBlockModifierDef *>::iterator it =
+			m_lbm_defs.begin(); it != m_lbm_defs.end(); ++it) {
+		if (it->second->run_at_every_load) {
+			lbms_running_always.addLBM(it->second, gamedef);
+		} else {
+			lbms_we_introduce_now.addLBM(it->second, gamedef);
+		}
+	}
+
+	// Clear the list, so that we don't delete remaining elements
+	// twice in the destructor
+	m_lbm_defs.clear();
+}
+
+std::string LBMManager::createIntroductionTimesString()
+{
+	// Precondition, we must be in query mode
+	FATAL_ERROR_IF(m_query_mode == false,
+		"attempted to query on non fully set up LBMManager");
+
+	std::ostringstream oss;
+	for (lbm_lookup_map::iterator it = m_lbm_lookup.begin();
+			it != m_lbm_lookup.end(); ++it) {
+		u32 time = it->first;
+		std::vector<LoadingBlockModifierDef *> &lbm_list = it->second.lbm_list;
+		for (std::vector<LoadingBlockModifierDef *>::iterator iit = lbm_list.begin();
+				iit != lbm_list.end(); ++iit) {
+			// Don't add if the LBM runs at every load,
+			// then introducement time is hardcoded
+			// and doesn't need to be stored
+			if ((*iit)->run_at_every_load)
+				continue;
+			oss << (*iit)->name << "~" << time << ";";
+		}
+	}
+	return oss.str();
+}
+
+void LBMManager::applyLBMs(ServerEnvironment *env, MapBlock *block, u32 stamp)
+{
+	// Precondition, we need m_lbm_lookup to be initialized
+	FATAL_ERROR_IF(m_query_mode == false,
+		"attempted to query on non fully set up LBMManager");
+	v3s16 pos_of_block = block->getPosRelative();
+	v3s16 pos;
+	MapNode n;
+	content_t c;
+	lbm_lookup_map::const_iterator it = getLBMsIntroducedAfter(stamp);
+	for (pos.X = 0; pos.X < MAP_BLOCKSIZE; pos.X++)
+	for (pos.Y = 0; pos.Y < MAP_BLOCKSIZE; pos.Y++)
+	for (pos.Z = 0; pos.Z < MAP_BLOCKSIZE; pos.Z++)
+	{
+		n = block->getNodeNoEx(pos);
+		c = n.getContent();
+		for (LBMManager::lbm_lookup_map::const_iterator iit = it;
+				iit != m_lbm_lookup.end(); ++iit) {
+			const std::vector<LoadingBlockModifierDef *> *lbm_list =
+				iit->second.lookup(c);
+			if (!lbm_list)
+				continue;
+			for (std::vector<LoadingBlockModifierDef *>::const_iterator iit =
+					lbm_list->begin(); iit != lbm_list->end(); ++iit) {
+				(*iit)->trigger(env, pos + pos_of_block, n);
+			}
+		}
+	}
 }
 
 /*
@@ -354,6 +590,7 @@ ServerEnvironment::ServerEnvironment(ServerMap *map,
 	m_active_block_interval_overload_skip(0),
 	m_game_time(0),
 	m_game_time_fraction_counter(0),
+	m_last_clear_objects_time(0),
 	m_recommended_send_interval(0.1),
 	m_max_lag_estimate(0.1)
 {
@@ -503,6 +740,11 @@ void ServerEnvironment::saveMeta()
 	Settings args;
 	args.setU64("game_time", m_game_time);
 	args.setU64("time_of_day", getTimeOfDay());
+	args.setU64("last_clear_objects_time", m_last_clear_objects_time);
+	args.setU64("lbm_introduction_times_version", 1);
+	args.set("lbm_introduction_times",
+		m_lbm_mgr.createIntroductionTimesString());
+	args.setU64("day_count", m_day_count);
 	args.writeLines(ss);
 	ss<<"EnvArgsEnd\n";
 
@@ -540,12 +782,35 @@ void ServerEnvironment::loadMeta()
 		throw SerializationError("Couldn't load env meta game_time");
 	}
 
+	setTimeOfDay(args.exists("time_of_day") ?
+		// set day to morning by default
+		args.getU64("time_of_day") : 9000);
+
+	m_last_clear_objects_time = args.exists("last_clear_objects_time") ?
+		// If missing, do as if clearObjects was never called
+		args.getU64("last_clear_objects_time") : 0;
+
+	std::string lbm_introduction_times = "";
 	try {
-		setTimeOfDay(args.getU64("time_of_day"));
+		u64 ver = args.getU64("lbm_introduction_times_version");
+		if (ver == 1) {
+			lbm_introduction_times = args.get("lbm_introduction_times");
+		} else {
+			infostream << "ServerEnvironment::loadMeta(): Non-supported"
+				<< " introduction time version " << ver << std::endl;
+		}
 	} catch (SettingNotFoundException &e) {
-		// This is not as important
-		setTimeOfDay(9000);
+		// No problem, this is expected. Just continue with an empty string
 	}
+	m_lbm_mgr.loadIntroductionTimes(lbm_introduction_times, m_gamedef, m_game_time);
+
+	m_day_count = args.exists("day_count") ?
+		args.getU64("day_count") : 0;
+}
+
+void ServerEnvironment::loadDefaultMeta()
+{
+	m_lbm_mgr.loadIntroductionTimes("", m_gamedef, m_game_time);
 }
 
 struct ActiveABM
@@ -739,12 +1004,18 @@ void ServerEnvironment::activateBlock(MapBlock *block, u32 additional_dtime)
 	// Get time difference
 	u32 dtime_s = 0;
 	u32 stamp = block->getTimestamp();
-	if(m_game_time > stamp && stamp != BLOCK_TIMESTAMP_UNDEFINED)
-		dtime_s = m_game_time - block->getTimestamp();
+	if (m_game_time > stamp && stamp != BLOCK_TIMESTAMP_UNDEFINED)
+		dtime_s = m_game_time - stamp;
 	dtime_s += additional_dtime;
 
 	/*infostream<<"ServerEnvironment::activateBlock(): block timestamp: "
 			<<stamp<<", game time: "<<m_game_time<<std::endl;*/
+
+	// Remove stored static objects if clearObjects was called since block's timestamp
+	if (stamp == BLOCK_TIMESTAMP_UNDEFINED || stamp < m_last_clear_objects_time) {
+		block->m_static_objects.m_stored.clear();
+		// do not set changed flag to avoid unnecessary mapblock writes
+	}
 
 	// Set current time as timestamp
 	block->setTimestampNoChangedFlag(m_game_time);
@@ -754,6 +1025,9 @@ void ServerEnvironment::activateBlock(MapBlock *block, u32 additional_dtime)
 
 	// Activate stored objects
 	activateObjects(block, dtime_s);
+
+	/* Handle LoadingBlockModifiers */
+	m_lbm_mgr.applyLBMs(this, block, stamp);
 
 	// Run node timers
 	std::map<v3s16, NodeTimer> elapsed_timers =
@@ -778,6 +1052,11 @@ void ServerEnvironment::activateBlock(MapBlock *block, u32 additional_dtime)
 void ServerEnvironment::addActiveBlockModifier(ActiveBlockModifier *abm)
 {
 	m_abms.push_back(ABMWithState(abm));
+}
+
+void ServerEnvironment::addLoadingBlockModifierDef(LoadingBlockModifierDef *lbm)
+{
+	m_lbm_mgr.addLBMDef(lbm);
 }
 
 bool ServerEnvironment::setNode(v3s16 p, const MapNode &n)
@@ -858,22 +1137,22 @@ void ServerEnvironment::getObjectsInsideRadius(std::vector<u16> &objects, v3f po
 	}
 }
 
-void ServerEnvironment::clearAllObjects()
+void ServerEnvironment::clearObjects(ClearObjectsMode mode)
 {
-	infostream<<"ServerEnvironment::clearAllObjects(): "
-			<<"Removing all active objects"<<std::endl;
+	infostream << "ServerEnvironment::clearObjects(): "
+		<< "Removing all active objects" << std::endl;
 	std::vector<u16> objects_to_remove;
-	for(std::map<u16, ServerActiveObject*>::iterator
+	for (std::map<u16, ServerActiveObject*>::iterator
 			i = m_active_objects.begin();
 			i != m_active_objects.end(); ++i) {
 		ServerActiveObject* obj = i->second;
-		if(obj->getType() == ACTIVEOBJECT_TYPE_PLAYER)
+		if (obj->getType() == ACTIVEOBJECT_TYPE_PLAYER)
 			continue;
 		u16 id = i->first;
 		// Delete static object if block is loaded
-		if(obj->m_static_exists){
+		if (obj->m_static_exists) {
 			MapBlock *block = m_map->getBlockNoCreateNoEx(obj->m_static_block);
-			if(block){
+			if (block) {
 				block->m_static_objects.remove(id);
 				block->raiseModified(MOD_STATE_WRITE_NEEDED,
 						MOD_REASON_CLEAR_ALL_OBJECTS);
@@ -881,7 +1160,7 @@ void ServerEnvironment::clearAllObjects()
 			}
 		}
 		// If known by some client, don't delete immediately
-		if(obj->m_known_by_count > 0){
+		if (obj->m_known_by_count > 0) {
 			obj->m_pending_deactivation = true;
 			obj->m_removed = true;
 			continue;
@@ -893,39 +1172,46 @@ void ServerEnvironment::clearAllObjects()
 		m_script->removeObjectReference(obj);
 
 		// Delete active object
-		if(obj->environmentDeletes())
+		if (obj->environmentDeletes())
 			delete obj;
 		// Id to be removed from m_active_objects
 		objects_to_remove.push_back(id);
 	}
 
 	// Remove references from m_active_objects
-	for(std::vector<u16>::iterator i = objects_to_remove.begin();
+	for (std::vector<u16>::iterator i = objects_to_remove.begin();
 			i != objects_to_remove.end(); ++i) {
 		m_active_objects.erase(*i);
 	}
 
 	// Get list of loaded blocks
 	std::vector<v3s16> loaded_blocks;
-	infostream<<"ServerEnvironment::clearAllObjects(): "
-			<<"Listing all loaded blocks"<<std::endl;
+	infostream << "ServerEnvironment::clearObjects(): "
+		<< "Listing all loaded blocks" << std::endl;
 	m_map->listAllLoadedBlocks(loaded_blocks);
-	infostream<<"ServerEnvironment::clearAllObjects(): "
-			<<"Done listing all loaded blocks: "
-			<<loaded_blocks.size()<<std::endl;
+	infostream << "ServerEnvironment::clearObjects(): "
+		<< "Done listing all loaded blocks: "
+		<< loaded_blocks.size()<<std::endl;
 
 	// Get list of loadable blocks
 	std::vector<v3s16> loadable_blocks;
-	infostream<<"ServerEnvironment::clearAllObjects(): "
-			<<"Listing all loadable blocks"<<std::endl;
-	m_map->listAllLoadableBlocks(loadable_blocks);
-	infostream<<"ServerEnvironment::clearAllObjects(): "
-			<<"Done listing all loadable blocks: "
-			<<loadable_blocks.size()
-			<<", now clearing"<<std::endl;
+	if (mode == CLEAR_OBJECTS_MODE_FULL) {
+		infostream << "ServerEnvironment::clearObjects(): "
+			<< "Listing all loadable blocks" << std::endl;
+		m_map->listAllLoadableBlocks(loadable_blocks);
+		infostream << "ServerEnvironment::clearObjects(): "
+			<< "Done listing all loadable blocks: "
+			<< loadable_blocks.size() << std::endl;
+	} else {
+		loadable_blocks = loaded_blocks;
+	}
+
+	infostream << "ServerEnvironment::clearObjects(): "
+		<< "Now clearing objects in " << loadable_blocks.size()
+		<< " blocks" << std::endl;
 
 	// Grab a reference on each loaded block to avoid unloading it
-	for(std::vector<v3s16>::iterator i = loaded_blocks.begin();
+	for (std::vector<v3s16>::iterator i = loaded_blocks.begin();
 			i != loaded_blocks.end(); ++i) {
 		v3s16 p = *i;
 		MapBlock *block = m_map->getBlockNoCreateNoEx(p);
@@ -934,24 +1220,27 @@ void ServerEnvironment::clearAllObjects()
 	}
 
 	// Remove objects in all loadable blocks
-	u32 unload_interval = g_settings->getS32("max_clearobjects_extra_loaded_blocks");
-	unload_interval = MYMAX(unload_interval, 1);
+	u32 unload_interval = U32_MAX;
+	if (mode == CLEAR_OBJECTS_MODE_FULL) {
+		unload_interval = g_settings->getS32("max_clearobjects_extra_loaded_blocks");
+		unload_interval = MYMAX(unload_interval, 1);
+	}
 	u32 report_interval = loadable_blocks.size() / 10;
 	u32 num_blocks_checked = 0;
 	u32 num_blocks_cleared = 0;
 	u32 num_objs_cleared = 0;
-	for(std::vector<v3s16>::iterator i = loadable_blocks.begin();
+	for (std::vector<v3s16>::iterator i = loadable_blocks.begin();
 			i != loadable_blocks.end(); ++i) {
 		v3s16 p = *i;
 		MapBlock *block = m_map->emergeBlock(p, false);
-		if(!block){
-			errorstream<<"ServerEnvironment::clearAllObjects(): "
-					<<"Failed to emerge block "<<PP(p)<<std::endl;
+		if (!block) {
+			errorstream << "ServerEnvironment::clearObjects(): "
+				<< "Failed to emerge block " << PP(p) << std::endl;
 			continue;
 		}
 		u32 num_stored = block->m_static_objects.m_stored.size();
 		u32 num_active = block->m_static_objects.m_active.size();
-		if(num_stored != 0 || num_active != 0){
+		if (num_stored != 0 || num_active != 0) {
 			block->m_static_objects.m_stored.clear();
 			block->m_static_objects.m_active.clear();
 			block->raiseModified(MOD_STATE_WRITE_NEEDED,
@@ -961,23 +1250,23 @@ void ServerEnvironment::clearAllObjects()
 		}
 		num_blocks_checked++;
 
-		if(report_interval != 0 &&
-				num_blocks_checked % report_interval == 0){
+		if (report_interval != 0 &&
+				num_blocks_checked % report_interval == 0) {
 			float percent = 100.0 * (float)num_blocks_checked /
-					loadable_blocks.size();
-			infostream<<"ServerEnvironment::clearAllObjects(): "
-					<<"Cleared "<<num_objs_cleared<<" objects"
-					<<" in "<<num_blocks_cleared<<" blocks ("
-					<<percent<<"%)"<<std::endl;
+				loadable_blocks.size();
+			infostream << "ServerEnvironment::clearObjects(): "
+				<< "Cleared " << num_objs_cleared << " objects"
+				<< " in " << num_blocks_cleared << " blocks ("
+				<< percent << "%)" << std::endl;
 		}
-		if(num_blocks_checked % unload_interval == 0){
+		if (num_blocks_checked % unload_interval == 0) {
 			m_map->unloadUnreferencedBlocks();
 		}
 	}
 	m_map->unloadUnreferencedBlocks();
 
 	// Drop references that were added above
-	for(std::vector<v3s16>::iterator i = loaded_blocks.begin();
+	for (std::vector<v3s16>::iterator i = loaded_blocks.begin();
 			i != loaded_blocks.end(); ++i) {
 		v3s16 p = *i;
 		MapBlock *block = m_map->getBlockNoCreateNoEx(p);
@@ -985,9 +1274,11 @@ void ServerEnvironment::clearAllObjects()
 		block->refDrop();
 	}
 
-	infostream<<"ServerEnvironment::clearAllObjects(): "
-			<<"Finished: Cleared "<<num_objs_cleared<<" objects"
-			<<" in "<<num_blocks_cleared<<" blocks"<<std::endl;
+	m_last_clear_objects_time = m_game_time;
+
+	infostream << "ServerEnvironment::clearObjects(): "
+		<< "Finished: Cleared " << num_objs_cleared << " objects"
+		<< " in " << num_blocks_cleared << " blocks" << std::endl;
 }
 
 void ServerEnvironment::step(float dtime)
@@ -1002,7 +1293,8 @@ void ServerEnvironment::step(float dtime)
 	// Update this one
 	// NOTE: This is kind of funny on a singleplayer game, but doesn't
 	// really matter that much.
-	m_recommended_send_interval = g_settings->getFloat("dedicated_server_step");
+	static const float server_step = g_settings->getFloat("dedicated_server_step");
+	m_recommended_send_interval = server_step;
 
 	/*
 		Increment game time
@@ -1036,9 +1328,8 @@ void ServerEnvironment::step(float dtime)
 	/*
 		Manage active block list
 	*/
-	if(m_active_blocks_management_interval.step(dtime, 2.0))
-	{
-		ScopeProfiler sp(g_profiler, "SEnv: manage act. block list avg /2s", SPT_AVG);
+	if (m_active_blocks_management_interval.step(dtime, m_cache_active_block_mgmt_interval)) {
+		ScopeProfiler sp(g_profiler, "SEnv: manage act. block list avg per interval", SPT_AVG);
 		/*
 			Get player block positions
 		*/
@@ -1059,7 +1350,7 @@ void ServerEnvironment::step(float dtime)
 		/*
 			Update list of active blocks, collecting changes
 		*/
-		const s16 active_block_range = g_settings->getS16("active_block_range");
+		static const s16 active_block_range = g_settings->getS16("active_block_range");
 		std::set<v3s16> blocks_removed;
 		std::set<v3s16> blocks_added;
 		m_active_blocks.update(players_blockpos, active_block_range,
@@ -1074,8 +1365,7 @@ void ServerEnvironment::step(float dtime)
 
 		for(std::set<v3s16>::iterator
 				i = blocks_removed.begin();
-				i != blocks_removed.end(); ++i)
-		{
+				i != blocks_removed.end(); ++i) {
 			v3s16 p = *i;
 
 			/* infostream<<"Server: Block " << PP(p)
@@ -1114,13 +1404,10 @@ void ServerEnvironment::step(float dtime)
 	/*
 		Mess around in active blocks
 	*/
-	const float abm_interval = 1.0;
-	if(m_active_blocks_nodemetadata_interval.step(dtime, 1.0))
-	{
-		ScopeProfiler sp(g_profiler, "SEnv: mess in act. blocks avg /1s", SPT_AVG);
+	if (m_active_blocks_nodemetadata_interval.step(dtime, m_cache_nodetimer_interval)) {
+		ScopeProfiler sp(g_profiler, "SEnv: mess in act. blocks avg per interval", SPT_AVG);
 
-		// Initialize handling of ActiveBlockModifiers
-		ABMHandler abmhandler(m_abms, abm_interval, this, true);
+		float dtime = m_cache_nodetimer_interval;
 
 		for(std::set<v3s16>::iterator
 				i = m_active_blocks.m_list.begin();
@@ -1141,7 +1428,7 @@ void ServerEnvironment::step(float dtime)
 			// Set current time as timestamp
 			block->setTimestampNoChangedFlag(m_game_time);
 
-			abmhandler.apply(block);
+			//abmhandler.apply(block);
 
 			// If time has changed much from the one on disk,
 			// set block to be saved when it is unloaded
@@ -1165,6 +1452,49 @@ void ServerEnvironment::step(float dtime)
 			}
 		}
 	}
+
+	if (m_active_block_modifier_interval.step(dtime, m_cache_abm_interval))
+	do{ // breakable
+		if(m_active_block_interval_overload_skip > 0){
+			ScopeProfiler sp(g_profiler, "SEnv: ABM overload skips");
+			m_active_block_interval_overload_skip--;
+			break;
+		}
+		ScopeProfiler sp(g_profiler, "SEnv: modify in blocks avg per interval", SPT_AVG);
+		TimeTaker timer("modify in active blocks per interval");
+
+		// Initialize handling of ActiveBlockModifiers
+		ABMHandler abmhandler(m_abms, m_cache_abm_interval, this, true);
+
+		for(std::set<v3s16>::iterator
+				i = m_active_blocks.m_list.begin();
+				i != m_active_blocks.m_list.end(); ++i)
+		{
+			v3s16 p = *i;
+
+			/*infostream<<"Server: Block ("<<p.X<<","<<p.Y<<","<<p.Z
+					<<") being handled"<<std::endl;*/
+
+			MapBlock *block = m_map->getBlockNoCreateNoEx(p);
+			if(block == NULL)
+				continue;
+
+			// Set current time as timestamp
+			block->setTimestampNoChangedFlag(m_game_time);
+
+			/* Handle ActiveBlockModifiers */
+			abmhandler.apply(block);
+		}
+
+		u32 time_ms = timer.stop(true);
+		u32 max_time_ms = 200;
+		if(time_ms > max_time_ms){
+			warningstream<<"active block modifiers took "
+					<<time_ms<<"ms (longer than "
+					<<max_time_ms<<"ms)"<<std::endl;
+			m_active_block_interval_overload_skip = (time_ms / max_time_ms) + 1;
+		}
+	}while(0);
 
 	/*
 		Step script environment (run global on_step())
@@ -1220,6 +1550,49 @@ void ServerEnvironment::step(float dtime)
 		*/
 		removeRemovedObjects();
 	}
+
+	/*
+		Manage particle spawner expiration
+	*/
+	if (m_particle_management_interval.step(dtime, 1.0)) {
+		for (std::map<u32, float>::iterator i = m_particle_spawners.begin();
+				i != m_particle_spawners.end(); ) {
+			//non expiring spawners
+			if (i->second == PARTICLE_SPAWNER_NO_EXPIRY) {
+				++i;
+				continue;
+			}
+
+			i->second -= 1.0f;
+			if (i->second <= 0.f)
+				m_particle_spawners.erase(i++);
+			else
+				++i;
+		}
+	}
+}
+
+u32 ServerEnvironment::addParticleSpawner(float exptime)
+{
+	// Timers with lifetime 0 do not expire
+	float time = exptime > 0.f ? exptime : PARTICLE_SPAWNER_NO_EXPIRY;
+
+	u32 id = 0;
+	for (;;) { // look for unused particlespawner id
+		id++;
+		std::map<u32, float>::iterator f;
+		f = m_particle_spawners.find(id);
+		if (f == m_particle_spawners.end()) {
+			m_particle_spawners[id] = time;
+			break;
+		}
+	}
+	return id;
+}
+
+void ServerEnvironment::deleteParticleSpawner(u32 id)
+{
+	m_particle_spawners.erase(id);
 }
 
 ServerActiveObject* ServerEnvironment::getActiveObject(u16 id)
@@ -2570,5 +2943,3 @@ ClientEnvEvent ClientEnvironment::getClientEvent()
 }
 
 #endif // #ifndef SERVER
-
-
