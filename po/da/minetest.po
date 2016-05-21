@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: 0.0.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2016-02-27 05:49+0100\n"
-"PO-Revision-Date: 2016-04-17 08:53+0000\n"
+"POT-Creation-Date: 2016-05-05 16:13+0200\n"
+"PO-Revision-Date: 2016-05-06 13:58+0000\n"
 "Last-Translator: Thomas Wagner Nielsen <thomas@viawords.com>\n"
 "Language-Team: Danish "
 "<https://hosted.weblate.org/projects/minetest/minetest/da/>\n"
@@ -17,7 +17,7 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=n != 1;\n"
-"X-Generator: Weblate 2.6-dev\n"
+"X-Generator: Weblate 2.7-dev\n"
 
 #: builtin/fstk/ui.lua
 msgid "An error occured in a Lua script, such as a mod:"
@@ -74,6 +74,7 @@ msgid "We support protocol versions between version $1 and $2."
 msgstr "Vi understøtter protokol versioner mellem $1 og $2."
 
 #: builtin/mainmenu/dlg_config_world.lua builtin/mainmenu/dlg_create_world.lua
+#: builtin/mainmenu/dlg_delete_mod.lua builtin/mainmenu/dlg_delete_world.lua
 #: builtin/mainmenu/dlg_rename_modpack.lua
 #: builtin/mainmenu/dlg_settings_advanced.lua src/guiKeyChangeMenu.cpp
 #: src/keycode.cpp
@@ -154,12 +155,14 @@ msgid "Mapgen"
 msgstr "Mapgen"
 
 #: builtin/mainmenu/dlg_create_world.lua
+#, fuzzy
 msgid "No worldname given or no game selected"
-msgstr ""
+msgstr "Intet navn på verden angivet eller intet spil valgt"
 
 #: builtin/mainmenu/dlg_create_world.lua
+#, fuzzy
 msgid "Seed"
-msgstr ""
+msgstr "Kim"
 
 #: builtin/mainmenu/dlg_create_world.lua
 msgid "Warning: The minimal development test is meant for developers."
@@ -177,6 +180,12 @@ msgstr "Du har ikke installeret nogle subgames."
 msgid "Are you sure you want to delete \"$1\"?"
 msgstr "Er du sikker på du vil slette \"$1\"?"
 
+#: builtin/mainmenu/dlg_delete_mod.lua builtin/mainmenu/dlg_delete_world.lua
+#: builtin/mainmenu/tab_server.lua builtin/mainmenu/tab_singleplayer.lua
+#: src/keycode.cpp
+msgid "Delete"
+msgstr "Slet"
+
 #: builtin/mainmenu/dlg_delete_mod.lua
 msgid "Modmgr: failed to delete \"$1\""
 msgstr "Modmgr: Kunne ikke slette \"$1\""
@@ -185,22 +194,9 @@ msgstr "Modmgr: Kunne ikke slette \"$1\""
 msgid "Modmgr: invalid modpath \"$1\""
 msgstr "Modmgr: ugyldig mod-sti \"$1\""
 
-#: builtin/mainmenu/dlg_delete_mod.lua
-msgid "No of course not!"
-msgstr "Nej selvfølgelig ikke!"
-
-#: builtin/mainmenu/dlg_delete_mod.lua builtin/mainmenu/dlg_delete_world.lua
-#: builtin/mainmenu/tab_settings.lua
-msgid "Yes"
-msgstr "Ja"
-
 #: builtin/mainmenu/dlg_delete_world.lua
 msgid "Delete World \"$1\"?"
 msgstr "Slet verden \"$1\"?"
-
-#: builtin/mainmenu/dlg_delete_world.lua
-msgid "No"
-msgstr "Nej"
 
 #: builtin/mainmenu/dlg_rename_modpack.lua src/keycode.cpp
 msgid "Accept"
@@ -219,12 +215,14 @@ msgid "(No description of setting given)"
 msgstr "(Der er ikke nogen beskrivelse af denne indstilling)"
 
 #: builtin/mainmenu/dlg_settings_advanced.lua
+#, fuzzy
 msgid "< Back to Settings page"
-msgstr ""
+msgstr "< Tilbage til siden Indstillinger"
 
 #: builtin/mainmenu/dlg_settings_advanced.lua
+#, fuzzy
 msgid "Browse"
-msgstr ""
+msgstr "Gennemse"
 
 #: builtin/mainmenu/dlg_settings_advanced.lua
 msgid "Disabled"
@@ -243,10 +241,13 @@ msgid "Format is 3 numbers separated by commas and inside brackets."
 msgstr "Formatet er 3 tal, adskilt af kommaer, og omgivet af parenteser."
 
 #: builtin/mainmenu/dlg_settings_advanced.lua
+#, fuzzy
 msgid ""
 "Format: <offset>, <scale>, (<spreadX>, <spreadY>, <spreadZ>), <seed>, "
 "<octaves>, <persistence>"
 msgstr ""
+"Format: <forskydning>, <skalering>, (<udbredelseX>, <udbredelseY>, "
+"<udbredelseZ>), <kim>, <oktaver>, <vedholdenhed>"
 
 #: builtin/mainmenu/dlg_settings_advanced.lua
 msgid "Games"
@@ -410,8 +411,8 @@ msgid "Uninstall selected modpack"
 msgstr "Afinstaller den valgte modpack"
 
 #: builtin/mainmenu/tab_multiplayer.lua
-msgid "Address / Port :"
-msgstr "Adresse/port:"
+msgid "Address / Port"
+msgstr "Adresse/port"
 
 #: builtin/mainmenu/tab_multiplayer.lua src/settings_translation_file.cpp
 msgid "Client"
@@ -429,18 +430,20 @@ msgstr "Kreativ tilstand"
 msgid "Damage enabled"
 msgstr "Skade aktiveret"
 
-#: builtin/mainmenu/tab_multiplayer.lua builtin/mainmenu/tab_server.lua
-#: builtin/mainmenu/tab_singleplayer.lua src/keycode.cpp
-msgid "Delete"
-msgstr "Slet"
-
-#: builtin/mainmenu/tab_multiplayer.lua
-msgid "Name / Password :"
-msgstr "Navn/kodeord:"
+#: builtin/mainmenu/tab_multiplayer.lua builtin/mainmenu/tab_simple_main.lua
+#, fuzzy
+msgid "Del. Favorite"
+msgstr "Vis favoritter"
 
 #: builtin/mainmenu/tab_multiplayer.lua builtin/mainmenu/tab_simple_main.lua
-msgid "Public Serverlist"
-msgstr "Offentlig serverliste"
+#, fuzzy
+msgid "Favorite"
+msgstr "Vis favoritter"
+
+#: builtin/mainmenu/tab_multiplayer.lua builtin/mainmenu/tab_simple_main.lua
+#, fuzzy
+msgid "Name / Password"
+msgstr "Navn/kodeord:"
 
 #: builtin/mainmenu/tab_multiplayer.lua builtin/mainmenu/tab_simple_main.lua
 msgid "PvP enabled"
@@ -464,7 +467,7 @@ msgstr "Kreativ tilstand"
 msgid "Enable Damage"
 msgstr "Aktivér skade"
 
-#: builtin/mainmenu/tab_server.lua builtin/mainmenu/tab_simple_main.lua
+#: builtin/mainmenu/tab_server.lua
 msgid "Name/Password"
 msgstr "Navn/kodeord"
 
@@ -473,12 +476,14 @@ msgid "New"
 msgstr "Ny"
 
 #: builtin/mainmenu/tab_server.lua builtin/mainmenu/tab_singleplayer.lua
+#, fuzzy
 msgid "No world created or selected!"
-msgstr ""
+msgstr "Ingen verden skabt eller valgt!"
 
 #: builtin/mainmenu/tab_server.lua
+#, fuzzy
 msgid "Port"
-msgstr ""
+msgstr "Port"
 
 #: builtin/mainmenu/tab_server.lua
 msgid "Public"
@@ -501,20 +506,23 @@ msgid "Start Game"
 msgstr "Start spil / Forbind"
 
 #: builtin/mainmenu/tab_settings.lua
+#, fuzzy
 msgid "2x"
-msgstr ""
+msgstr "2x"
 
 #: builtin/mainmenu/tab_settings.lua
 msgid "3D Clouds"
 msgstr "3D-skyer"
 
 #: builtin/mainmenu/tab_settings.lua
+#, fuzzy
 msgid "4x"
-msgstr ""
+msgstr "4x"
 
 #: builtin/mainmenu/tab_settings.lua
+#, fuzzy
 msgid "8x"
-msgstr ""
+msgstr "8x"
 
 #: builtin/mainmenu/tab_settings.lua
 msgid "Advanced Settings"
@@ -532,9 +540,9 @@ msgstr "Er du sikker på, at du vil nulstille din enkelt spiller-verden?"
 msgid "Bilinear Filter"
 msgstr "Bi-lineær filtréring"
 
-#: builtin/mainmenu/tab_settings.lua src/settings_translation_file.cpp
+#: builtin/mainmenu/tab_settings.lua
 #, fuzzy
-msgid "Bumpmapping"
+msgid "Bump Mapping"
 msgstr "Mip-mapping"
 
 #: builtin/mainmenu/tab_settings.lua
@@ -546,17 +554,9 @@ msgid "Connected Glass"
 msgstr "Forbundet glas"
 
 #: builtin/mainmenu/tab_settings.lua
-msgid "Enable Particles"
-msgstr "Aktivér partikler"
-
-#: builtin/mainmenu/tab_settings.lua
 #, fuzzy
 msgid "Fancy Leaves"
 msgstr "Opakt (uigennemsigtigt) vand"
-
-#: builtin/mainmenu/tab_settings.lua
-msgid "Generate Normalmaps"
-msgstr ""
 
 #: builtin/mainmenu/tab_settings.lua
 #, fuzzy
@@ -568,6 +568,10 @@ msgid "Mipmap + Aniso. Filter"
 msgstr ""
 
 #: builtin/mainmenu/tab_settings.lua
+msgid "No"
+msgstr "Nej"
+
+#: builtin/mainmenu/tab_settings.lua
 msgid "No Filter"
 msgstr "Intet filter"
 
@@ -577,17 +581,23 @@ msgid "No Mipmap"
 msgstr "Mip-mapping"
 
 #: builtin/mainmenu/tab_settings.lua
-msgid "No!!!"
-msgstr ""
+#, fuzzy
+msgid "Node Highlighting"
+msgstr "Glat belysning"
 
 #: builtin/mainmenu/tab_settings.lua
 #, fuzzy
-msgid "Node Highlighting"
+msgid "Node Outlining"
 msgstr "Glat belysning"
 
 #: builtin/mainmenu/tab_settings.lua builtin/mainmenu/tab_texturepacks.lua
 msgid "None"
 msgstr "Ingen"
+
+#: builtin/mainmenu/tab_settings.lua
+#, fuzzy
+msgid "Normal Mapping"
+msgstr "Mip-mapping"
 
 #: builtin/mainmenu/tab_settings.lua
 #, fuzzy
@@ -602,6 +612,11 @@ msgstr "Opakt (uigennemsigtigt) vand"
 #: builtin/mainmenu/tab_settings.lua src/settings_translation_file.cpp
 msgid "Parallax Occlusion"
 msgstr ""
+
+#: builtin/mainmenu/tab_settings.lua
+#, fuzzy
+msgid "Particles"
+msgstr "Aktivér partikler"
 
 #: builtin/mainmenu/tab_settings.lua
 msgid "Settings"
@@ -627,6 +642,11 @@ msgstr ""
 msgid "To enable shaders the OpenGL driver needs to be used."
 msgstr ""
 
+#: builtin/mainmenu/tab_settings.lua src/settings_translation_file.cpp
+#, fuzzy
+msgid "Tone Mapping"
+msgstr "Mip-mapping"
+
 #: builtin/mainmenu/tab_settings.lua
 msgid "Touchthreshold (px)"
 msgstr ""
@@ -649,6 +669,10 @@ msgstr "\"Smarte\" træer"
 #, fuzzy
 msgid "Waving Water"
 msgstr "\"Smarte\" træer"
+
+#: builtin/mainmenu/tab_settings.lua
+msgid "Yes"
+msgstr "Ja"
 
 #: builtin/mainmenu/tab_simple_main.lua
 msgid "Config mods"
@@ -732,8 +756,9 @@ msgid "Player name too long."
 msgstr "Spillerens navn er for langt."
 
 #: src/client/clientlauncher.cpp
+#, fuzzy
 msgid "Provided world path doesn't exist: "
-msgstr ""
+msgstr "Den angivne sti til verdenen findes ikke: "
 
 #: src/fontengine.cpp
 msgid "needs_fallback_font"
@@ -764,14 +789,17 @@ msgid "Continue"
 msgstr "Fortsæt"
 
 #: src/game.cpp
+#, fuzzy
 msgid "Creating client..."
-msgstr ""
+msgstr "Opretter klient..."
 
 #: src/game.cpp
+#, fuzzy
 msgid "Creating server..."
-msgstr ""
+msgstr "Opretter server..."
 
 #: src/game.cpp
+#, fuzzy
 msgid ""
 "Default Controls:\n"
 "- WASD: move\n"
@@ -785,8 +813,20 @@ msgid ""
 "- Mouse wheel: select item\n"
 "- T: chat\n"
 msgstr ""
+"Standard-styring:\n"
+"- WASD: Bevæge sig rundt\n"
+"- Mellemrumstast: Hoppe/klatre\n"
+"- Skift: Snige/gå nedad\n"
+"- Q: Smide genstand\n"
+"- I: Medbragt\n"
+"- Mus: Vende rundt/kigge\n"
+"- Mus venstre: Grave/slå\n"
+"- Mus højre: Placere/bruge\n"
+"- Musehjul: Vælge genstand\n"
+"- T: Chat\n"
 
 #: src/game.cpp
+#, fuzzy
 msgid ""
 "Default Controls:\n"
 "No menu visible:\n"
@@ -801,6 +841,18 @@ msgid ""
 "- touch&drag, tap 2nd finger\n"
 " --> place single item to slot\n"
 msgstr ""
+"Standard-styring:\n"
+"Ingen menu synlig:\n"
+"- Enkelt tryk: Aktivér knap\n"
+"- Dobbelt tryk: Placér/brug\n"
+"- Stryg finger: Kig rundt\n"
+"Menu/Medbragt synlig:\n"
+"- Dobbelt tryk (uden for):\n"
+" --> Luk\n"
+"- Rør ved stakken, rør ved felt:\n"
+" --> Flyt stakken\n"
+"- Rør ved og træk, tryk med 2. finger\n"
+" --> Placér enkelt genstand på feltet\n"
 
 #: src/game.cpp
 msgid "Exit to Menu"
@@ -815,24 +867,23 @@ msgid "Item definitions..."
 msgstr ""
 
 #: src/game.cpp
+#, fuzzy
 msgid "KiB/s"
-msgstr ""
+msgstr "KiB/s"
 
 #: src/game.cpp
 msgid "Media..."
 msgstr "Medier..."
 
 #: src/game.cpp
+#, fuzzy
 msgid "MiB/s"
-msgstr ""
+msgstr "MiB/s"
 
 #: src/game.cpp
+#, fuzzy
 msgid "Node definitions..."
-msgstr ""
-
-#: src/game.cpp src/guiFormSpecMenu.cpp
-msgid "Proceed"
-msgstr "Fortsæt"
+msgstr "Blokdefinitioner..."
 
 #: src/game.cpp
 msgid "Resolving address..."
@@ -854,13 +905,17 @@ msgstr "Lydniveau"
 msgid "You died."
 msgstr "Du døde."
 
+#: src/game.cpp src/guiFormSpecMenu.cpp
+msgid "ok"
+msgstr "ok"
+
 #: src/guiFormSpecMenu.cpp
 msgid "Enter "
 msgstr ""
 
 #: src/guiFormSpecMenu.cpp
-msgid "ok"
-msgstr "ok"
+msgid "Proceed"
+msgstr "Fortsæt"
 
 #: src/guiKeyChangeMenu.cpp
 msgid "\"Use\" = climb down"
@@ -980,12 +1035,14 @@ msgid "Passwords do not match!"
 msgstr "Kodeordene er ikke ens!"
 
 #: src/guiVolumeChange.cpp
+#, fuzzy
 msgid "Exit"
-msgstr ""
+msgstr "Afslut"
 
 #: src/guiVolumeChange.cpp
+#, fuzzy
 msgid "Sound Volume: "
-msgstr ""
+msgstr "Lydstyrke: "
 
 #: src/keycode.cpp
 msgid "Apps"
@@ -1298,8 +1355,9 @@ msgid "3D clouds"
 msgstr "3D skyer"
 
 #: src/settings_translation_file.cpp
+#, fuzzy
 msgid "3D mode"
-msgstr ""
+msgstr "3D-tilstand"
 
 #: src/settings_translation_file.cpp
 msgid ""
@@ -1320,19 +1378,30 @@ msgid ""
 msgstr ""
 
 #: src/settings_translation_file.cpp
+#, fuzzy
 msgid "A message to be displayed to all clients when the server crashes."
-msgstr ""
+msgstr "Besked, som skal vises til alle klienter, når serveren går ned."
 
 #: src/settings_translation_file.cpp
+#, fuzzy
 msgid "A message to be displayed to all clients when the server shuts down."
-msgstr ""
+msgstr "Besked, som skal vises til alle klienter, når serveren lukker ned."
 
 #: src/settings_translation_file.cpp
 msgid "Absolute limit of emerge queues"
 msgstr ""
 
 #: src/settings_translation_file.cpp
+#, fuzzy
 msgid "Acceleration in air"
+msgstr "Acceleration i luft"
+
+#: src/settings_translation_file.cpp
+msgid "Active Block Management interval"
+msgstr ""
+
+#: src/settings_translation_file.cpp
+msgid "Active Block Modifier interval"
 msgstr ""
 
 #: src/settings_translation_file.cpp
@@ -1351,10 +1420,13 @@ msgid ""
 msgstr ""
 
 #: src/settings_translation_file.cpp
+#, fuzzy
 msgid ""
 "Adjust dpi configuration to your screen (non X11/Android only) e.g. for 4k "
 "screens."
 msgstr ""
+"Justér DPI-konfigurationen til din skærm (ikke-X11 / kun Andorid) f.eks. til "
+"4k-skærme."
 
 #: src/settings_translation_file.cpp
 msgid ""
@@ -1371,16 +1443,18 @@ msgid "Altitude Chill"
 msgstr ""
 
 #: src/settings_translation_file.cpp
+#, fuzzy
 msgid "Always fly and fast"
-msgstr ""
+msgstr "Flyv altid og hurtigt"
 
 #: src/settings_translation_file.cpp
 msgid "Ambient occlusion gamma"
 msgstr ""
 
 #: src/settings_translation_file.cpp
+#, fuzzy
 msgid "Amplifies the valleys"
-msgstr ""
+msgstr "Forstærker dalene"
 
 #: src/settings_translation_file.cpp
 #, fuzzy
@@ -1403,12 +1477,14 @@ msgid "Approximate (X,Y,Z) scale of fractal in nodes."
 msgstr ""
 
 #: src/settings_translation_file.cpp
+#, fuzzy
 msgid "Ask to reconnect after crash"
-msgstr ""
+msgstr "Spørg om at forbinde igen, efter den er gået ned."
 
 #: src/settings_translation_file.cpp
+#, fuzzy
 msgid "Automaticaly report to the serverlist."
-msgstr ""
+msgstr "Rapportér automatisk til serverlisten."
 
 #: src/settings_translation_file.cpp
 #, fuzzy
@@ -1421,6 +1497,10 @@ msgstr ""
 
 #: src/settings_translation_file.cpp
 msgid "Basic"
+msgstr ""
+
+#: src/settings_translation_file.cpp
+msgid "Basic Privileges"
 msgstr ""
 
 #: src/settings_translation_file.cpp
@@ -1442,6 +1522,11 @@ msgid "Build inside player"
 msgstr "Flerspiller"
 
 #: src/settings_translation_file.cpp
+#, fuzzy
+msgid "Bumpmapping"
+msgstr "Mip-mapping"
+
+#: src/settings_translation_file.cpp
 msgid "Camera smoothing"
 msgstr ""
 
@@ -1459,6 +1544,10 @@ msgstr ""
 
 #: src/settings_translation_file.cpp
 msgid "Cave noise #2"
+msgstr ""
+
+#: src/settings_translation_file.cpp
+msgid "Cave width"
 msgstr ""
 
 #: src/settings_translation_file.cpp
@@ -1626,6 +1715,10 @@ msgstr ""
 
 #: src/settings_translation_file.cpp
 msgid "Controls steepness/height of hills."
+msgstr ""
+
+#: src/settings_translation_file.cpp
+msgid "Controls width of tunnels, a smaller value creates wider tunnels."
 msgstr ""
 
 #: src/settings_translation_file.cpp
@@ -2025,6 +2118,10 @@ msgid "Font size"
 msgstr ""
 
 #: src/settings_translation_file.cpp
+msgid "Format of screenshots."
+msgstr ""
+
+#: src/settings_translation_file.cpp
 #, fuzzy
 msgid "Forward key"
 msgstr "Fremad"
@@ -2090,9 +2187,11 @@ msgid ""
 "Global map generation attributes.\n"
 "In Mapgen v6 the 'decorations' flag controls all decorations except trees\n"
 "and junglegrass, in all other mapgens this flag controls all decorations.\n"
+"The default flags set in the engine are: caves, light, decorations\n"
+"The flags string modifies the engine defaults.\n"
 "Flags that are not specified in the flag string are not modified from the "
 "default.\n"
-"Flags starting with \"no\" are used to explicitly disable them."
+"Flags starting with 'no' are used to explicitly disable them."
 msgstr ""
 
 #: src/settings_translation_file.cpp
@@ -2569,6 +2668,14 @@ msgid ""
 msgstr ""
 
 #: src/settings_translation_file.cpp
+msgid "Length of time between ABM execution cycles"
+msgstr ""
+
+#: src/settings_translation_file.cpp
+msgid "Length of time between NodeTimer execution cycles"
+msgstr ""
+
+#: src/settings_translation_file.cpp
 msgid ""
 "Level of logging to be written to debug.txt:\n"
 "-    <nothing> (no logging)\n"
@@ -2655,41 +2762,50 @@ msgstr ""
 #: src/settings_translation_file.cpp
 msgid ""
 "Map generation attributes specific to Mapgen Valleys.\n"
+"'altitude_chill' makes higher elevations colder, which may cause biome "
+"issues.\n"
+"'humid_rivers' modifies the humidity around rivers and in areas where water "
+"would tend to pool,\n"
+"it may interfere with delicately adjusted biomes.\n"
+"The default flags set in the engine are: altitude_chill, humid_rivers\n"
+"The flags string modifies the engine defaults.\n"
 "Flags that are not specified in the flag string are not modified from the "
 "default.\n"
-"Flags starting with \"no\" are used to explicitly disable them.\n"
-"\"altitude_chill\" makes higher elevations colder, which may cause biome "
-"issues.\n"
-"\"humid_rivers\" modifies the humidity around rivers and in areas where "
-"water would tend to pool. It may interfere with delicately adjusted biomes."
+"Flags starting with 'no' are used to explicitly disable them."
 msgstr ""
 
 #: src/settings_translation_file.cpp
 msgid ""
 "Map generation attributes specific to Mapgen flat.\n"
-"Occasional lakes and hills added to the flat world.\n"
+"Occasional lakes and hills can be added to the flat world.\n"
+"The default flags set in the engine are: none\n"
+"The flags string modifies the engine defaults.\n"
 "Flags that are not specified in the flag string are not modified from the "
 "default.\n"
-"Flags starting with \"no\" are used to explicitly disable them."
+"Flags starting with 'no' are used to explicitly disable them."
 msgstr ""
 
 #: src/settings_translation_file.cpp
 msgid ""
 "Map generation attributes specific to Mapgen v6.\n"
-"When snowbiomes are enabled jungles are enabled and the jungles flag is "
-"ignored.\n"
+"When snowbiomes are enabled jungles are automatically enabled, the 'jungles' "
+"flag is ignored.\n"
+"The default flags set in the engine are: biomeblend, mudflow\n"
+"The flags string modifies the engine defaults.\n"
 "Flags that are not specified in the flag string are not modified from the "
 "default.\n"
-"Flags starting with \"no\" are used to explicitly disable them."
+"Flags starting with 'no' are used to explicitly disable them."
 msgstr ""
 
 #: src/settings_translation_file.cpp
 msgid ""
 "Map generation attributes specific to Mapgen v7.\n"
-"'ridges' are the rivers.\n"
+"The 'ridges' flag controls the rivers.\n"
+"The default flags set in the engine are: mountains, ridges\n"
+"The flags string modifies the engine defaults.\n"
 "Flags that are not specified in the flag string are not modified from the "
 "default.\n"
-"Flags starting with \"no\" are used to explicitly disable them."
+"Flags starting with 'no' are used to explicitly disable them."
 msgstr ""
 
 #: src/settings_translation_file.cpp
@@ -2739,6 +2855,11 @@ msgid "Mapgen flat"
 msgstr "Mapgen"
 
 #: src/settings_translation_file.cpp
+#, fuzzy
+msgid "Mapgen flat cave width"
+msgstr "Mapgen"
+
+#: src/settings_translation_file.cpp
 msgid "Mapgen flat cave1 noise parameters"
 msgstr ""
 
@@ -2785,6 +2906,11 @@ msgstr ""
 #: src/settings_translation_file.cpp
 msgid "Mapgen fractal"
 msgstr ""
+
+#: src/settings_translation_file.cpp
+#, fuzzy
+msgid "Mapgen fractal cave width"
+msgstr "Mapgen"
 
 #: src/settings_translation_file.cpp
 msgid "Mapgen fractal cave1 noise parameters"
@@ -2848,6 +2974,10 @@ msgstr ""
 
 #: src/settings_translation_file.cpp
 msgid "Mapgen v5"
+msgstr ""
+
+#: src/settings_translation_file.cpp
+msgid "Mapgen v5 cave width"
 msgstr ""
 
 #: src/settings_translation_file.cpp
@@ -2932,6 +3062,10 @@ msgstr ""
 
 #: src/settings_translation_file.cpp
 msgid "Mapgen v7"
+msgstr ""
+
+#: src/settings_translation_file.cpp
+msgid "Mapgen v7 cave width"
 msgstr ""
 
 #: src/settings_translation_file.cpp
@@ -3228,6 +3362,10 @@ msgid "Node highlighting"
 msgstr ""
 
 #: src/settings_translation_file.cpp
+msgid "NodeTimer interval"
+msgstr ""
+
+#: src/settings_translation_file.cpp
 msgid "Noise parameters for biome API temperature, humidity and biome blend."
 msgstr ""
 
@@ -3344,6 +3482,10 @@ msgid "Prevent mods from doing insecure things like running shell commands."
 msgstr ""
 
 #: src/settings_translation_file.cpp
+msgid "Privileges that players with basic_privs can grant"
+msgstr ""
+
+#: src/settings_translation_file.cpp
 msgid "Profiler data print interval. 0 = disable. Useful for developers."
 msgstr ""
 
@@ -3455,6 +3597,23 @@ msgid "Screenshot folder"
 msgstr ""
 
 #: src/settings_translation_file.cpp
+#, fuzzy
+msgid "Screenshot format"
+msgstr "Tilstandsbillede"
+
+#: src/settings_translation_file.cpp
+#, fuzzy
+msgid "Screenshot quality"
+msgstr "Tilstandsbillede"
+
+#: src/settings_translation_file.cpp
+msgid ""
+"Screenshot quality. Only used for JPEG format.\n"
+"1 means worst quality; 100 means best quality.\n"
+"Use 0 for default quality."
+msgstr ""
+
+#: src/settings_translation_file.cpp
 msgid "Security"
 msgstr ""
 
@@ -3547,6 +3706,10 @@ msgid "Show debug info"
 msgstr ""
 
 #: src/settings_translation_file.cpp
+msgid "Show entity selection boxes"
+msgstr ""
+
+#: src/settings_translation_file.cpp
 msgid "Shutdown message"
 msgstr ""
 
@@ -3610,6 +3773,10 @@ msgstr ""
 
 #: src/settings_translation_file.cpp
 msgid "Strict protocol checking"
+msgstr ""
+
+#: src/settings_translation_file.cpp
+msgid "Support older servers"
 msgstr ""
 
 #: src/settings_translation_file.cpp
@@ -3686,6 +3853,10 @@ msgid "This font will be used for certain languages."
 msgstr ""
 
 #: src/settings_translation_file.cpp
+msgid "Time in between active block management cycles"
+msgstr ""
+
+#: src/settings_translation_file.cpp
 msgid ""
 "Time in seconds for item entity (dropped items) to live.\n"
 "Setting it to -1 disables the feature."
@@ -3714,11 +3885,6 @@ msgstr ""
 #: src/settings_translation_file.cpp
 msgid "Toggle camera mode key"
 msgstr ""
-
-#: src/settings_translation_file.cpp
-#, fuzzy
-msgid "Tone Mapping"
-msgstr "Mip-mapping"
 
 #: src/settings_translation_file.cpp
 msgid "Tooltip delay"
@@ -3971,6 +4137,14 @@ msgid ""
 msgstr ""
 
 #: src/settings_translation_file.cpp
+msgid ""
+"Whether to support older servers before protocol version 25.\n"
+"Enable if you want to connect to 0.4.12 servers and before.\n"
+"Servers starting with 0.4.13 will work, 0.4.12-dev servers may work.\n"
+"Disabling this option will protect your password better."
+msgstr ""
+
+#: src/settings_translation_file.cpp
 msgid "Width component of the initial window size."
 msgstr ""
 
@@ -4005,44 +4179,53 @@ msgid "cURL timeout"
 msgstr ""
 
 #, fuzzy
-#~ msgid "If disabled "
-#~ msgstr "Deaktivér alle"
+#~ msgid "Downloading"
+#~ msgstr "Ned"
 
-#, fuzzy
-#~ msgid "If enabled, "
-#~ msgstr "aktiveret"
+#~ msgid "Left click: Move all items, Right click: Move single item"
+#~ msgstr "Venstre klik: flyt alle enheder. Højre klik: flyt en enkelt enhed"
 
-#, fuzzy
-#~ msgid "Game Name"
-#~ msgstr "Spil"
+#~ msgid "is required by:"
+#~ msgstr "er påkrævet af:"
 
-#, fuzzy
-#~ msgid "Favorites:"
+#~ msgid "Configuration saved.  "
+#~ msgstr "Konfiguration gemt.  "
+
+#~ msgid "Warning: Configuration not consistent.  "
+#~ msgstr "Advarsel: konfigurationen er ikke sammenhængende.  "
+
+#~ msgid "Cannot create world: Name contains invalid characters"
+#~ msgstr "Kan ikke skabe verden: navnet indeholder ugyldige bogstaver"
+
+#~ msgid "Show Public"
+#~ msgstr "Vis offentlig"
+
+#~ msgid "Show Favorites"
 #~ msgstr "Vis favoritter"
 
-#, fuzzy
-#~ msgid "Password"
-#~ msgstr "Gammelt kodeord"
+#~ msgid "Leave address blank to start a local server."
+#~ msgstr "Lad adresse-feltet være tomt for at starte en lokal server."
 
-#~ msgid "Preload item visuals"
-#~ msgstr "For-indlæs elementernes grafik"
+#~ msgid "Create world"
+#~ msgstr "Skab verden"
 
-#~ msgid ""
-#~ "Warning: Some mods are not configured yet.\n"
-#~ "They will be enabled by default when you save the configuration.  "
-#~ msgstr ""
-#~ "Advarsel: nogle modifikationer er endnu ikke konfigureret.\n"
-#~ "De vil blive aktiveret som standard når du gemmer konfigurationen.  "
+#~ msgid "Address required."
+#~ msgstr "Adresse påkrævet."
 
-#~ msgid ""
-#~ "Warning: Some configured mods are missing.\n"
-#~ "Their setting will be removed when you save the configuration.  "
-#~ msgstr ""
-#~ "Advarsel: nogle konfigurerede modifikationer mangler.\n"
-#~ "Deres indstillinger vil blive fjernet når du gemmer konfigurationen.  "
+#~ msgid "Cannot delete world: Nothing selected"
+#~ msgstr "Kan ikke slette verden: ingenting valgt"
 
-#~ msgid "Delete map"
-#~ msgstr "Slet mappen"
+#~ msgid "Files to be deleted"
+#~ msgstr "Filer som slettes"
+
+#~ msgid "Cannot create world: No games found"
+#~ msgstr "Kan ikke skabe verden: ingen spil fundet"
+
+#~ msgid "Cannot configure world: Nothing selected"
+#~ msgstr "Kan ikke konfigurere verden: ingenting valgt"
+
+#~ msgid "Failed to delete all world files"
+#~ msgstr "Mislykkedes i at slette alle verdenens filer"
 
 #~ msgid ""
 #~ "Default Controls:\n"
@@ -4069,51 +4252,44 @@ msgstr ""
 #~ "- ESC: denne menu\n"
 #~ "- T: snak\n"
 
-#~ msgid "Failed to delete all world files"
-#~ msgstr "Mislykkedes i at slette alle verdenens filer"
+#~ msgid "Delete map"
+#~ msgstr "Slet mappen"
 
-#~ msgid "Cannot configure world: Nothing selected"
-#~ msgstr "Kan ikke konfigurere verden: ingenting valgt"
+#~ msgid ""
+#~ "Warning: Some configured mods are missing.\n"
+#~ "Their setting will be removed when you save the configuration.  "
+#~ msgstr ""
+#~ "Advarsel: nogle konfigurerede modifikationer mangler.\n"
+#~ "Deres indstillinger vil blive fjernet når du gemmer konfigurationen.  "
 
-#~ msgid "Cannot create world: No games found"
-#~ msgstr "Kan ikke skabe verden: ingen spil fundet"
+#~ msgid ""
+#~ "Warning: Some mods are not configured yet.\n"
+#~ "They will be enabled by default when you save the configuration.  "
+#~ msgstr ""
+#~ "Advarsel: nogle modifikationer er endnu ikke konfigureret.\n"
+#~ "De vil blive aktiveret som standard når du gemmer konfigurationen.  "
 
-#~ msgid "Files to be deleted"
-#~ msgstr "Filer som slettes"
-
-#~ msgid "Cannot delete world: Nothing selected"
-#~ msgstr "Kan ikke slette verden: ingenting valgt"
-
-#~ msgid "Address required."
-#~ msgstr "Adresse påkrævet."
-
-#~ msgid "Create world"
-#~ msgstr "Skab verden"
-
-#~ msgid "Leave address blank to start a local server."
-#~ msgstr "Lad adresse-feltet være tomt for at starte en lokal server."
-
-#~ msgid "Show Favorites"
-#~ msgstr "Vis favoritter"
-
-#~ msgid "Show Public"
-#~ msgstr "Vis offentlig"
-
-#~ msgid "Cannot create world: Name contains invalid characters"
-#~ msgstr "Kan ikke skabe verden: navnet indeholder ugyldige bogstaver"
-
-#~ msgid "Warning: Configuration not consistent.  "
-#~ msgstr "Advarsel: konfigurationen er ikke sammenhængende.  "
-
-#~ msgid "Configuration saved.  "
-#~ msgstr "Konfiguration gemt.  "
-
-#~ msgid "is required by:"
-#~ msgstr "er påkrævet af:"
-
-#~ msgid "Left click: Move all items, Right click: Move single item"
-#~ msgstr "Venstre klik: flyt alle enheder. Højre klik: flyt en enkelt enhed"
+#~ msgid "Preload item visuals"
+#~ msgstr "For-indlæs elementernes grafik"
 
 #, fuzzy
-#~ msgid "Downloading"
-#~ msgstr "Ned"
+#~ msgid "Password"
+#~ msgstr "Gammelt kodeord"
+
+#, fuzzy
+#~ msgid "Game Name"
+#~ msgstr "Spil"
+
+#, fuzzy
+#~ msgid "If enabled, "
+#~ msgstr "aktiveret"
+
+#, fuzzy
+#~ msgid "If disabled "
+#~ msgstr "Deaktivér alle"
+
+#~ msgid "Public Serverlist"
+#~ msgstr "Offentlig serverliste"
+
+#~ msgid "No of course not!"
+#~ msgstr "Nej selvfølgelig ikke!"
