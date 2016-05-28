@@ -1,5 +1,7 @@
-Minetest
-========
+Voxel Adventures Client
+=======================
+
+Based on Minetest
 
 An InfiniMiner/Minecraft inspired game.
 
@@ -117,30 +119,20 @@ For Fedora users:
 $ sudo dnf install git-core
 
 Download source (this is the URL to the latest of source repository, which might not work at all times) using git:
-$ git clone --depth 1 https://github.com/minetest/minetest.git
-$ cd minetest
-
-Download minetest_game (otherwise only the "Minimal development test" game is available) using git:
-$ git clone --depth 1 https://github.com/minetest/minetest_game.git games/minetest_game
+$ git clone --depth 1 https://github.com/bremaweb/voxeladventures-client.git
+$ cd voxeladventures-client
 
 Download source, without using git:
-$ wget https://github.com/minetest/minetest/archive/master.tar.gz
+$ wget https://github.com/bremaweb/voxeladventures-client/archive/master.tar.gz
 $ tar xf master.tar.gz
 $ cd minetest-master
 
-Download minetest_game, without using git:
-$ cd games/
-$ wget https://github.com/minetest/minetest_game/archive/master.tar.gz
-$ tar xf master.tar.gz
-$ mv minetest_game-master minetest_game
-$ cd ..
-
-Build a version that runs directly from the source directory:
-$ cmake . -DRUN_IN_PLACE=TRUE
+Build a version that runs directly from the source directory (if you want to build the server change -DBUILD_SERVER=FALSE to -DBUILD_SERVER=TRUE):
+$ cmake . -DRUN_IN_PLACE=TRUE -DBUILD_CLIENT=TRUE -DBUILD_SERVER=FALSE
 $ make -j <number of processors>
 
 Run it:
-$ ./bin/minetest
+$ ./bin/voxeladventures-client
 
 - Use cmake . -LH to see all CMake options and their current state
 - If you want to install it system-wide (or are making a distribution package),

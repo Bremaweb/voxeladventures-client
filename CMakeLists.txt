@@ -6,8 +6,8 @@ if(${CMAKE_VERSION} STREQUAL "2.8.2")
 endif()
 
 # This can be read from ${PROJECT_NAME} after project() is called
-project(minetest)
-set(PROJECT_NAME_CAPITALIZED "Minetest")
+project(voxeladventures-client)
+set(PROJECT_NAME_CAPITALIZED "Voxel Adventures Client")
 
 
 # Also remember to set PROTOCOL_VERSION in network/networkprotocol.h when releasing
@@ -17,7 +17,7 @@ set(VERSION_PATCH 14)
 set(VERSION_EXTRA "" CACHE STRING "Stuff to append to version string")
 
 # Change to false for releases
-set(DEVELOPMENT_BUILD TRUE)
+set(DEVELOPMENT_BUILD FALSE)
 
 set(VERSION_STRING "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}")
 if(VERSION_EXTRA)
@@ -195,8 +195,8 @@ set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "An InfiniMiner/Minecraft inspired game")
 set(CPACK_PACKAGE_VERSION_MAJOR ${VERSION_MAJOR})
 set(CPACK_PACKAGE_VERSION_MINOR ${VERSION_MINOR})
 set(CPACK_PACKAGE_VERSION_PATCH ${VERSION_PATCH})
-set(CPACK_PACKAGE_VENDOR "celeron55")
-set(CPACK_PACKAGE_CONTACT "Perttu Ahola <celeron55@gmail.com>")
+set(CPACK_PACKAGE_VENDOR "bremaweb")
+set(CPACK_PACKAGE_CONTACT "Brandon <brandon@bremaweb.com>")
 
 if(WIN32)
 	if(CMAKE_SIZEOF_VOID_P EQUAL 8)

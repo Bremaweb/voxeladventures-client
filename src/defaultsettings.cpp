@@ -195,13 +195,14 @@ void set_default_settings(Settings *settings)
 
 	settings->setDefault("enable_remote_media_server", "true");
 
-	settings->setDefault("serverlist_url", "servers.minetest.net");
+	settings->setDefault("serverlist_url", "voxeladventures.com");
 	settings->setDefault("serverlist_file", "favoriteservers.txt");
 	settings->setDefault("server_announce", "false");
 	settings->setDefault("server_url", "");
 	settings->setDefault("server_address", "");
 	settings->setDefault("server_name", "");
 	settings->setDefault("server_description", "");
+	settings->setDefault("public_serverlist","true");
 
 #if USE_FREETYPE
 	settings->setDefault("freetype", "true");
