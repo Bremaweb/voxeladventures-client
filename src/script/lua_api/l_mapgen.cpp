@@ -39,11 +39,11 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 struct EnumString ModApiMapgen::es_BiomeTerrainType[] =
 {
-	{BIOME_NORMAL, "normal"},
-	{BIOME_LIQUID, "liquid"},
-	{BIOME_NETHER, "nether"},
-	{BIOME_AETHER, "aether"},
-	{BIOME_FLAT,   "flat"},
+	{BIOMETYPE_NORMAL, "normal"},
+	{BIOMETYPE_LIQUID, "liquid"},
+	{BIOMETYPE_NETHER, "nether"},
+	{BIOMETYPE_AETHER, "aether"},
+	{BIOMETYPE_FLAT,   "flat"},
 	{0, NULL},
 };
 
@@ -371,7 +371,7 @@ Biome *read_biome_def(lua_State *L, int index, INodeDefManager *ndef)
 		return NULL;
 
 	BiomeType biometype = (BiomeType)getenumfield(L, index, "type",
-		ModApiMapgen::es_BiomeTerrainType, BIOME_NORMAL);
+		ModApiMapgen::es_BiomeTerrainType, BIOMETYPE_NORMAL);
 	Biome *b = BiomeManager::create(biometype);
 
 	b->name            = getstringfield_default(L, index, "name", "");
@@ -528,24 +528,26 @@ int ModApiMapgen::l_get_mapgen_object(lua_State *L)
 		return 1;
 	}
 	case MGOBJ_BIOMEMAP: {
-		if (!mg->biomemap)
+		if (!mg->biomegen)
 			return 0;
 
 		lua_newtable(L);
 		for (size_t i = 0; i != maplen; i++) {
-			lua_pushinteger(L, mg->biomemap[i]);
+			lua_pushinteger(L, mg->biomegen->biomemap[i]);
 			lua_rawseti(L, -2, i + 1);
 		}
 
 		return 1;
 	}
 	case MGOBJ_HEATMAP: {
-		if (!mg->heatmap)
+		if (!mg->biomegen || mg->biomegen->getType() != BIOMEGEN_ORIGINAL)
 			return 0;
+
+		BiomeGenOriginal *bg = (BiomeGenOriginal *)mg->biomegen;
 
 		lua_newtable(L);
 		for (size_t i = 0; i != maplen; i++) {
-			lua_pushnumber(L, mg->heatmap[i]);
+			lua_pushnumber(L, bg->heatmap[i]);
 			lua_rawseti(L, -2, i + 1);
 		}
 
@@ -553,12 +555,14 @@ int ModApiMapgen::l_get_mapgen_object(lua_State *L)
 	}
 
 	case MGOBJ_HUMIDMAP: {
-		if (!mg->humidmap)
+		if (!mg->biomegen || mg->biomegen->getType() != BIOMEGEN_ORIGINAL)
 			return 0;
+
+		BiomeGenOriginal *bg = (BiomeGenOriginal *)mg->biomegen;
 
 		lua_newtable(L);
 		for (size_t i = 0; i != maplen; i++) {
-			lua_pushnumber(L, mg->humidmap[i]);
+			lua_pushnumber(L, bg->humidmap[i]);
 			lua_rawseti(L, -2, i + 1);
 		}
 

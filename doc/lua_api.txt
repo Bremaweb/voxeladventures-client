@@ -1701,6 +1701,24 @@ numerical form, the raw integer value of an ARGB8 quad:
 or string form, a ColorString (defined above):
     `colorspec = "green"`
 
+Escape sequences
+----------------
+Most text can contain escape sequences, that can for example color the text.
+There are a few exceptions: tab headers, dropdowns and vertical labels can't.
+The following functions provide escape sequences:
+* `core.get_color_escape_sequence(color)`:
+    * `color` is a ColorString
+    * The escape sequence sets the text color to `color`
+* `core.colorize(color, message)`:
+    * Equivalent to:
+      `core.get_color_escape_sequence(color) ..
+       message ..
+       core.get_color_escape_sequence("#ffffff")`
+* `color.get_background_escape_sequence(color)`
+    * `color` is a ColorString
+    * The escape sequence sets the background of the whole text element to
+      `color`. Only defined for item descriptions and tooltips.
+
 Spatial Vectors
 ---------------
 * `vector.new(a[, b, c])`: returns a vector:
@@ -1951,12 +1969,21 @@ Call these functions only at load time!
 * `minetest.notify_authentication_modified(name)`
     * Should be called by the authentication handler if privileges changes.
     * To report everybody, set `name=nil`.
+* `minetest.check_password_entry(name, entry, password)`
+    * Returns true if the "db entry" for a player with name matches given
+    * password, false otherwise.
+    * The "db entry" is the usually player-individual value that is derived
+    * from the player's chosen password and stored on the server in order to allow
+    * authentication whenever the player desires to log in.
+    * Only use this function for making it possible to log in via the password from
+    * via protocols like IRC, other uses for inside the game are frowned upon.
 * `minetest.get_password_hash(name, raw_password)`
     * Convert a name-password pair to a password hash that Minetest can use.
     * The returned value alone is not a good basis for password checks based
     * on comparing the password hash in the database with the password hash
     * from the function, with an externally provided password, as the hash
     * in the db might use the new SRP verifier format.
+    * For this purpose, use minetest.check_password_entry instead.
 * `minetest.string_to_privs(str)`: returns `{priv1=true,...}`
 * `minetest.privs_to_string(privs)`: returns `"priv1,priv2,..."`
     * Convert between two privilege representations
@@ -2438,6 +2465,10 @@ These functions return the leftover itemstack.
     * See documentation on `minetest.compress()` for supported compression methods.
     * currently supported.
     * `...` indicates method-specific arguments. Currently, no methods use this.
+* `minetest.encode_base64(string)`: returns string encoded in base64
+    * Encodes a string in base64.
+* `minetest.decode_base64(string)`: returns string
+    * Decodes a string encoded in base64.
 * `minetest.is_protected(pos, name)`: returns boolean
     * Returns true, if player `name` shouldn't be abled to dig at `pos` or do other
       actions, defineable by mods, due to some mod-defined ownership-like concept.
@@ -3881,6 +3912,9 @@ Definition tables
         size = 1,
         collisiondetection = false,
     --  ^ collisiondetection: if true collides with physical objects
+        collision_removal = false,
+    --  ^ collision_removal: if true then particle is removed when it collides,
+    --  ^ requires collisiondetection = true to have any effect
         vertical = false,
     --  ^ vertical: if true faces player using y axis only
         texture = "image.png",
@@ -3910,6 +3944,9 @@ Definition tables
     --  ^ minsize/maxsize, minexptime/maxexptime (expirationtime)
         collisiondetection = false,
     --  ^ collisiondetection: if true uses collision detection
+        collision_removal = false,
+    --  ^ collision_removal: if true then particle is removed when it collides,
+    --  ^ requires collisiondetection = true to have any effect
         vertical = false,
     --  ^ vertical: if true faces player using y axis only
         texture = "image.png",
