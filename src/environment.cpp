@@ -1404,31 +1404,29 @@ void ServerEnvironment::step(float dtime)
 	/*
 		Mess around in active blocks
 	*/
-	if (m_active_blocks_nodemetadata_interval.step(dtime, m_cache_nodetimer_interval)) {
-		ScopeProfiler sp(g_profiler, "SEnv: mess in act. blocks avg per interval", SPT_AVG);
+	bool nodetimers = m_active_blocks_nodemetadata_interval.step(dtime, m_cache_nodetimer_interval);
+	bool abms = m_active_block_modifier_interval.step(dtime, m_cache_abm_interval);
+	ABMHandler abmhandler(m_abms, m_cache_abm_interval, this, true);
 
-		float dtime = m_cache_nodetimer_interval;
+	for(std::set<v3s16>::iterator
+			i = m_active_blocks.m_list.begin();
+			i != m_active_blocks.m_list.end(); ++i)
+	{
+		v3s16 p = *i;
 
-		for(std::set<v3s16>::iterator
-				i = m_active_blocks.m_list.begin();
-				i != m_active_blocks.m_list.end(); ++i)
-		{
-			v3s16 p = *i;
+		/*infostream<<"Server: Block ("<<p.X<<","<<p.Y<<","<<p.Z
+				<<") being handled"<<std::endl;*/
 
-			/*infostream<<"Server: Block ("<<p.X<<","<<p.Y<<","<<p.Z
-					<<") being handled"<<std::endl;*/
+		MapBlock *block = m_map->getBlockNoCreateNoEx(p);
+		if(block==NULL)
+			continue;
 
-			MapBlock *block = m_map->getBlockNoCreateNoEx(p);
-			if(block==NULL)
-				continue;
+		// Set current time as timestamp
+		block->setTimestampNoChangedFlag(m_game_time);
 
+		if ( nodetimers ){
 			// Reset block usage timer
 			block->resetUsageTimer();
-
-			// Set current time as timestamp
-			block->setTimestampNoChangedFlag(m_game_time);
-
-			//abmhandler.apply(block);
 
 			// If time has changed much from the one on disk,
 			// set block to be saved when it is unloaded
@@ -1437,8 +1435,7 @@ void ServerEnvironment::step(float dtime)
 					MOD_REASON_BLOCK_EXPIRED);
 
 			// Run node timers
-			std::map<v3s16, NodeTimer> elapsed_timers =
-				block->m_node_timers.step((float)dtime);
+			std::map<v3s16, NodeTimer> elapsed_timers =	block->m_node_timers.step(m_cache_nodetimer_interval);
 			if(!elapsed_timers.empty()){
 				MapNode n;
 				for(std::map<v3s16, NodeTimer>::iterator
@@ -1451,50 +1448,11 @@ void ServerEnvironment::step(float dtime)
 				}
 			}
 		}
-	}
 
-	if (m_active_block_modifier_interval.step(dtime, m_cache_abm_interval))
-	do{ // breakable
-		if(m_active_block_interval_overload_skip > 0){
-			ScopeProfiler sp(g_profiler, "SEnv: ABM overload skips");
-			m_active_block_interval_overload_skip--;
-			break;
-		}
-		ScopeProfiler sp(g_profiler, "SEnv: modify in blocks avg per interval", SPT_AVG);
-		TimeTaker timer("modify in active blocks per interval");
-
-		// Initialize handling of ActiveBlockModifiers
-		ABMHandler abmhandler(m_abms, m_cache_abm_interval, this, true);
-
-		for(std::set<v3s16>::iterator
-				i = m_active_blocks.m_list.begin();
-				i != m_active_blocks.m_list.end(); ++i)
-		{
-			v3s16 p = *i;
-
-			/*infostream<<"Server: Block ("<<p.X<<","<<p.Y<<","<<p.Z
-					<<") being handled"<<std::endl;*/
-
-			MapBlock *block = m_map->getBlockNoCreateNoEx(p);
-			if(block == NULL)
-				continue;
-
-			// Set current time as timestamp
-			block->setTimestampNoChangedFlag(m_game_time);
-
-			/* Handle ActiveBlockModifiers */
+		if ( abms ){
 			abmhandler.apply(block);
 		}
-
-		u32 time_ms = timer.stop(true);
-		u32 max_time_ms = 200;
-		if(time_ms > max_time_ms){
-			warningstream<<"active block modifiers took "
-					<<time_ms<<"ms (longer than "
-					<<max_time_ms<<"ms)"<<std::endl;
-			m_active_block_interval_overload_skip = (time_ms / max_time_ms) + 1;
-		}
-	}while(0);
+	}
 
 	/*
 		Step script environment (run global on_step())
