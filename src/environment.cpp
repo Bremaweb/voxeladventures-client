@@ -1435,9 +1435,9 @@ void ServerEnvironment::step(float dtime)
 					MOD_REASON_BLOCK_EXPIRED);
 
 			// Run node timers
-
-			std::map<v3s16, NodeTimer> elapsed_timers =	block->m_node_timers.step(m_cache_nodetimer_interval);
-			if(!elapsed_timers.empty()){
+			std::vector<NodeTimer> elapsed_timers =
+				block->m_node_timers.step(m_cache_nodetimer_interval);
+			if (!elapsed_timers.empty()) {
 				MapNode n;
 				for (std::vector<NodeTimer>::iterator
 						i = elapsed_timers.begin();
