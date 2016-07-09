@@ -49,26 +49,24 @@ FlagDesc flagdesc_mapgen_flat[] = {
 ///////////////////////////////////////////////////////////////////////////////////////
 
 
-MapgenFlat::MapgenFlat(int mapgenid, MapgenParams *params, EmergeManager *emerge)
+MapgenFlat::MapgenFlat(int mapgenid, MapgenFlatParams *params, EmergeManager *emerge)
 	: MapgenBasic(mapgenid, params, emerge)
 {
-	MapgenFlatParams *sp = (MapgenFlatParams *)params->sparams;
-
-	this->spflags          = sp->spflags;
-	this->ground_level     = sp->ground_level;
-	this->large_cave_depth = sp->large_cave_depth;
-	this->cave_width       = sp->cave_width;
-	this->lake_threshold   = sp->lake_threshold;
-	this->lake_steepness   = sp->lake_steepness;
-	this->hill_threshold   = sp->hill_threshold;
-	this->hill_steepness   = sp->hill_steepness;
+	this->spflags          = params->spflags;
+	this->ground_level     = params->ground_level;
+	this->large_cave_depth = params->large_cave_depth;
+	this->cave_width       = params->cave_width;
+	this->lake_threshold   = params->lake_threshold;
+	this->lake_steepness   = params->lake_steepness;
+	this->hill_threshold   = params->hill_threshold;
+	this->hill_steepness   = params->hill_steepness;
 
 	//// 2D noise
-	noise_terrain      = new Noise(&sp->np_terrain,      seed, csize.X, csize.Z);
-	noise_filler_depth = new Noise(&sp->np_filler_depth, seed, csize.X, csize.Z);
+	noise_terrain      = new Noise(&params->np_terrain,      seed, csize.X, csize.Z);
+	noise_filler_depth = new Noise(&params->np_filler_depth, seed, csize.X, csize.Z);
 
-	MapgenBasic::np_cave1 = sp->np_cave1;
-	MapgenBasic::np_cave2 = sp->np_cave2;
+	MapgenBasic::np_cave1 = params->np_cave1;
+	MapgenBasic::np_cave2 = params->np_cave2;
 }
 
 
@@ -84,7 +82,7 @@ MapgenFlatParams::MapgenFlatParams()
 	spflags          = 0;
 	ground_level     = 8;
 	large_cave_depth = -33;
-	cave_width       = 0.3;
+	cave_width       = 0.2;
 	lake_threshold   = -0.45;
 	lake_steepness   = 48.0;
 	hill_threshold   = 0.45;
@@ -92,8 +90,8 @@ MapgenFlatParams::MapgenFlatParams()
 
 	np_terrain      = NoiseParams(0, 1,   v3f(600, 600, 600), 7244,  5, 0.6, 2.0);
 	np_filler_depth = NoiseParams(0, 1.2, v3f(150, 150, 150), 261,   3, 0.7, 2.0);
-	np_cave1        = NoiseParams(0, 12,  v3f(96,  96,  96),  52534, 4, 0.5, 2.0);
-	np_cave2        = NoiseParams(0, 12,  v3f(96,  96,  96),  10325, 4, 0.5, 2.0);
+	np_cave1        = NoiseParams(0, 12,  v3f(61,  61,  61),  52534, 3, 0.5, 2.0);
+	np_cave2        = NoiseParams(0, 12,  v3f(67,  67,  67),  10325, 3, 0.5, 2.0);
 }
 
 
@@ -192,7 +190,6 @@ void MapgenFlat::makeChunk(BlockMakeData *data)
 
 	// Init biome generator, place biome-specific nodes, and build biomemap
 	biomegen->calcBiomeNoise(node_min);
-	biomegen->getBiomes(heightmap);
 	MgStoneType stone_type = generateBiomes();
 
 	if (flags & MG_CAVES)

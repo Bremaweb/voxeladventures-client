@@ -149,7 +149,8 @@ public:
 	 * @param smgr scene manager to add scene elements to
 	 * @param data struct to transfer data to main game handling
 	 */
-	GUIEngine(	irr::IrrlichtDevice* dev,
+	GUIEngine(irr::IrrlichtDevice* dev,
+			JoystickController *joystick,
 			gui::IGUIElement* parent,
 			IMenuManager *menumgr,
 			scene::ISceneManager* smgr,
@@ -269,10 +270,10 @@ private:
 	void drawVersion();
 
 	/**
-	 * specify text to be appended to version string
+	 * specify text to appear as top left string
 	 * @param text to set
 	 */
-	void setTopleftText(std::string append);
+	void setTopleftText(const std::string &text);
 
 	/** pointer to gui element shown at topleft corner */
 	irr::gui::IGUIStaticText*	m_irr_toplefttext;

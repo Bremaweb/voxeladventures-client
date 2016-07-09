@@ -53,7 +53,7 @@ FlagDesc flagdesc_mapgen_v6[] = {
 /////////////////////////////////////////////////////////////////////////////
 
 
-MapgenV6::MapgenV6(int mapgenid, MapgenParams *params, EmergeManager *emerge)
+MapgenV6::MapgenV6(int mapgenid, MapgenV6Params *params, EmergeManager *emerge)
 	: Mapgen(mapgenid, params, emerge)
 {
 	this->m_emerge = emerge;
@@ -61,26 +61,25 @@ MapgenV6::MapgenV6(int mapgenid, MapgenParams *params, EmergeManager *emerge)
 
 	this->heightmap = new s16[csize.X * csize.Z];
 
-	MapgenV6Params *sp = (MapgenV6Params *)params->sparams;
-	this->spflags     = sp->spflags;
-	this->freq_desert = sp->freq_desert;
-	this->freq_beach  = sp->freq_beach;
+	this->spflags     = params->spflags;
+	this->freq_desert = params->freq_desert;
+	this->freq_beach  = params->freq_beach;
 
-	np_cave        = &sp->np_cave;
-	np_humidity    = &sp->np_humidity;
-	np_trees       = &sp->np_trees;
-	np_apple_trees = &sp->np_apple_trees;
+	np_cave        = &params->np_cave;
+	np_humidity    = &params->np_humidity;
+	np_trees       = &params->np_trees;
+	np_apple_trees = &params->np_apple_trees;
 
 	//// Create noise objects
-	noise_terrain_base   = new Noise(&sp->np_terrain_base,   seed, csize.X, csize.Y);
-	noise_terrain_higher = new Noise(&sp->np_terrain_higher, seed, csize.X, csize.Y);
-	noise_steepness      = new Noise(&sp->np_steepness,      seed, csize.X, csize.Y);
-	noise_height_select  = new Noise(&sp->np_height_select,  seed, csize.X, csize.Y);
-	noise_mud            = new Noise(&sp->np_mud,            seed, csize.X, csize.Y);
-	noise_beach          = new Noise(&sp->np_beach,          seed, csize.X, csize.Y);
-	noise_biome          = new Noise(&sp->np_biome,          seed,
+	noise_terrain_base   = new Noise(&params->np_terrain_base,   seed, csize.X, csize.Y);
+	noise_terrain_higher = new Noise(&params->np_terrain_higher, seed, csize.X, csize.Y);
+	noise_steepness      = new Noise(&params->np_steepness,      seed, csize.X, csize.Y);
+	noise_height_select  = new Noise(&params->np_height_select,  seed, csize.X, csize.Y);
+	noise_mud            = new Noise(&params->np_mud,            seed, csize.X, csize.Y);
+	noise_beach          = new Noise(&params->np_beach,          seed, csize.X, csize.Y);
+	noise_biome          = new Noise(&params->np_biome,          seed,
 			csize.X + 2 * MAP_BLOCKSIZE, csize.Y + 2 * MAP_BLOCKSIZE);
-	noise_humidity       = new Noise(&sp->np_humidity,       seed,
+	noise_humidity       = new Noise(&params->np_humidity,       seed,
 			csize.X + 2 * MAP_BLOCKSIZE, csize.Y + 2 * MAP_BLOCKSIZE);
 
 	//// Resolve nodes to be used
@@ -560,28 +559,30 @@ void MapgenV6::makeChunk(BlockMakeData *data)
 		DungeonParams dp;
 
 		dp.seed = seed;
+		dp.c_water       = c_water_source;
+		dp.c_river_water = c_water_source;
+		dp.rooms_min     = 2;
+		dp.rooms_max     = 16;
+		dp.y_min         = -MAX_MAP_GENERATION_LIMIT;
+		dp.y_max         = MAX_MAP_GENERATION_LIMIT;
+		dp.np_density    = NoiseParams(0.9, 0.5, v3f(500.0, 500.0, 500.0), 0, 2, 0.8, 2.0);
+		dp.np_alt_wall   = NoiseParams(-0.4, 1.0, v3f(40.0, 40.0, 40.0), 32474, 6, 1.1, 2.0);
 
-		dp.np_rarity  = nparams_dungeon_rarity;
-		dp.np_density = nparams_dungeon_density;
-		dp.np_wetness = nparams_dungeon_wetness;
-		dp.c_water    = c_water_source;
 		if (getBiome(0, v2s16(node_min.X, node_min.Z)) == BT_DESERT) {
-			dp.c_cobble = c_desert_stone;
-			dp.c_moss   = c_desert_stone;
-			dp.c_stair  = c_desert_stone;
+			dp.c_wall     = c_desert_stone;
+			dp.c_alt_wall = CONTENT_IGNORE;
+			dp.c_stair    = c_desert_stone;
 
 			dp.diagonal_dirs = true;
-			dp.mossratio     = 0.0;
 			dp.holesize      = v3s16(2, 3, 2);
 			dp.roomsize      = v3s16(2, 5, 2);
 			dp.notifytype    = GENNOTIFY_TEMPLE;
 		} else {
-			dp.c_cobble = c_cobble;
-			dp.c_moss   = c_mossycobble;
-			dp.c_stair  = c_stair_cobble;
+			dp.c_wall     = c_cobble;
+			dp.c_alt_wall = c_mossycobble;
+			dp.c_stair    = c_stair_cobble;
 
 			dp.diagonal_dirs = false;
-			dp.mossratio     = 3.0;
 			dp.holesize      = v3s16(1, 2, 1);
 			dp.roomsize      = v3s16(0, 0, 0);
 			dp.notifytype    = GENNOTIFY_DUNGEON;

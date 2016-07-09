@@ -29,6 +29,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "modalMenu.h"
 #include "guiTable.h"
 #include "network/networkprotocol.h"
+#include "client/joystick_controller.h"
 #include "util/string.h"
 #include "util/enriched_string.h"
 
@@ -278,6 +279,7 @@ class GUIFormSpecMenu : public GUIModalMenu
 
 public:
 	GUIFormSpecMenu(irr::IrrlichtDevice* dev,
+			JoystickController *joystick,
 			gui::IGUIElement* parent, s32 id,
 			IMenuManager *menumgr,
 			InventoryManager *invmgr,
@@ -438,6 +440,8 @@ private:
 	unsigned int      m_formspec_version;
 	std::string       m_focused_element;
 	bool              m_selection_active;
+	JoystickController *m_joystick;
+
 
 	typedef struct {
 		bool explicit_size;
@@ -494,6 +498,8 @@ private:
 	bool parseVersionDirect(std::string data);
 	bool parseSizeDirect(parserData* data, std::string element);
 	void parseScrollBar(parserData* data, std::string element);
+
+	void tryClose();
 
 	/**
 	 * check if event is part of a double click

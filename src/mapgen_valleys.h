@@ -46,7 +46,7 @@ class BiomeGenOriginal;
 //extern Profiler *mapgen_profiler;
 
 
-struct MapgenValleysParams : public MapgenSpecificParams {
+struct MapgenValleysParams : public MapgenParams {
 	u32 spflags;
 	s16 large_cave_depth;
 	s16 massive_cave_depth;
@@ -88,8 +88,10 @@ struct TerrainNoise {
 class MapgenValleys : public MapgenBasic {
 public:
 
-	MapgenValleys(int mapgenid, MapgenParams *params, EmergeManager *emerge);
+	MapgenValleys(int mapgenid, MapgenValleysParams *params, EmergeManager *emerge);
 	~MapgenValleys();
+
+	virtual MapgenType getType() const { return MAPGEN_VALLEYS; }
 
 	virtual void makeChunk(BlockMakeData *data);
 	int getSpawnLevelAtPoint(v2s16 p);
@@ -125,7 +127,6 @@ private:
 	Noise *noise_valley_profile;
 
 	content_t c_lava_source;
-	content_t c_sand;
 
 	float terrainLevelAtPoint(s16 x, s16 z);
 
@@ -136,18 +137,6 @@ private:
 	float adjustedTerrainLevelFromNoise(TerrainNoise *tn);
 
 	virtual void generateCaves(s16 max_stone_y, s16 large_cave_depth);
-};
-
-struct MapgenFactoryValleys : public MapgenFactory {
-	Mapgen *createMapgen(int mgid, MapgenParams *params, EmergeManager *emerge)
-	{
-		return new MapgenValleys(mgid, params, emerge);
-	};
-
-	MapgenSpecificParams *createMapgenParams()
-	{
-		return new MapgenValleysParams();
-	};
 };
 
 #endif

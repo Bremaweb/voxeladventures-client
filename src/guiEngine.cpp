@@ -131,6 +131,7 @@ void MenuMusicFetcher::fetchSounds(const std::string &name,
 /** GUIEngine                                                                 */
 /******************************************************************************/
 GUIEngine::GUIEngine(	irr::IrrlichtDevice* dev,
+						JoystickController *joystick,
 						gui::IGUIElement* parent,
 						IMenuManager *menumgr,
 						scene::ISceneManager* smgr,
@@ -173,8 +174,7 @@ GUIEngine::GUIEngine(	irr::IrrlichtDevice* dev,
 		m_sound_manager = &dummySoundManager;
 
 	//create topleft header
-	m_toplefttext = utf8_to_wide(std::string(PROJECT_NAME_C " ") +
-			g_version_hash);
+	m_toplefttext = L"";
 
 	core::rect<s32> rect(0, 0, g_fontengine->getTextWidth(m_toplefttext.c_str()),
 		g_fontengine->getTextHeight());
@@ -189,6 +189,7 @@ GUIEngine::GUIEngine(	irr::IrrlichtDevice* dev,
 
 	/* Create menu */
 	m_menu = new GUIFormSpecMenu(m_device,
+			joystick,
 			m_parent,
 			-1,
 			m_menumanager,
@@ -569,18 +570,9 @@ bool GUIEngine::downloadFile(std::string url, std::string target)
 }
 
 /******************************************************************************/
-void GUIEngine::setTopleftText(std::string append)
+void GUIEngine::setTopleftText(const std::string &text)
 {
-	std::wstring toset = utf8_to_wide(std::string(PROJECT_NAME_C " ") +
-		g_version_hash);
-
-	if (append != "")
-	{
-		toset += L" / ";
-		toset += utf8_to_wide(append);
-	}
-
-	m_toplefttext = toset;
+	m_toplefttext = utf8_to_wide(text);
 
 	updateTopLeftTextSize();
 }

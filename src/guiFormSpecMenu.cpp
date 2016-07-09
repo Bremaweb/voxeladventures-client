@@ -79,6 +79,7 @@ static unsigned int font_line_height(gui::IGUIFont *font)
 }
 
 GUIFormSpecMenu::GUIFormSpecMenu(irr::IrrlichtDevice* dev,
+		JoystickController *joystick,
 		gui::IGUIElement* parent, s32 id, IMenuManager *menumgr,
 		InventoryManager *invmgr, IGameDef *gamedef,
 		ISimpleTextureSource *tsrc, IFormSource* fsrc, TextDest* tdst,
@@ -102,6 +103,7 @@ GUIFormSpecMenu::GUIFormSpecMenu(irr::IrrlichtDevice* dev,
 	m_text_dst(tdst),
 	m_formspec_version(0),
 	m_focused_element(""),
+	m_joystick(joystick),
 	m_font(NULL),
 	m_remap_dbl_click(remap_dbl_click)
 #ifdef __ANDROID__
@@ -3024,6 +3026,25 @@ bool GUIFormSpecMenu::preprocessEvent(const SEvent& event)
 	}
 	#endif
 
+	if (event.EventType == irr::EET_JOYSTICK_INPUT_EVENT) {
+		/* TODO add a check like:
+		if (event.JoystickEvent != joystick_we_listen_for)
+			return false;
+		*/
+		bool handled = m_joystick->handleEvent(event.JoystickEvent);
+		if (handled) {
+			if (m_joystick->wasKeyDown(KeyType::ESC)) {
+				tryClose();
+			} else if (m_joystick->wasKeyDown(KeyType::JUMP)) {
+				if (m_allowclose) {
+					acceptInput(quit_mode_accept);
+					quitMenu();
+				}
+			}
+		}
+		return handled;
+	}
+
 	return false;
 }
 
@@ -3085,19 +3106,24 @@ bool GUIFormSpecMenu::DoubleClickDetection(const SEvent event)
 	return false;
 }
 
+void GUIFormSpecMenu::tryClose()
+{
+	if (m_allowclose) {
+		doPause = false;
+		acceptInput(quit_mode_cancel);
+		quitMenu();
+	} else {
+		m_text_dst->gotText(L"MenuQuit");
+	}
+}
+
 bool GUIFormSpecMenu::OnEvent(const SEvent& event)
 {
 	if (event.EventType==EET_KEY_INPUT_EVENT) {
 		KeyPress kp(event.KeyInput);
 		if (event.KeyInput.PressedDown && ( (kp == EscapeKey) ||
 				(kp == getKeySetting("keymap_inventory")) || (kp == CancelKey))) {
-			if (m_allowclose) {
-				doPause = false;
-				acceptInput(quit_mode_cancel);
-				quitMenu();
-			} else {
-				m_text_dst->gotText(L"MenuQuit");
-			}
+			tryClose();
 			return true;
 		} else if (m_client != NULL && event.KeyInput.PressedDown &&
 				(kp == getKeySetting("keymap_screenshot"))) {

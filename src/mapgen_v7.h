@@ -32,7 +32,7 @@ class BiomeManager;
 extern FlagDesc flagdesc_mapgen_v7[];
 
 
-struct MapgenV7Params : public MapgenSpecificParams {
+struct MapgenV7Params : public MapgenParams {
 	u32 spflags;
 	float cave_width;
 	NoiseParams np_terrain_base;
@@ -56,8 +56,10 @@ struct MapgenV7Params : public MapgenSpecificParams {
 
 class MapgenV7 : public MapgenBasic {
 public:
-	MapgenV7(int mapgenid, MapgenParams *params, EmergeManager *emerge);
+	MapgenV7(int mapgenid, MapgenV7Params *params, EmergeManager *emerge);
 	~MapgenV7();
+
+	virtual MapgenType getType() const { return MAPGEN_V7; }
 
 	virtual void makeChunk(BlockMakeData *data);
 	int getSpawnLevelAtPoint(v2s16 p);
@@ -78,18 +80,6 @@ private:
 	Noise *noise_ridge_uwater;
 	Noise *noise_mountain;
 	Noise *noise_ridge;
-};
-
-struct MapgenFactoryV7 : public MapgenFactory {
-	Mapgen *createMapgen(int mgid, MapgenParams *params, EmergeManager *emerge)
-	{
-		return new MapgenV7(mgid, params, emerge);
-	};
-
-	MapgenSpecificParams *createMapgenParams()
-	{
-		return new MapgenV7Params();
-	};
 };
 
 #endif

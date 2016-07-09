@@ -169,6 +169,7 @@ LOCAL_SRC_FILES := \
 		jni/src/log.cpp                           \
 		jni/src/main.cpp                          \
 		jni/src/map.cpp                           \
+		jni/src/map_settings_manager.cpp          \
 		jni/src/mapblock.cpp                      \
 		jni/src/mapblock_mesh.cpp                 \
 		jni/src/mapgen.cpp                        \
@@ -224,6 +225,7 @@ LOCAL_SRC_FILES := \
 		jni/src/util/auth.cpp                     \
 		jni/src/util/base64.cpp                   \
 		jni/src/util/directiontables.cpp          \
+		jni/src/util/enriched_string.cpp          \
 		jni/src/util/numeric.cpp                  \
 		jni/src/util/pointedthing.cpp             \
 		jni/src/util/serialize.cpp                \
@@ -237,6 +239,7 @@ LOCAL_SRC_FILES := \
 		jni/src/unittest/test_connection.cpp      \
 		jni/src/unittest/test_filepath.cpp        \
 		jni/src/unittest/test_inventory.cpp       \
+		jni/src/unittest/test_map_settings_manager.cpp \
 		jni/src/unittest/test_mapnode.cpp         \
 		jni/src/unittest/test_nodedef.cpp         \
 		jni/src/unittest/test_noderesolver.cpp    \
@@ -256,7 +259,9 @@ LOCAL_SRC_FILES := \
 		jni/src/settings.cpp                      \
 		jni/src/wieldmesh.cpp                     \
 		jni/src/client/clientlauncher.cpp         \
-		jni/src/client/tile.cpp
+		jni/src/client/tile.cpp                   \
+		jni/src/client/joystick_controller.cpp    \
+		jni/src/irrlicht_changes/static_text.cpp
 
 # intentionally kept out (we already build openssl itself): jni/src/util/sha256.c
 

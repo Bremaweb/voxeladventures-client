@@ -47,29 +47,27 @@ FlagDesc flagdesc_mapgen_fractal[] = {
 ///////////////////////////////////////////////////////////////////////////////////////
 
 
-MapgenFractal::MapgenFractal(int mapgenid, MapgenParams *params, EmergeManager *emerge)
+MapgenFractal::MapgenFractal(int mapgenid, MapgenFractalParams *params, EmergeManager *emerge)
 	: MapgenBasic(mapgenid, params, emerge)
 {
-	MapgenFractalParams *sp = (MapgenFractalParams *)params->sparams;
-
-	this->spflags    = sp->spflags;
-	this->cave_width = sp->cave_width;
-	this->fractal    = sp->fractal;
-	this->iterations = sp->iterations;
-	this->scale      = sp->scale;
-	this->offset     = sp->offset;
-	this->slice_w    = sp->slice_w;
-	this->julia_x    = sp->julia_x;
-	this->julia_y    = sp->julia_y;
-	this->julia_z    = sp->julia_z;
-	this->julia_w    = sp->julia_w;
+	this->spflags    = params->spflags;
+	this->cave_width = params->cave_width;
+	this->fractal    = params->fractal;
+	this->iterations = params->iterations;
+	this->scale      = params->scale;
+	this->offset     = params->offset;
+	this->slice_w    = params->slice_w;
+	this->julia_x    = params->julia_x;
+	this->julia_y    = params->julia_y;
+	this->julia_z    = params->julia_z;
+	this->julia_w    = params->julia_w;
 
 	//// 2D terrain noise
-	noise_seabed       = new Noise(&sp->np_seabed, seed, csize.X, csize.Z);
-	noise_filler_depth = new Noise(&sp->np_filler_depth, seed, csize.X, csize.Z);
+	noise_seabed       = new Noise(&params->np_seabed, seed, csize.X, csize.Z);
+	noise_filler_depth = new Noise(&params->np_filler_depth, seed, csize.X, csize.Z);
 
-	MapgenBasic::np_cave1 = sp->np_cave1;
-	MapgenBasic::np_cave2 = sp->np_cave2;
+	MapgenBasic::np_cave1 = params->np_cave1;
+	MapgenBasic::np_cave2 = params->np_cave2;
 
 	this->formula = fractal / 2 + fractal % 2;
 	this->julia   = fractal % 2 == 0;
@@ -86,7 +84,7 @@ MapgenFractal::~MapgenFractal()
 MapgenFractalParams::MapgenFractalParams()
 {
 	spflags    = 0;
-	cave_width = 0.3;
+	cave_width = 0.2;
 	fractal    = 1;
 	iterations = 11;
 	scale      = v3f(4096.0, 1024.0, 4096.0);
@@ -99,8 +97,8 @@ MapgenFractalParams::MapgenFractalParams()
 
 	np_seabed       = NoiseParams(-14, 9,   v3f(600, 600, 600), 41900, 5, 0.6, 2.0);
 	np_filler_depth = NoiseParams(0,   1.2, v3f(150, 150, 150), 261,   3, 0.7, 2.0);
-	np_cave1        = NoiseParams(0,   12,  v3f(96,  96,  96),  52534, 4, 0.5, 2.0);
-	np_cave2        = NoiseParams(0,   12,  v3f(96,  96,  96),  10325, 4, 0.5, 2.0);
+	np_cave1        = NoiseParams(0,   12,  v3f(61,  61,  61),  52534, 3, 0.5, 2.0);
+	np_cave2        = NoiseParams(0,   12,  v3f(67,  67,  67),  10325, 3, 0.5, 2.0);
 }
 
 
@@ -208,7 +206,6 @@ void MapgenFractal::makeChunk(BlockMakeData *data)
 
 	// Init biome generator, place biome-specific nodes, and build biomemap
 	biomegen->calcBiomeNoise(node_min);
-	biomegen->getBiomes(heightmap);
 	MgStoneType stone_type = generateBiomes();
 
 	if (flags & MG_CAVES)
