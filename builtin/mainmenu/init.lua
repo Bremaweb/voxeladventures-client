@@ -56,7 +56,7 @@ tabs.credits = dofile(menupath .. DIR_DELIM .. "tab_credits.lua")
 if PLATFORM == "Android" then
 	tabs.simple_main = dofile(menupath .. DIR_DELIM .. "tab_simple_main.lua")
 else
-	--tabs.singleplayer = dofile(menupath .. DIR_DELIM .. "tab_singleplayer.lua")
+	tabs.singleplayer = dofile(menupath .. DIR_DELIM .. "tab_singleplayer.lua")
 	tabs.multiplayer = dofile(menupath .. DIR_DELIM .. "tab_multiplayer.lua")
 	tabs.server = dofile(menupath .. DIR_DELIM .. "tab_server.lua")
 	tabs.texturepacks = dofile(menupath .. DIR_DELIM .. "tab_texturepacks.lua")
@@ -135,7 +135,7 @@ local function init_globals()
 		tv_main:add(tabs.settings)
 	else
 		tv_main:set_autosave_tab(true)
-		--tv_main:add(tabs.singleplayer)
+		tv_main:add(tabs.singleplayer)
 		tv_main:add(tabs.multiplayer)
 		--tv_main:add(tabs.server)
 		tv_main:add(tabs.settings)
