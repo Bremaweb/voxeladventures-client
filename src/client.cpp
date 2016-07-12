@@ -481,6 +481,7 @@ void Client::step(float dtime)
 
 	// Step environment
 	m_env.step(dtime);
+	m_sound->step(dtime);
 
 	if ( g_settings->getBool("ambiance") ){
 		m_ambiance->doAmbiance(dtime,m_env.getTimeOfDay());
