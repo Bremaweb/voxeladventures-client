@@ -596,8 +596,8 @@ enum ToClientCommand
 	TOCLIENT_FADE_SOUND = 0x54,
 	/*
 		s32 sound_id
-		s32 step
-		s32 gain
+		float step
+		float gain
 	 */
 
 	TOCLIENT_SRP_BYTES_S_B = 0x60,
