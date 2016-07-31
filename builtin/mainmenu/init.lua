@@ -58,7 +58,7 @@ if PLATFORM == "Android" then
 else
 	--tabs.singleplayer = dofile(menupath .. DIR_DELIM .. "tab_singleplayer.lua")
 	tabs.multiplayer = dofile(menupath .. DIR_DELIM .. "tab_multiplayer.lua")
-	tabs.server = dofile(menupath .. DIR_DELIM .. "tab_server.lua")
+	--tabs.server = dofile(menupath .. DIR_DELIM .. "tab_server.lua")
 	tabs.texturepacks = dofile(menupath .. DIR_DELIM .. "tab_texturepacks.lua")
 end
 
@@ -135,7 +135,7 @@ local function init_globals()
 		tv_main:add(tabs.settings)
 	else
 		tv_main:set_autosave_tab(true)
-		tv_main:add(tabs.singleplayer)
+		--tv_main:add(tabs.singleplayer)
 		tv_main:add(tabs.multiplayer)
 		--tv_main:add(tabs.server)
 		tv_main:add(tabs.settings)

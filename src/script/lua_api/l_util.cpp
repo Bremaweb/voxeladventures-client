@@ -525,3 +525,4 @@ void ModApiUtil::InitializeAsync(AsyncEngine& engine)
 	ASYNC_API_FCT(encode_base64);
 	ASYNC_API_FCT(decode_base64);
 }
+
