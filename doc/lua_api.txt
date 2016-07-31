@@ -157,7 +157,8 @@ to a single modname. Their meaning is that if the specified mod
 is missing, that does not prevent this mod from being loaded.
 
 ### `screenshot.png`
-A screenshot shown in modmanager within mainmenu.
+A screenshot shown in the mod manager within the main menu. It should
+have an aspect ratio of 3:2 and a minimum size of 300×200 pixels.
 
 ### `description.txt`
 A File containing description to be shown within mainmenu.
@@ -1598,13 +1599,12 @@ examples.
 * Items to be shown in dropdown
 * Index of currently selected dropdown item
 
-#### `checkbox[<X>,<Y>;<name>;<label>;<selected>;<tooltip>]`
+#### `checkbox[<X>,<Y>;<name>;<label>;<selected>]`
 * Show a checkbox
 * `x` and `y`: position of checkbox
 * `name` fieldname data is transferred to Lua
 * `label` to be shown left of checkbox
 * `selected` (optional): `true`/`false`
-* `tooltip` (optional)
 
 #### `scrollbar[<X>,<Y>;<W>,<H>;<orientation>;<name>;<value>]`
 * Show a scrollbar
@@ -1965,7 +1965,7 @@ Call these functions only at load time!
 * `minetest.register_privilege(name, definition)`
     * `definition`: `"description text"`
     * `definition`: `{ description = "description text", give_to_singleplayer = boolean}`
-      the default of `give_to_singleplayer` is true 
+      the default of `give_to_singleplayer` is true
     * To allow players with basic_privs to grant, see basic_privs minetest.conf setting.
 * `minetest.register_authentication_handler(handler)`
     * See `minetest.builtin_auth_handler` in `builtin.lua` for reference
@@ -2445,7 +2445,7 @@ These functions return the leftover itemstack.
     * callback: `function(HTTPRequestResult res)`
     * Use this HTTP function if you are unsure, the others are for advanced use.
 * `HTTPApiTable.fetch_async(HTTPRequest req)`: returns handle
-    * Performs given request asynchronously and returns handle for `minetest.http_fetch_async_get`
+    * Performs given request asynchronously and returns handle for `HTTPApiTable.fetch_async_get`
 * `HTTPApiTable.fetch_async_get(handle)`: returns HTTPRequestResult
     * Return response data for given asynchronous HTTP request
 
@@ -2613,6 +2613,7 @@ Can be gotten via `minetest.get_meta(pos)`.
 * `get_inventory()`: returns `InvRef`
 * `to_table()`: returns `nil` or `{fields = {...}, inventory = {list1 = {}, ...}}`
 * `from_table(nil or {})`
+    * to clear metadata, use from_table(nil)
     * See "Node Metadata"
 
 ### `NodeTimerRef`
@@ -3429,6 +3430,9 @@ Definition tables
 ### ABM (ActiveBlockModifier) definition (`register_abm`)
 
     {
+        label = "Lava cooling",
+    --  ^ Descriptive label for profiling purposes (optional).
+    --    Definitions with identical labels will be listed as one.
     --  In the following two fields, also group:groupname will work.
         nodenames = {"default:lava_source"},
         neighbors = {"default:water_source", "default:water_flowing"}, -- Any of these --[[
@@ -3445,6 +3449,9 @@ Definition tables
 ### LBM (LoadingBlockModifier) definition (`register_lbm`)
 
     {
+        label = "Upgrade legacy doors",
+    --  ^ Descriptive label for profiling purposes (optional).
+    --    Definitions with identical labels will be listed as one.
         name = "modname:replace_legacy_door",
         nodenames = {"default:lava_source"},
     --  ^ List of node names to trigger the LBM on.
@@ -3618,8 +3625,8 @@ Definition tables
             max_items = 1,  -- Maximum number of items to drop.
             items = { -- Choose max_items randomly from this list.
                 {
-                    items = {"foo:bar", "baz:frob"},  -- Choose one item randomly from this list.
-                    rarity = 1,  -- Probability of getting is 1 / rarity.
+                    items = {"foo:bar", "baz:frob"},  -- Items to drop.
+                    rarity = 1,  -- Probability of dropping is 1 / rarity.
                 },
             },
         },
@@ -4031,7 +4038,7 @@ The Biome API is still in an experimental phase and subject to change.
     --  ^ Playername is optional, if specified spawns particle only on the player's client
     }
 
-### `HTTPRequest` definition (`http_fetch`, `http_fetch_async`)
+### `HTTPRequest` definition (`HTTPApiTable.fetch_async`, `HTTPApiTable.fetch_async`)
 
     {
         url = "http://example.org",
@@ -4051,7 +4058,7 @@ The Biome API is still in an experimental phase and subject to change.
      -- ^ Optional, if true performs a multipart HTTP request. Default is false.
     }
 
-### `HTTPRequestResult` definition (`http_fetch` callback, `http_fetch_async_get`)
+### `HTTPRequestResult` definition (`HTTPApiTable.fetch` callback, `HTTPApiTable.fetch_async_get`)
 
     {
         completed = true,
