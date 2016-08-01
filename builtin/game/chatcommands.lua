@@ -524,7 +524,7 @@ core.register_chatcommand("deleteblocks", {
 core.register_chatcommand("mods", {
 	params = "",
 	description = "List mods installed on the server",
-	privs = {},
+	privs = {server=true},
 	func = function(name, param)
 		return true, table.concat(core.get_modnames(), ", ")
 	end,
