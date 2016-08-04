@@ -189,6 +189,8 @@ public:
 	{ return 0; }
 	virtual ItemStack getWieldedItem() const;
 	virtual bool setWieldedItem(const ItemStack &item);
+	void attachParticleSpawner(u32 id);
+	void detachParticleSpawner(u32 id);
 
 	/*
 		Number of players which know about this object. Object won't be
@@ -243,6 +245,7 @@ protected:
 
 	ServerEnvironment *m_env;
 	v3f m_base_position;
+	std::set<u32> m_attached_particle_spawners;
 
 private:
 	// Used for creating objects based on type

@@ -99,3 +99,12 @@ bool ServerActiveObject::setWieldedItem(const ItemStack &item)
 	return false;
 }
 
+void ServerActiveObject::attachParticleSpawner(u32 id)
+{
+	m_attached_particle_spawners.insert(id);
+}
+
+void ServerActiveObject::detachParticleSpawner(u32 id)
+{
+	m_attached_particle_spawners.erase(id);
+}

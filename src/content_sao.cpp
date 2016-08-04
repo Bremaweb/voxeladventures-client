@@ -156,6 +156,13 @@ LuaEntitySAO::~LuaEntitySAO()
 	if(m_registered){
 		m_env->getScriptIface()->luaentity_Remove(m_id);
 	}
+
+	std::set<u32>::iterator it;
+	std::set<u32>::iterator begin = m_attached_particle_spawners.begin();
+	std::set<u32>::iterator end = m_attached_particle_spawners.end();
+	for (it = begin; it != end; ++it) {
+		m_env->deleteParticleSpawner(*it, false);
+	}
 }
 
 void LuaEntitySAO::addedToEnvironment(u32 dtime_s)
@@ -805,7 +812,6 @@ PlayerSAO::~PlayerSAO()
 {
 	if(m_inventory != &m_player->inventory)
 		delete m_inventory;
-
 }
 
 std::string PlayerSAO::getDescription()
@@ -833,6 +839,12 @@ void PlayerSAO::removingFromEnvironment()
 		m_player->peer_id = 0;
 		m_env->savePlayer((RemotePlayer*)m_player);
 		m_env->removePlayer(m_player);
+		std::set<u32>::iterator it;
+		std::set<u32>::iterator begin = m_attached_particle_spawners.begin();
+		std::set<u32>::iterator end = m_attached_particle_spawners.end();
+		for (it = begin; it != end; ++it) {
+			m_env->deleteParticleSpawner(*it, false);
+		}
 	}
 }
 

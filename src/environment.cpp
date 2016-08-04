@@ -1589,9 +1589,29 @@ u32 ServerEnvironment::addParticleSpawner(float exptime)
 	return id;
 }
 
-void ServerEnvironment::deleteParticleSpawner(u32 id)
+u32 ServerEnvironment::addParticleSpawner(float exptime, u16 attached_id)
+{
+	u32 id = addParticleSpawner(exptime);
+	m_particle_spawner_attachments[id] = attached_id;
+	ServerActiveObject *obj = getActiveObject(attached_id);
+	if (obj != NULL) {
+		obj->attachParticleSpawner(id);
+	}
+	return id;
+}
+
+void ServerEnvironment::deleteParticleSpawner(u32 id,
+	bool remove_from_object)
 {
 	m_particle_spawners.erase(id);
+	try {
+		u16 obj_id = m_particle_spawner_attachments.at(id);
+		ServerActiveObject *sao = getActiveObject(obj_id);
+		if (sao != NULL && remove_from_object) {
+			sao->detachParticleSpawner(id);
+		}
+	} catch (...) {}
+	m_particle_spawner_attachments.erase(id);
 }
 
 ServerActiveObject* ServerEnvironment::getActiveObject(u16 id)

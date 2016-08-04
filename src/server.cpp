@@ -3204,7 +3204,12 @@ u32 Server::addParticleSpawner(u16 amount, float spawntime,
 
 	s32 attached_id = attached == NULL ? -1 : attached->getId();
 
-	u32 id = m_env->addParticleSpawner(spawntime);
+	u32 id;
+	if (attached_id == -1) {
+		id = m_env->addParticleSpawner(spawntime);
+	} else {
+		id = m_env->addParticleSpawner(spawntime, attached_id);
+	}
 	SendAddParticleSpawner(peer_id, amount, spawntime,
 		minpos, maxpos, minvel, maxvel, minacc, maxacc,
 		minexptime, maxexptime, minsize, maxsize,
