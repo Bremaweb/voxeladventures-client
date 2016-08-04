@@ -201,6 +201,7 @@ struct ClientEvent
 			f32 maxsize;
 			bool collisiondetection;
 			bool collision_removal;
+			s32 attached_id;
 			bool vertical;
 			std::string *texture;
 			u32 id;
