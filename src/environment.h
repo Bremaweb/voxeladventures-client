@@ -338,7 +338,8 @@ public:
 	void loadDefaultMeta();
 
 	u32 addParticleSpawner(float exptime);
-	void deleteParticleSpawner(u32 id);
+	u32 addParticleSpawner(float exptime, u16 attached_id);
+	void deleteParticleSpawner(u32 id, bool remove_from_object = true);
 
 	/*
 		External ActiveObject interface
@@ -523,6 +524,7 @@ private:
 	// Particles
 	IntervalLimiter m_particle_management_interval;
 	std::map<u32, float> m_particle_spawners;
+	std::map<u32, u16> m_particle_spawner_attachments;
 };
 
 #ifndef SERVER
