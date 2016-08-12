@@ -19,6 +19,8 @@ const std::string TREE = "default:tree";//m_env.getGameDef()->getNodeDefManager(
 const std::string LEAVES = "default:leaves";//m_env.getGameDef()->getNodeDefManager()->getId("default:leaves");
 const std::string WATER = "default:water_source";//m_env.getGameDef()->getNodeDefManager()->getId("default:water_source");
 const std::string WATER_FLOWING = "default:water_flowing";//m_env.getGameDef()->getNodeDefManager()->getId("default:water_flowing");
+const std::string MG_WATER = "default:mg_water_source";
+const std::string MG_WATER_FLOWING = "default:mg_water_flowing";
 const std::string SNOW = "default:snow";
 const std::string DIRT_SNOW = "default:dirt_with_snow";
 const std::string SAND = "default:sand";
@@ -326,12 +328,12 @@ int Ambiance::readEnvironment(){
 	std::string standingOnNode = getNodeName(v3s16(spos.X, spos.Y, spos.Z));
 	std::string aboveHeadNode = getNodeName(v3s16(spos.X, (spos.Y+3), spos.Z));
 
-	if ( ( upperBodyNode == WATER || upperBodyNode == WATER_FLOWING ) ){
+	if ( ( upperBodyNode == WATER || upperBodyNode == MG_WATER || upperBodyNode == WATER_FLOWING || upperBodyNode = MG_WATER_FLOWING ) ){
 		underwater = true;
 		return ENV_UNDERWATER;
 	}
 
-	if ( moving == true && ( lowerBodyNode == WATER || lowerBodyNode == WATER_FLOWING || standingOnNode == WATER || standingOnNode == WATER_FLOWING ) ){
+	if ( moving == true && ( lowerBodyNode == WATER || lowerBodyNode == WATER_FLOWING || lowerBodyNode == MG_WATER || lowerBodyNode == MG_WATER_FLOWING || standingOnNode == WATER || standingOnNode == WATER_FLOWING || standingOnNode == MG_WATER || standingOnNode == MG_WATER_FLOWING ) ){
 		return ENV_INWATER;
 	}
 
@@ -376,7 +378,7 @@ int Ambiance::readEnvironment(){
 
 		if ( spos.Y < 7 && spos.Y > -1 ){
 			if ( nodesInRange(spos,10,2,7,SAND, 1, 10) ){
-				if ( nodesInRange(spos, 20, 0, 7, WATER, 5, 8) ){
+				if ( nodesInRange(spos, 20, 0, 7, WATER, 5, 8) || nodesInRange(spos, 20, 0, 7, MG_WATER, 5, 8) ){
 					return ENV_OCEAN;
 				}
 			}
