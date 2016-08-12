@@ -328,7 +328,7 @@ int Ambiance::readEnvironment(){
 	std::string standingOnNode = getNodeName(v3s16(spos.X, spos.Y, spos.Z));
 	std::string aboveHeadNode = getNodeName(v3s16(spos.X, (spos.Y+3), spos.Z));
 
-	if ( ( upperBodyNode == WATER || upperBodyNode == MG_WATER || upperBodyNode == WATER_FLOWING || upperBodyNode = MG_WATER_FLOWING ) ){
+	if ( ( upperBodyNode == WATER || upperBodyNode == MG_WATER || upperBodyNode == WATER_FLOWING || upperBodyNode == MG_WATER_FLOWING ) ){
 		underwater = true;
 		return ENV_UNDERWATER;
 	}
