@@ -579,8 +579,7 @@ GenericCAO::GenericCAO(IGameDef *gamedef, ClientEnvironment *env):
 		m_visuals_expired(false),
 		m_step_distance_counter(0),
 		m_last_light(255),
-		m_is_visible(false),
-		m_infotext("")
+		m_is_visible(false)
 {
 	if (gamedef == NULL) {
 		ClientActiveObject::registerType(getType(), create);
@@ -666,7 +665,6 @@ void GenericCAO::initialize(const std::string &data)
 			assert( localplayer != NULL );
 			localplayer->setCAO(this);
 		}
-		m_infotext = m_name;
 		m_env->addPlayerName(m_name.c_str());
 	}
 }
@@ -963,14 +961,12 @@ void GenericCAO::addToScene(scene::ISceneManager *smgr,
 	}
 	updateTextures("");
 
-	/*
 	scene::ISceneNode *node = getSceneNode();
 	if (node && m_prop.nametag != "" && !m_is_local_player) {
 		// Add nametag
 		m_nametag = m_gamedef->getCamera()->addNametag(node,
 			m_prop.nametag, m_prop.nametag_color);
 	}
-	*/
 
 	updateNodePos();
 	updateAnimation();

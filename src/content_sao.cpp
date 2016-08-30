@@ -814,6 +814,7 @@ PlayerSAO::~PlayerSAO()
 {
 	if(m_inventory != &m_player->inventory)
 		delete m_inventory;
+
 }
 
 std::string PlayerSAO::getDescription()

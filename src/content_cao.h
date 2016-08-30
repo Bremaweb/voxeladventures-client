@@ -105,7 +105,6 @@ private:
 	float m_step_distance_counter;
 	u8 m_last_light;
 	bool m_is_visible;
-	std::string m_infotext;
 
 	std::vector<u16> m_children;
 
