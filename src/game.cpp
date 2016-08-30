@@ -1273,10 +1273,10 @@ static void updateChat(Client &client, f32 dtime, bool show_debug,
 	setStaticText(guitext_chat, recent_chat);
 
 	// Update gui element size and position
-	s32 chat_y = 5;
+	s32 chat_y = 5 + line_height;
 
 	if (show_debug)
-		chat_y += 2 * line_height;
+		chat_y += line_height;
 
 	// first pass to calculate height of text to be set
 	s32 width = std::min(g_fontengine->getTextWidth(recent_chat.c_str()) + 10,
