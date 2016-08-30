@@ -1371,6 +1371,7 @@ void KeyCache::populate()
 			= getKeySetting("keymap_decrease_viewing_range_min");
 	key[KeyType::RANGESELECT]
 			= getKeySetting("keymap_rangeselect");
+	key[KeyType::ZOOM] = getKeySetting("keymap_zoom");
 
 	key[KeyType::QUICKTUNE_NEXT] = getKeySetting("keymap_quicktune_next");
 	key[KeyType::QUICKTUNE_PREV] = getKeySetting("keymap_quicktune_prev");
@@ -2402,7 +2403,26 @@ bool Game::connectToServer(const std::string &playername,
 			wait_time += dtime;
 			// Only time out if we aren't waiting for the server we started
 			if ((*address != "") && (wait_time > 10)) {
-				*error_message = "Connection timed out.";
+				bool sent_old_init = g_settings->getFlag("send_pre_v25_init");
+				// If no pre v25 init was sent, and no answer was received,
+				// but the low level connection could be established
+				// (meaning that we have a peer id), then we probably wanted
+				// to connect to a legacy server. In this case, tell the user
+				// to enable the option to be able to connect.
+				if (!sent_old_init &&
+						(client->getProtoVersion() == 0) &&
+						client->connectedToServer()) {
+					*error_message = "Connection failure: init packet not "
+					"recognized by server.\n"
+					"Most likely the server uses an old protocol version (<v25).\n"
+					"Please ask the server owner to update to 0.4.13 or later.\n"
+					"To still connect to the server in the meantime,\n"
+					"you can enable the 'send_pre_v25_init' setting by editing minetest.conf,\n"
+					"or by enabling the 'Client -> Network -> Support older Servers'\n"
+					"entry in the advanced settings menu.";
+				} else {
+					*error_message = "Connection timed out.";
+				}
 				errorstream << *error_message << std::endl;
 				break;
 			}
@@ -3321,6 +3341,7 @@ void Game::updatePlayerControl(const CameraOrientation &cam)
 		isKeyDown(KeyType::JUMP),
 		isKeyDown(KeyType::SPECIAL1),
 		isKeyDown(KeyType::SNEAK),
+		isKeyDown(KeyType::ZOOM),
 		isLeftPressed(),
 		isRightPressed(),
 		cam.camera_pitch,

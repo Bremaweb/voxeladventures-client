@@ -1,6 +1,6 @@
 /*
 Minetest
-Copyright (C) 2013 celeron55, Perttu Ahola <celeron55@gmail.com>
+Copyright (C) 2016 nerzhul, Loic Blot <loic.blot@unix-experience.fr>
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by
@@ -17,18 +17,19 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-#ifndef __CONVERT_JSON_H__
-#define __CONVERT_JSON_H__
+#ifndef MT_CPP11CONTAINER_HEADER
+#define MT_CPP11CONTAINER_HEADER
 
-#include <json/json.h>
-
-struct ModStoreMod;
-struct ModStoreModDetails;
-
-std::vector<ModStoreMod>    readModStoreList(Json::Value& modlist);
-ModStoreModDetails          readModStoreModDetails(Json::Value& details);
-
-Json::Value                 fetchJsonValue(const std::string &url,
-                                           std::vector<std::string> *extra_headers);
+#if __cplusplus >= 201103L
+	#include <unordered_map>
+	#include <unordered_set>
+	#define UNORDERED_MAP std::unordered_map
+	#define UNORDERED_SET std::unordered_set
+#else
+	#include <map>
+	#include <set>
+	#define UNORDERED_MAP std::map
+	#define UNORDERED_SET std::set
+#endif
 
 #endif
