@@ -191,7 +191,7 @@ void Ambiance::doAmbiance(float dtime, u32 tod){
 					float v = ( rand() % 60 );	// add a little random variation to the sound volume
 					if ( v > 0 )
 						v = v / 100;
-					verbosestream << "[AMBIANCE] Sound selected: " << to_string(s) << " " << a_env[currentEnv].sounds[s].name << std::endl;
+					verbosestream << "[AMBIANCE] Sound selected: " << std::to_string(s) << " " << a_env[currentEnv].sounds[s].name << std::endl;
 					playSound(a_env[currentEnv].sounds[s].name, ( a_env[currentEnv].sounds[s].gain - v ));
 				}
 			} else {
