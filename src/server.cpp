@@ -549,10 +549,12 @@ void Server::AsyncRunStep(bool initial_step)
 		SendTimeOfDay(PEER_ID_INEXISTENT, time, time_speed);
 	}
 
+	float _max_lag = 0;
 	{
 		MutexAutoLock lock(m_env_mutex);
 		// Figure out and report maximum lag to environment
 		float max_lag = m_env->getMaxLagEstimate();
+		_max_lag = max_lag;
 		max_lag *= 0.9998; // Decrease slowly (about half per 5 minutes)
 		if(dtime > max_lag){
 			if(dtime > 0.1 && dtime > max_lag * 2.0)
@@ -650,7 +652,7 @@ void Server::AsyncRunStep(bool initial_step)
 					m_clients.getPlayerNames(),
 					m_uptime.get(),
 					m_env->getGameTime(),
-					m_lag,
+					_max_lag,
 					m_gamespec.id,
 					Mapgen::getMapgenName(m_emerge->mgparams->mgtype),
 					m_mods);
