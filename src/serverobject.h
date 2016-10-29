@@ -250,11 +250,7 @@ protected:
 
 	ServerEnvironment *m_env;
 	v3f m_base_position;
-<<<<<<< HEAD
-	std::set<u32> m_attached_particle_spawners;
-=======
 	UNORDERED_SET<u32> m_attached_particle_spawners;
->>>>>>> minetest/master
 
 private:
 	// Used for creating objects based on type
