@@ -260,7 +260,7 @@ Client::Client(
 	m_localdb(NULL)
 {
 	// Add local player
-	m_env.addPlayer(new LocalPlayer(this, playername));
+	m_env.setLocalPlayer(new LocalPlayer(this, playername));
 
 	m_mapper = new Mapper(device, this);
 	m_cache_save_interval = g_settings->getU16("server_map_save_interval");
@@ -309,7 +309,7 @@ Client::~Client()
 	delete m_inventory_from_server;
 
 	// Delete detached inventories
-	for (std::map<std::string, Inventory*>::iterator
+	for (UNORDERED_MAP<std::string, Inventory*>::iterator
 			i = m_detached_inventories.begin();
 			i != m_detached_inventories.end(); ++i) {
 		delete i->second;
@@ -389,7 +389,7 @@ void Client::step(float dtime)
 		if(counter <= 0.0) {
 			counter = 2.0;
 
-			Player *myplayer = m_env.getLocalPlayer();
+			LocalPlayer *myplayer = m_env.getLocalPlayer();
 			FATAL_ERROR_IF(myplayer == NULL, "Local player not found in environment.");
 
 			u16 proto_version_min = g_settings->getFlag("send_pre_v25_init") ?
@@ -624,7 +624,7 @@ void Client::step(float dtime)
 		{
 			// Do this every <interval> seconds after TOCLIENT_INVENTORY
 			// Reset the locally changed inventory to the authoritative inventory
-			Player *player = m_env.getLocalPlayer();
+			LocalPlayer *player = m_env.getLocalPlayer();
 			player->inventory = *m_inventory_from_server;
 			m_inventory_updated = true;
 		}
@@ -634,10 +634,8 @@ void Client::step(float dtime)
 		Update positions of sounds attached to objects
 	*/
 	{
-		for(std::map<int, u16>::iterator
-				i = m_sounds_to_objects.begin();
-				i != m_sounds_to_objects.end(); ++i)
-		{
+		for(UNORDERED_MAP<int, u16>::iterator i = m_sounds_to_objects.begin();
+				i != m_sounds_to_objects.end(); ++i) {
 			int client_id = i->first;
 			u16 object_id = i->second;
 			ClientActiveObject *cao = m_env.getActiveObject(object_id);
@@ -656,8 +654,7 @@ void Client::step(float dtime)
 		m_removed_sounds_check_timer = 0;
 		// Find removed sounds and clear references to them
 		std::vector<s32> removed_server_ids;
-		for(std::map<s32, int>::iterator
-				i = m_sounds_server_to_client.begin();
+		for(UNORDERED_MAP<s32, int>::iterator i = m_sounds_server_to_client.begin();
 				i != m_sounds_server_to_client.end();) {
 			s32 server_id = i->first;
 			int client_id = i->second;
@@ -1205,7 +1202,7 @@ void Client::sendChatMessage(const std::wstring &message)
 void Client::sendChangePassword(const std::string &oldpassword,
         const std::string &newpassword)
 {
-	Player *player = m_env.getLocalPlayer();
+	LocalPlayer *player = m_env.getLocalPlayer();
 	if (player == NULL)
 		return;
 
@@ -1331,7 +1328,7 @@ void Client::sendPlayerPos()
 
 void Client::sendPlayerItem(u16 item)
 {
-	Player *myplayer = m_env.getLocalPlayer();
+	LocalPlayer *myplayer = m_env.getLocalPlayer();
 	if(myplayer == NULL)
 		return;
 
@@ -1412,7 +1409,7 @@ bool Client::getLocalInventoryUpdated()
 // Copies the inventory of the local player to parameter
 void Client::getLocalInventory(Inventory &dst)
 {
-	Player *player = m_env.getLocalPlayer();
+	LocalPlayer *player = m_env.getLocalPlayer();
 	assert(player != NULL);
 	dst = player->inventory;
 }
@@ -1425,15 +1422,16 @@ Inventory* Client::getInventory(const InventoryLocation &loc)
 	break;
 	case InventoryLocation::CURRENT_PLAYER:
 	{
-		Player *player = m_env.getLocalPlayer();
+		LocalPlayer *player = m_env.getLocalPlayer();
 		assert(player != NULL);
 		return &player->inventory;
 	}
 	break;
 	case InventoryLocation::PLAYER:
 	{
-		Player *player = m_env.getPlayer(loc.name.c_str());
-		if(!player)
+		// Check if we are working with local player inventory
+		LocalPlayer *player = m_env.getLocalPlayer();
+		if (!player || strcmp(player->getName(), loc.name.c_str()) != 0)
 			return NULL;
 		return &player->inventory;
 	}
@@ -1448,7 +1446,7 @@ Inventory* Client::getInventory(const InventoryLocation &loc)
 	break;
 	case InventoryLocation::DETACHED:
 	{
-		if(m_detached_inventories.count(loc.name) == 0)
+		if (m_detached_inventories.count(loc.name) == 0)
 			return NULL;
 		return m_detached_inventories[loc.name];
 	}
@@ -1514,11 +1512,6 @@ ClientActiveObject * Client::getSelectedActiveObject(
 	return NULL;
 }
 
-std::list<std::string> Client::getConnectedPlayerNames()
-{
-	return m_env.getPlayerNames();
-}
-
 float Client::getAnimationTime()
 {
 	return m_animation_time;
@@ -1551,16 +1544,9 @@ void Client::setCrack(int level, v3s16 pos)
 
 u16 Client::getHP()
 {
-	Player *player = m_env.getLocalPlayer();
+	LocalPlayer *player = m_env.getLocalPlayer();
 	assert(player != NULL);
 	return player->hp;
-}
-
-u16 Client::getBreath()
-{
-	Player *player = m_env.getLocalPlayer();
-	assert(player != NULL);
-	return player->getBreath();
 }
 
 bool Client::getChatMessage(std::wstring &message)
@@ -1685,7 +1671,7 @@ void Client::addUpdateMeshTaskForNode(v3s16 nodepos, bool ack_to_server, bool ur
 ClientEvent Client::getClientEvent()
 {
 	ClientEvent event;
-	if(m_client_event_queue.size() == 0) {
+	if (m_client_event_queue.empty()) {
 		event.type = CE_NONE;
 	}
 	else {

@@ -207,7 +207,7 @@ int ModApiParticles::l_add_particlespawner(lua_State *L)
 			lua_pop(L, 1);
 			attached = ObjectRef::getobject(ref);
 		}
-		
+
 		vertical = getboolfield_default(L, 1, "vertical", vertical);
 		texture = getstringfield_default(L, 1, "texture", "");
 		playername = getstringfield_default(L, 1, "playername", "");
