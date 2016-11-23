@@ -293,13 +293,19 @@ void ClientMap::updateDrawList(video::IVideoDriver* driver)
 			float step = BS * 1;
 			float stepfac = 1.1;
 			float startoff = BS * 1;
-			float endoff = -BS*MAP_BLOCKSIZE * 1.42 * 1.42;
-			v3s16 spn = cam_pos_nodes + v3s16(0, 0, 0);
+			// The occlusion search of 'isOccluded()' must stop short of the target
+			// point by distance 'endoff' (end offset) to not enter the target mapblock.
+			// For the 8 mapblock corners 'endoff' must therefore be the maximum diagonal
+			// of a mapblock, because we must consider all view angles.
+			// sqrt(1^2 + 1^2 + 1^2) = 1.732
+			float endoff = -BS * MAP_BLOCKSIZE * 1.732050807569;
+			v3s16 spn = cam_pos_nodes;
 			s16 bs2 = MAP_BLOCKSIZE / 2 + 1;
 			u32 needed_count = 1;
 			if (occlusion_culling_enabled &&
-					isOccluded(this, spn, cpn + v3s16(0, 0, 0),
-						step, stepfac, startoff, endoff, needed_count, nodemgr) &&
+					// For the central point of the mapblock 'endoff' can be halved
+					isOccluded(this, spn, cpn,
+						step, stepfac, startoff, endoff / 2.0f, needed_count, nodemgr) &&
 					isOccluded(this, spn, cpn + v3s16(bs2,bs2,bs2),
 						step, stepfac, startoff, endoff, needed_count, nodemgr) &&
 					isOccluded(this, spn, cpn + v3s16(bs2,bs2,-bs2),
@@ -521,6 +527,7 @@ void ClientMap::renderMap(video::IVideoDriver* driver, s32 pass)
 				buf->getMaterial().setFlag(video::EMF_TRILINEAR_FILTER, m_cache_trilinear_filter);
 				buf->getMaterial().setFlag(video::EMF_BILINEAR_FILTER, m_cache_bilinear_filter);
 				buf->getMaterial().setFlag(video::EMF_ANISOTROPIC_FILTER, m_cache_anistropic_filter);
+				buf->getMaterial().setFlag(video::EMF_WIREFRAME, m_control.show_wireframe);
 
 				const video::SMaterial& material = buf->getMaterial();
 				video::IMaterialRenderer* rnd =

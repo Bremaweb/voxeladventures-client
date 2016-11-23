@@ -362,6 +362,7 @@ PointedThing getPointedThing(Client *client, Hud *hud, const v3f &player_positio
 
 			min_distance = (selected_object->getPosition() - camera_position).getLength();
 
+			hud->setSelectedFaceNormal(v3f(0.0, 0.0, 0.0));
 			result.type = POINTEDTHING_OBJECT;
 			result.object_id = selected_object->getId();
 		}
@@ -473,6 +474,7 @@ PointedThing getPointedThing(Client *client, Hud *hud, const v3f &player_positio
 				if (!facebox.intersectsWithLine(shootline))
 					continue;
 				result.node_abovesurface = pointed_pos + facedir;
+				hud->setSelectedFaceNormal(v3f(facedir.X, facedir.Y, facedir.Z));
 				face_min_distance = distance;
 			}
 		}
@@ -886,40 +888,73 @@ public:
 	}
 };
 
+
+// before 1.8 there isn't a "integer interface", only float
+#if (IRRLICHT_VERSION_MAJOR == 1 && IRRLICHT_VERSION_MINOR < 8)
+typedef f32 SamplerLayer_t;
+#else
+typedef s32 SamplerLayer_t;
+#endif
+
+
 class GameGlobalShaderConstantSetter : public IShaderConstantSetter
 {
 	Sky *m_sky;
 	bool *m_force_fog_off;
 	f32 *m_fog_range;
+	bool m_fog_enabled;
+	CachedPixelShaderSetting<float, 4> m_sky_bg_color;
+	CachedPixelShaderSetting<float> m_fog_distance;
+	CachedVertexShaderSetting<float> m_animation_timer_vertex;
+	CachedPixelShaderSetting<float> m_animation_timer_pixel;
+	CachedPixelShaderSetting<float> m_day_night_ratio;
+	CachedPixelShaderSetting<float, 3> m_eye_position_pixel;
+	CachedVertexShaderSetting<float, 3> m_eye_position_vertex;
+	CachedPixelShaderSetting<float, 3> m_minimap_yaw;
+	CachedPixelShaderSetting<SamplerLayer_t> m_base_texture;
+	CachedPixelShaderSetting<SamplerLayer_t> m_normal_texture;
+	CachedPixelShaderSetting<SamplerLayer_t> m_texture_flags;
 	Client *m_client;
-	bool m_fogEnabled;
 
 public:
 	void onSettingsChange(const std::string &name)
 	{
 		if (name == "enable_fog")
-			m_fogEnabled = g_settings->getBool("enable_fog");
+			m_fog_enabled = g_settings->getBool("enable_fog");
 	}
 
-	static void SettingsCallback(const std::string &name, void *userdata)
+	static void settingsCallback(const std::string &name, void *userdata)
 	{
 		reinterpret_cast<GameGlobalShaderConstantSetter*>(userdata)->onSettingsChange(name);
 	}
+
+	void setSky(Sky *sky) { m_sky = sky; }
 
 	GameGlobalShaderConstantSetter(Sky *sky, bool *force_fog_off,
 			f32 *fog_range, Client *client) :
 		m_sky(sky),
 		m_force_fog_off(force_fog_off),
 		m_fog_range(fog_range),
+		m_sky_bg_color("skyBgColor"),
+		m_fog_distance("fogDistance"),
+		m_animation_timer_vertex("animationTimer"),
+		m_animation_timer_pixel("animationTimer"),
+		m_day_night_ratio("dayNightRatio"),
+		m_eye_position_pixel("eyePosition"),
+		m_eye_position_vertex("eyePosition"),
+		m_minimap_yaw("yawVec"),
+		m_base_texture("baseTexture"),
+		m_normal_texture("normalTexture"),
+		m_texture_flags("textureFlags"),
 		m_client(client)
 	{
-		g_settings->registerChangedCallback("enable_fog", SettingsCallback, this);
-		m_fogEnabled = g_settings->getBool("enable_fog");
+		g_settings->registerChangedCallback("enable_fog", settingsCallback, this);
+		m_fog_enabled = g_settings->getBool("enable_fog");
 	}
 
 	~GameGlobalShaderConstantSetter()
 	{
-		g_settings->deregisterChangedCallback("enable_fog", SettingsCallback, this);
+		g_settings->deregisterChangedCallback("enable_fog", settingsCallback, this);
 	}
 
 	virtual void onSetConstants(video::IMaterialRendererServices *services,
@@ -937,53 +972,91 @@ public:
 			bgcolorf.b,
 			bgcolorf.a,
 		};
-		services->setPixelShaderConstant("skyBgColor", bgcolorfa, 4);
+		m_sky_bg_color.set(bgcolorfa, services);
 
 		// Fog distance
 		float fog_distance = 10000 * BS;
 
-		if (m_fogEnabled && !*m_force_fog_off)
+		if (m_fog_enabled && !*m_force_fog_off)
 			fog_distance = *m_fog_range;
 
-		services->setPixelShaderConstant("fogDistance", &fog_distance, 1);
+		m_fog_distance.set(&fog_distance, services);
 
-		// Day-night ratio
-		u32 daynight_ratio = m_client->getEnv().getDayNightRatio();
-		float daynight_ratio_f = (float)daynight_ratio / 1000.0;
-		services->setPixelShaderConstant("dayNightRatio", &daynight_ratio_f, 1);
+		float daynight_ratio = (float)m_client->getEnv().getDayNightRatio() / 1000.f;
+		m_day_night_ratio.set(&daynight_ratio, services);
 
 		u32 animation_timer = porting::getTimeMs() % 100000;
-		float animation_timer_f = (float)animation_timer / 100000.0;
-		services->setPixelShaderConstant("animationTimer", &animation_timer_f, 1);
-		services->setVertexShaderConstant("animationTimer", &animation_timer_f, 1);
+		float animation_timer_f = (float)animation_timer / 100000.f;
+		m_animation_timer_vertex.set(&animation_timer_f, services);
+		m_animation_timer_pixel.set(&animation_timer_f, services);
 
-		LocalPlayer *player = m_client->getEnv().getLocalPlayer();
-		v3f eye_position = player->getEyePosition();
-		services->setPixelShaderConstant("eyePosition", (irr::f32 *)&eye_position, 3);
-		services->setVertexShaderConstant("eyePosition", (irr::f32 *)&eye_position, 3);
-
-		v3f minimap_yaw_vec = m_client->getMapper()->getYawVec();
-		services->setPixelShaderConstant("yawVec", (irr::f32 *)&minimap_yaw_vec, 3);
-
-		// Uniform sampler layers
-		// before 1.8 there isn't a "integer interface", only float
+		float eye_position_array[3];
+		v3f epos = m_client->getEnv().getLocalPlayer()->getEyePosition();
 #if (IRRLICHT_VERSION_MAJOR == 1 && IRRLICHT_VERSION_MINOR < 8)
-		f32 layer0 = 0;
-		f32 layer1 = 1;
-		f32 layer2 = 2;
-		services->setPixelShaderConstant("baseTexture" , (irr::f32 *)&layer0, 1);
-		services->setPixelShaderConstant("normalTexture" , (irr::f32 *)&layer1, 1);
-		services->setPixelShaderConstant("textureFlags" , (irr::f32 *)&layer2, 1);
+		eye_position_array[0] = epos.X;
+		eye_position_array[1] = epos.Y;
+		eye_position_array[2] = epos.Z;
 #else
-		s32 layer0 = 0;
-		s32 layer1 = 1;
-		s32 layer2 = 2;
-		services->setPixelShaderConstant("baseTexture" , (irr::s32 *)&layer0, 1);
-		services->setPixelShaderConstant("normalTexture" , (irr::s32 *)&layer1, 1);
-		services->setPixelShaderConstant("textureFlags" , (irr::s32 *)&layer2, 1);
+		epos.getAs3Values(eye_position_array);
 #endif
+		m_eye_position_pixel.set(eye_position_array, services);
+		m_eye_position_vertex.set(eye_position_array, services);
+
+		float minimap_yaw_array[3];
+		v3f minimap_yaw = m_client->getMapper()->getYawVec();
+#if (IRRLICHT_VERSION_MAJOR == 1 && IRRLICHT_VERSION_MINOR < 8)
+		minimap_yaw_array[0] = minimap_yaw.X;
+		minimap_yaw_array[1] = minimap_yaw.Y;
+		minimap_yaw_array[2] = minimap_yaw.Z;
+#else
+		minimap_yaw.getAs3Values(minimap_yaw_array);
+#endif
+		m_minimap_yaw.set(minimap_yaw_array, services);
+
+		SamplerLayer_t base_tex = 0,
+				normal_tex = 1,
+				flags_tex = 2;
+		m_base_texture.set(&base_tex, services);
+		m_normal_texture.set(&normal_tex, services);
+		m_texture_flags.set(&flags_tex, services);
 	}
 };
+
+
+class GameGlobalShaderConstantSetterFactory : public IShaderConstantSetterFactory
+{
+	Sky *m_sky;
+	bool *m_force_fog_off;
+	f32 *m_fog_range;
+	Client *m_client;
+	std::vector<GameGlobalShaderConstantSetter *> created_nosky;
+public:
+	GameGlobalShaderConstantSetterFactory(bool *force_fog_off,
+			f32 *fog_range, Client *client) :
+		m_sky(NULL),
+		m_force_fog_off(force_fog_off),
+		m_fog_range(fog_range),
+		m_client(client)
+	{}
+
+	void setSky(Sky *sky) {
+		m_sky = sky;
+		for (size_t i = 0; i < created_nosky.size(); ++i) {
+			created_nosky[i]->setSky(m_sky);
+		}
+		created_nosky.clear();
+	}
+
+	virtual IShaderConstantSetter* create()
+	{
+		GameGlobalShaderConstantSetter *scs = new GameGlobalShaderConstantSetter(
+				m_sky, m_force_fog_off, m_fog_range, m_client);
+		if (!m_sky)
+			created_nosky.push_back(scs);
+		return scs;
+	}
+};
+
 
 bool nodePlacementPrediction(Client &client,
 		const ItemDefinition &playeritem_def, v3s16 nodepos, v3s16 neighbourpos)
@@ -1132,6 +1205,7 @@ static inline void create_formspec_menu(GUIFormSpecMenu **cur_formspec,
 		(*cur_formspec)->setFormSource(fs_src);
 		(*cur_formspec)->setTextDest(txt_dest);
 	}
+	
 }
 
 #ifdef __ANDROID__
@@ -1573,7 +1647,7 @@ protected:
 			bool shift_pressed);
 	void toggleFog(float *statustext_time, bool *flag);
 	void toggleDebug(float *statustext_time, bool *show_debug,
-			bool *show_profiler_graph);
+			bool *show_profiler_graph, bool *show_wireframe);
 	void toggleUpdateCamera(float *statustext_time, bool *flag);
 	void toggleProfiler(float *statustext_time, u32 *profiler_current_page,
 			u32 profiler_max_page);
@@ -1680,6 +1754,8 @@ private:
 	ChatBackend *chat_backend;
 
 	GUIFormSpecMenu *current_formspec;
+	//default: "". If other than "", empty show_formspec packets will only close the formspec when the formname matches
+	std::string cur_formname;
 
 	EventManager *eventmgr;
 	QuicktuneShortcutter *quicktune;
@@ -1692,6 +1768,9 @@ private:
 	Inventory *local_inventory;
 	Hud *hud;
 	Mapper *mapper;
+
+	GameRunData runData;
+	VolatileRunFlags flags;
 
 	/* 'cache'
 	   This class does take ownership/responsibily for cleaning up etc of any of
@@ -1765,6 +1844,7 @@ Game::Game() :
 	soundmaker(NULL),
 	chat_backend(NULL),
 	current_formspec(NULL),
+	cur_formname(""),
 	eventmgr(NULL),
 	quicktune(NULL),
 	gui_chat_console(NULL),
@@ -1884,6 +1964,18 @@ bool Game::startup(bool *kill,
 
 	smgr->getParameters()->setAttribute(scene::OBJ_LOADER_IGNORE_MATERIAL_FILES, true);
 
+	memset(&runData, 0, sizeof(runData));
+	runData.time_from_last_punch = 10.0;
+	runData.profiler_max_page = 3;
+	runData.update_wielded_item_trigger = true;
+
+	memset(&flags, 0, sizeof(flags));
+	flags.show_chat = true;
+	flags.show_hud = true;
+	flags.show_debug = g_settings->getBool("show_debug");
+	flags.invert_mouse = g_settings->getBool("invert_mouse");
+	flags.first_loop_after_window_activation = true;
+
 	if (!init(map_dir, address, port, gamespec))
 		return false;
 
@@ -1900,33 +1992,14 @@ void Game::run()
 	RunStats stats              = { 0 };
 	CameraOrientation cam_view_target  = { 0 };
 	CameraOrientation cam_view  = { 0 };
-	GameRunData runData         = { 0 };
 	FpsControl draw_times       = { 0 };
-	VolatileRunFlags flags      = { 0 };
 	f32 dtime; // in seconds
-
-	runData.time_from_last_punch  = 10.0;
-	runData.profiler_max_page = 3;
-	runData.update_wielded_item_trigger = true;
-
-	flags.show_chat = true;
-	flags.show_hud = true;
-	flags.show_minimap = g_settings->getBool("enable_minimap");
-	flags.show_debug = g_settings->getBool("show_debug");
-	flags.invert_mouse = g_settings->getBool("invert_mouse");
-	flags.first_loop_after_window_activation = true;
 
 	/* Clear the profiler */
 	Profiler::GraphValues dummyvalues;
 	g_profiler->graphGet(dummyvalues);
 
 	draw_times.last_time = device->getTimer()->getTime();
-
-	shader_src->addGlobalConstantSetter(new GameGlobalShaderConstantSetter(
-			sky,
-			&flags.force_fog_off,
-			&runData.fog_range,
-			client));
 
 	set_light_table(g_settings->getFloat("display_gamma"));
 
@@ -2167,6 +2240,10 @@ bool Game::createClient(const std::string &playername,
 		return false;
 	}
 
+	GameGlobalShaderConstantSetterFactory *scsf = new GameGlobalShaderConstantSetterFactory(
+			&flags.force_fog_off, &runData.fog_range, client);
+	shader_src->addShaderConstantSetterFactory(scsf);
+
 	// Update cached textures, meshes and materials
 	client->afterContentReceived(device);
 
@@ -2191,6 +2268,7 @@ bool Game::createClient(const std::string &playername,
 	/* Skybox
 	 */
 	sky = new Sky(smgr->getRootSceneNode(), smgr, -1, texture_src);
+	scsf->setSky(sky);
 	skybox = NULL;	// This is used/set later on in the main run loop
 
 	local_inventory = new Inventory(itemdef_manager);
@@ -2812,7 +2890,8 @@ void Game::processKeyInput(VolatileRunFlags *flags,
 	} else if (wasKeyDown(KeyType::TOGGLE_UPDATE_CAMERA)) {
 		toggleUpdateCamera(statustext_time, &flags->disable_camera_update);
 	} else if (wasKeyDown(KeyType::TOGGLE_DEBUG)) {
-		toggleDebug(statustext_time, &flags->show_debug, &flags->show_profiler_graph);
+		toggleDebug(statustext_time, &flags->show_debug, &flags->show_profiler_graph,
+			&draw_control->show_wireframe);
 	} else if (wasKeyDown(KeyType::TOGGLE_PROFILER)) {
 		toggleProfiler(statustext_time, profiler_current_page, profiler_max_page);
 	} else if (wasKeyDown(KeyType::INCREASE_VIEWING_RANGE)) {
@@ -2981,6 +3060,7 @@ void Game::openInventory()
 
 	create_formspec_menu(&current_formspec, client, gamedef, texture_src,
 			device, &input->joystick, fs_src, txt_dst, client);
+	cur_formname = "";
 
 	InventoryLocation inventoryloc;
 	inventoryloc.setCurrentPlayer();
@@ -3170,22 +3250,33 @@ void Game::toggleFog(float *statustext_time, bool *flag)
 
 
 void Game::toggleDebug(float *statustext_time, bool *show_debug,
-		bool *show_profiler_graph)
+		bool *show_profiler_graph, bool *show_wireframe)
 {
-	// Initial / 3x toggle: Chat only
+	// Initial / 4x toggle: Chat only
 	// 1x toggle: Debug text with chat
 	// 2x toggle: Debug text with profiler graph
+	// 3x toggle: Debug text and wireframe
 	if (!*show_debug) {
 		*show_debug = true;
 		*show_profiler_graph = false;
+		*show_wireframe = false;
 		statustext = L"Debug info shown";
-	} else if (*show_profiler_graph) {
-		*show_debug = false;
-		*show_profiler_graph = false;
-		statustext = L"Debug info and profiler graph hidden";
-	} else {
+	} else if (!*show_profiler_graph && !*show_wireframe) {
 		*show_profiler_graph = true;
 		statustext = L"Profiler graph shown";
+	} else if (!*show_wireframe && client->checkPrivilege("debug")) {
+		*show_profiler_graph = false;
+		*show_wireframe = true;
+		statustext = L"Wireframe shown";
+	} else {
+		*show_debug = false;
+		*show_profiler_graph = false;
+		*show_wireframe = false;
+		if (client->checkPrivilege("debug")) {
+			statustext = L"Debug info, profiler graph, and wireframe hidden";
+		} else {
+			statustext = L"Debug info and profiler graph hidden";
+		}
 	}
 	*statustext_time = 0;
 }
@@ -3449,14 +3540,21 @@ void Game::processClientEvents(CameraOrientation *cam, float *damage_flash)
 			player->hurt_tilt_strength = 0;
 
 		} else if (event.type == CE_SHOW_FORMSPEC) {
-			FormspecFormSource *fs_src =
-				new FormspecFormSource(*(event.show_formspec.formspec));
-			TextDestPlayerInventory *txt_dst =
-				new TextDestPlayerInventory(client, *(event.show_formspec.formname));
+			if (*(event.show_formspec.formspec) == "") {
+				if (current_formspec && ( *(event.show_formspec.formname) == "" || *(event.show_formspec.formname) == cur_formname) ){
+					current_formspec->quitMenu();
+				}
+			} else {
+				FormspecFormSource *fs_src =
+					new FormspecFormSource(*(event.show_formspec.formspec));
+				TextDestPlayerInventory *txt_dst =
+					new TextDestPlayerInventory(client, *(event.show_formspec.formname));
 
-			create_formspec_menu(&current_formspec, client, gamedef,
-				texture_src, device, &input->joystick,
-				fs_src, txt_dst, client);
+				create_formspec_menu(&current_formspec, client, gamedef,
+					texture_src, device, &input->joystick,
+					fs_src, txt_dst, client);
+				cur_formname = *(event.show_formspec.formname);
+			}
 
 			delete(event.show_formspec.formspec);
 			delete(event.show_formspec.formname);
@@ -3927,6 +4025,7 @@ void Game::handlePointingAtNode(GameRunData *runData,
 
 			create_formspec_menu(&current_formspec, client, gamedef,
 				texture_src, device, &input->joystick, fs_src, txt_dst, client);
+			cur_formname = "";
 
 			current_formspec->setFormSpec(meta->getString("formspec"), inventoryloc);
 		} else {

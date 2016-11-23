@@ -2288,11 +2288,15 @@ and `minetest.auth_reload` call the authetification handler.
     * increase level of leveled node by level, default `level` equals `1`
     * if `totallevel > maxlevel`, returns rest (`total-max`)
     * can be negative for decreasing
-* `nodeupdate_single(pos)`
+* `core.check_single_for_falling(pos)`
     * causes an unsupported `group:falling_node` node to fall and causes an
       unattached `group:attached_node` node to fall.
-    * does not spread these updates to neighbours
-    * a helper function, not officially part of the API, but useful
+    * does not spread these updates to neighbours.
+* `core.check_for_falling(pos)`
+    * causes an unsupported `group:falling_node` node to fall and causes an
+      unattached `group:attached_node` node to fall.
+    * spread these updates to neighbours and can cause a cascade
+      of nodes to fall.
 
 ### Inventory
 `minetest.get_inventory(location)`: returns an `InvRef`
@@ -2314,6 +2318,13 @@ and `minetest.auth_reload` call the authetification handler.
     * `formname`: name passed to `on_player_receive_fields` callbacks.
       It should follow the `"modname:<whatever>"` naming convention
     * `formspec`: formspec to display
+* `minetest.close_formspec(playername, formname)`
+    * `playername`: name of player to close formspec
+    * `formname`: has to exactly match the one given in show_formspec, or the formspec will
+       not close.
+    * calling show_formspec(playername, formname, "") is equal to this expression
+    * to close a formspec regardless of the formname, call 
+      minetest.close_formspec(playername, ""). USE THIS ONLY WHEN ABSOLUTELY NECESSARY!
 * `minetest.formspec_escape(string)`: returns a string
     * escapes the characters "[", "]", "\", "," and ";", which can not be used in formspecs
 * `minetest.explode_table_event(string)`: returns a table
@@ -3531,8 +3542,9 @@ Definition tables
     --  ^ Called sometimes; the string returned is passed to on_activate when
     --    the entity is re-activated from static state
 
-        -- Also you can define arbitrary member variables here
-        myvariable = whatever,
+        -- Also you can define arbitrary member variables here (see item definition for
+        -- more info)
+        _custom_field = whatever,
     }
 
 ### ABM (ActiveBlockModifier) definition (`register_abm`)
@@ -3607,6 +3619,7 @@ Definition tables
           actual result to client in a short moment.
         ]]
         sound = {
+            breaks = "default_tool_break", -- tools only
             place = --[[<SimpleSoundSpec>]],
         },
 
@@ -3647,6 +3660,12 @@ Definition tables
               return itemstack
             end
         ^ The user may be any ObjectRef or nil.
+        ]]
+        _custom_field = whatever,
+        --[[
+        ^ Add your own custom fields. By convention, all custom field names
+          should start with `_` to avoid naming collisions with future engine
+          usage.
         ]]
     }
 
@@ -4146,7 +4165,8 @@ The Biome API is still in an experimental phase and subject to change.
     --  ^ collision_removal: if true then particle is removed when it collides,
     --  ^ requires collisiondetection = true to have any effect
         attached = ObjectRef,
-    --  ^ attached: if defined, makes particle positions relative to this object.
+    --  ^ attached: if defined, particle positions, velocities and accelerations
+    --  ^ are relative to this object's position and yaw.
         vertical = false,
     --  ^ vertical: if true faces player using y axis only
         texture = "image.png",
