@@ -707,11 +707,15 @@ void Server::AsyncRunStep(bool initial_step)
 			if (playersao == NULL)
 				continue;
 
+			s16 my_radius = MYMIN(radius, playersao->getWantedRange() * MAP_BLOCKSIZE);
+			if (my_radius <= 0) my_radius = radius;
+			//infostream << "Server: Active Radius " << my_radius << std::endl;
+
 			std::queue<u16> removed_objects;
 			std::queue<u16> added_objects;
-			m_env->getRemovedActiveObjects(playersao, radius, player_radius,
+			m_env->getRemovedActiveObjects(playersao, my_radius, player_radius,
 					client->m_known_objects, removed_objects);
-			m_env->getAddedActiveObjects(playersao, radius, player_radius,
+			m_env->getAddedActiveObjects(playersao, my_radius, player_radius,
 					client->m_known_objects, added_objects);
 
 			// Ignore if nothing happened
@@ -2510,11 +2514,16 @@ void Server::sendDetachedInventory(const std::string &name, u16 peer_id)
 	NetworkPacket pkt(TOCLIENT_DETACHED_INVENTORY, 0, peer_id);
 	pkt.putRawString(s.c_str(), s.size());
 
-	if (peer_id != PEER_ID_INEXISTENT) {
-		Send(&pkt);
-	}
-	else {
-		m_clients.sendToAll(0, &pkt, true);
+	const std::string &check = m_detached_inventories_player[name];
+	if (peer_id == PEER_ID_INEXISTENT) {
+		if (check == "")
+			return m_clients.sendToAll(0, &pkt, true);
+		RemotePlayer *p = m_env->getPlayer(check.c_str());
+		if (p)
+			m_clients.send(p->peer_id, 0, &pkt, true);
+	} else {
+		if (check == "" || getPlayerName(peer_id) == check)
+			Send(&pkt);
 	}
 }
 
@@ -3248,7 +3257,7 @@ void Server::deleteParticleSpawner(const std::string &playername, u32 id)
 	SendDeleteParticleSpawner(peer_id, id);
 }
 
-Inventory* Server::createDetachedInventory(const std::string &name)
+Inventory* Server::createDetachedInventory(const std::string &name, const std::string &player)
 {
 	if(m_detached_inventories.count(name) > 0){
 		infostream<<"Server clearing detached inventory \""<<name<<"\""<<std::endl;
@@ -3259,6 +3268,7 @@ Inventory* Server::createDetachedInventory(const std::string &name)
 	Inventory *inv = new Inventory(m_itemdef);
 	sanity_check(inv);
 	m_detached_inventories[name] = inv;
+	m_detached_inventories_player[name] = player;
 	//TODO find a better way to do this
 	sendDetachedInventory(name,PEER_ID_INEXISTENT);
 	return inv;

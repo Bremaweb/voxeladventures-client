@@ -782,6 +782,7 @@ void Server::process_PlayerPos(RemotePlayer *player, PlayerSAO *playersao,
 
 	v3s32 ps, ss;
 	s32 f32pitch, f32yaw;
+	u8 f32fov;
 
 	*pkt >> ps;
 	*pkt >> ss;
@@ -792,8 +793,18 @@ void Server::process_PlayerPos(RemotePlayer *player, PlayerSAO *playersao,
 	f32 yaw = (f32)f32yaw / 100.0;
 	u32 keyPressed = 0;
 
+	// default behavior (in case an old client doesn't send these)
+	f32 fov = (72.0*M_PI/180) * 4./3.;
+	u8 wanted_range = 0;
+
 	if (pkt->getRemainingBytes() >= 4)
 		*pkt >> keyPressed;
+	if (pkt->getRemainingBytes() >= 1) {
+		*pkt >> f32fov;
+		fov = (f32)f32fov / 80.0;
+	}
+	if (pkt->getRemainingBytes() >= 1)
+		*pkt >> wanted_range;
 
 	v3f position((f32)ps.X / 100.0, (f32)ps.Y / 100.0, (f32)ps.Z / 100.0);
 	v3f speed((f32)ss.X / 100.0, (f32)ss.Y / 100.0, (f32)ss.Z / 100.0);
@@ -805,6 +816,8 @@ void Server::process_PlayerPos(RemotePlayer *player, PlayerSAO *playersao,
 	player->setSpeed(speed);
 	playersao->setPitch(pitch);
 	playersao->setYaw(yaw);
+	playersao->setFov(fov);
+	playersao->setWantedRange(wanted_range);
 	player->keyPressed = keyPressed;
 	player->control.up = (keyPressed & 1);
 	player->control.down = (keyPressed & 2);
@@ -1529,10 +1542,7 @@ void Server::handleCommand_Interact(NetworkPacket* pkt)
 					m_script->on_cheat(playersao, "finished_unknown_dig");
 				}
 				// Get player's wielded item
-				ItemStack playeritem;
-				InventoryList *mlist = playersao->getInventory()->getList("main");
-				if (mlist != NULL)
-					playeritem = mlist->getItem(playersao->getWieldIndex());
+				ItemStack playeritem = playersao->getWieldedItem();
 				ToolCapabilities playeritem_toolcap =
 						playeritem.getToolCapabilities(m_itemdef);
 				// Get diggability and expected digging time
