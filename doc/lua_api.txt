@@ -441,20 +441,26 @@ from the available ones of the following files:
 
 Examples of sound parameter tables:
 
-    -- Play location-less on all clients
+    -- Play locationless on all clients
     {
         gain = 1.0, -- default
         fade = 0, -- default, change to a value > 0 to fade the sound in
     }
-    -- Play location-less to a player
+    -- Play locationless to one player
     {
         to_player = name,
         gain = 1.0, -- default
         fade = 0, -- default, change to a value > 0 to fade the sound in
     }
+    -- Play locationless to one player, looped
+    {
+        to_player = name,
+        gain = 1.0, -- default
+        loop = true,
+    }
     -- Play in a location
     {
-        pos = {x=1,y=2,z=3},
+        pos = {x = 1, y = 2, z = 3},
         gain = 1.0, -- default
         max_hear_distance = 32, -- default, uses an euclidean metric
     }
@@ -463,15 +469,18 @@ Examples of sound parameter tables:
         object = <an ObjectRef>,
         gain = 1.0, -- default
         max_hear_distance = 32, -- default, uses an euclidean metric
-        loop = true, -- only sounds connected to objects can be looped
+        loop = true,
     }
+
+Looped sounds must either be connected to an object or played locationless to
+one player using `to_player = name,`
 
 ### `SimpleSoundSpec`
 * e.g. `""`
 * e.g. `"default_place_node"`
 * e.g. `{}`
-* e.g. `{name="default_place_node"}`
-* e.g. `{name="default_place_node", gain=1.0}`
+* e.g. `{name = "default_place_node"}`
+* e.g. `{name = "default_place_node", gain = 1.0}`
 
 Registered definitions of stuff
 -------------------------------
@@ -2127,7 +2136,7 @@ and `minetest.auth_reload` call the authetification handler.
 * `minetest.set_node(pos, node)`
 * `minetest.add_node(pos, node): alias set_node(pos, node)`
     * Set node at position (`node = {name="foo", param1=0, param2=0}`)
-* `minetest.swap_node(pos, node`
+* `minetest.swap_node(pos, node)`
     * Set node at position, but don't remove metadata
 * `minetest.remove_node(pos)`
     * Equivalent to `set_node(pos, "air")`
@@ -2333,7 +2342,7 @@ and `minetest.auth_reload` call the authetification handler.
     * `formname`: has to exactly match the one given in show_formspec, or the formspec will
        not close.
     * calling show_formspec(playername, formname, "") is equal to this expression
-    * to close a formspec regardless of the formname, call 
+    * to close a formspec regardless of the formname, call
       minetest.close_formspec(playername, ""). USE THIS ONLY WHEN ABSOLUTELY NECESSARY!
 * `minetest.formspec_escape(string)`: returns a string
     * escapes the characters "[", "]", "\", "," and ";", which can not be used in formspecs
@@ -2573,6 +2582,10 @@ These functions return the leftover itemstack.
 
 ### Misc.
 * `minetest.get_connected_players()`: returns list of `ObjectRefs`
+* `minetest.hud_replace_builtin(name, hud_definition)`
+    * Replaces definition of a builtin hud element
+    * `name`: `"breath"` or `"health"`
+    * `hud_definition`: definition to replace builtin definition
 * `minetest.hash_node_position({x=,y=,z=})`: returns an 48-bit integer
     * Gives a unique hash number for a node position (16+16+16=48bit)
 * `minetest.get_position_from_hash(hash)`: returns a position
@@ -2898,10 +2911,6 @@ This is basically a reference to a C++ `ServerActiveObject`
 * `hud_set_hotbar_selected_image(texturename)`
     * sets image for selected item of hotbar
 * `hud_get_hotbar_selected_image`: returns texturename
-* `hud_replace_builtin(name, hud_definition)`
-    * replace definition of a builtin hud element
-    * `name`: `"breath"` or `"health"`
-    * `hud_definition`: definition to replace builtin definition
 * `set_sky(bgcolor, type, {texture names})`
     * `bgcolor`: ColorSpec, defaults to white
     * Available types:
@@ -4037,8 +4046,10 @@ The Biome API is still in an experimental phase and subject to change.
     --  ^ Number of nodes high the decoration is made.
     --  ^ If height_max is not 0, this is the lower bound of the randomly selected height.
         height_max = 0,
-    --      ^ Number of nodes the decoration can be at maximum.
+    --  ^ Number of nodes the decoration can be at maximum.
     --  ^ If absent, the parameter 'height' is used as a constant.
+        param2 = 0,
+    --  ^ Param2 value of placed decoration node.
 
         ----- Schematic-type parameters
         schematic = "foobar.mts",
