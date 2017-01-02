@@ -65,18 +65,12 @@ local function get_formspec(tabview, name, tabdata)
 		if #favs > 0 then
 			for i = 1, #favs do
 			for j = 1, #menudata.favorites do
-				if menudata.favorites[j] ~= nil and favs[i] ~= nil then
-					if menudata.favorites[j].address == favs[i].address and
-							menudata.favorites[j].port == favs[i].port then
-						table.insert(menudata.favorites, i, table.remove(menudata.favorites, j))
-					end
+				if menudata.favorites[j].address == favs[i].address and
+						menudata.favorites[j].port == favs[i].port then
+					table.insert(menudata.favorites, i, table.remove(menudata.favorites, j))
 				end
 			end
-				if menudata.favorites[i] ~= nil then
-					if favs[i].address ~= menudata.favorites[i].address then
-						table.insert(menudata.favorites, i, favs[i])
-					end
-				else
+				if favs[i].address ~= menudata.favorites[i].address then
 					table.insert(menudata.favorites, i, favs[i])
 				end
 			end

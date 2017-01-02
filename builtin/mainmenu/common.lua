@@ -79,9 +79,6 @@ end
 --------------------------------------------------------------------------------
 function render_favorite(spec, is_favorite)
 	local text = ""
-	
-	if spec == nil then return "" end
-	
 	if spec.name then
 		text = text .. core.formspec_escape(spec.name:trim())
 	elseif spec.address then
