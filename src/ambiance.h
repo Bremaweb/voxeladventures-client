@@ -9,6 +9,7 @@
 
 #include "gamedef.h"
 #include "environment.h"
+#include "clientenvironment.h"
 #include "sound.h"
 #include "settings.h"
 #include "sound_openal.h"
