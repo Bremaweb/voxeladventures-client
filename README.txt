@@ -5,7 +5,7 @@ Based on Minetest
 
 An InfiniMiner/Minecraft inspired game.
 
-Copyright (c) 2010-2013 Perttu Ahola <celeron55@gmail.com>
+Copyright (c) 2010-2017 Perttu Ahola <celeron55@gmail.com>
 and contributors (see source file comments and the version control log)
 
 In case you downloaded the source code:
@@ -170,7 +170,7 @@ ENABLE_FREETYPE     - Build with FreeType2; Allows using TTF fonts
 ENABLE_GETTEXT      - Build with Gettext; Allows using translations
 ENABLE_GLES         - Search for Open GLES headers & libraries and use them
 ENABLE_LEVELDB      - Build with LevelDB; Enables use of LevelDB map backend
-ENABLE_POSTGRESQL   - Build with libpq; Enables use of PostgreSQL map backend (PostgreSQL 9.5 or greater required)
+ENABLE_POSTGRESQL   - Build with libpq; Enables use of PostgreSQL map backend (PostgreSQL 9.5 or greater recommended)
 ENABLE_REDIS        - Build with libhiredis; Enables use of Redis map backend
 ENABLE_SPATIAL      - Build with LibSpatial; Speeds up AreaStores
 ENABLE_SOUND        - Build with OpenAL, libogg & libvorbis; in-game Sounds
@@ -419,7 +419,7 @@ License of Minetest source code
 -------------------------------
 
 Minetest
-Copyright (C) 2010-2013 celeron55, Perttu Ahola <celeron55@gmail.com>
+Copyright (C) 2010-2017 celeron55, Perttu Ahola <celeron55@gmail.com>
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by

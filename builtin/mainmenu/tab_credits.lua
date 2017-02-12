@@ -45,6 +45,7 @@ local active_contributors = {
 	"Jean-Patrick G (kilbith) <jeanpatrick.guerrero@gmail.com>",
 	"Diego Martínez (kaeza) <kaeza@users.sf.net>",
 	"Dániel Juhász (juhdanad) <juhdanad@gmail.com>",
+	"Rogier <rogier777@gmail.com>",
 }
 
 local previous_core_developers = {
@@ -84,7 +85,7 @@ return {
 			"label[0.5,3.5;http://minetest.net]" ..
 			"tablecolumns[color;text]" ..
 			"tableoptions[background=#00000000;highlight=#00000000;border=false]" ..
-			"table[3.5,-0.25;8.5,5.8;list_credits;" ..
+			"table[3.5,-0.25;8.5,6.05;list_credits;" ..
 			"#FFFF00," .. fgettext("Core Developers") .. ",," ..
 			table.concat(core_developers, ",,") .. ",,," ..
 			"#FFFF00," .. fgettext("Active Contributors") .. ",," ..

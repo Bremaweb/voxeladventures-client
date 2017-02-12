@@ -440,11 +440,11 @@ fov (Field of view) int 72 30 160
 
 #    Field of view while zooming in degrees.
 #    This requires the "zoom" privilege on the server.
-zoom_fov (Field of view for zoom) int 15 15 160
+zoom_fov (Field of view for zoom) int 15 7 160
 
-#    Adjust the gamma encoding for the light tables. Lower numbers are brighter.
+#    Adjust the gamma encoding for the light tables. Higher numbers are brighter.
 #    This setting is for the client only and is ignored by the server.
-display_gamma (Gamma) float 1.8 1.0 3.0
+display_gamma (Gamma) float 2.2 1.0 3.0
 
 #    Path to texture directory. All textures are first searched from here.
 texture_path (Texture path) path
@@ -476,6 +476,9 @@ fall_bobbing_amount (Fall bobbing) float 0.0
 #    -    sidebyside: split screen side by side.
 #    -    pageflip: quadbuffer based 3d.
 3d_mode (3D mode) enum none none,anaglyph,interlaced,topbottom,sidebyside,pageflip
+
+#    In-game chat console height, between 0.1 (10%) and 1.0 (100%).
+console_height (Console height) float 1.0 0.1 1.0
 
 #    In-game chat console background color (R,G,B).
 console_color (Console color) string (0,0,0)
@@ -703,6 +706,9 @@ map-dir (Map directory) path
 #    Setting it to -1 disables the feature.
 item_entity_ttl (Item entity TTL) int 900
 
+#    If enabled, show the server status message on player connection.
+show_statusline_on_connect (Status message on connection) bool true
+
 #    Enable players getting damage and dying.
 enable_damage (Damage) bool false
 
@@ -758,7 +764,7 @@ active_object_send_range_blocks (Active object send range) int 3
 
 #    How large area of blocks are subject to the active block stuff, stated in mapblocks (16 nodes).
 #    In active blocks objects are loaded and ABMs run.
-active_block_range (Active block range) int 2
+active_block_range (Active block range) int 3
 
 #    From how far blocks are sent to clients, stated in mapblocks (16 nodes).
 max_block_send_distance (Max block send distance) int 10
@@ -834,7 +840,7 @@ active_block_mgmt_interval (Active Block Management interval) float 2.0
 abm_interval (Active Block Modifier interval) float 1.0
 
 #    Length of time between NodeTimer execution cycles
-nodetimer_interval (NodeTimer interval) float 1.0
+nodetimer_interval (NodeTimer interval) float 0.2
 
 #    If enabled, invalid world data won't cause the server to shut down.
 #    Only enable this if you know what you are doing.
@@ -910,9 +916,9 @@ emergequeue_limit_generate (Limit of emerge queues to generate) int 32
 num_emerge_threads (Number of emerge threads) int 1
 
 #    Noise parameters for biome API temperature, humidity and biome blend.
-mg_biome_np_heat (Mapgen biome heat noise parameters) noise_params 50, 50, (750, 750, 750), 5349, 3, 0.5, 2.0
+mg_biome_np_heat (Mapgen biome heat noise parameters) noise_params 50, 50, (1000, 1000, 1000), 5349, 3, 0.5, 2.0
 mg_biome_np_heat_blend (Mapgen heat blend noise parameters) noise_params 0, 1.5, (8, 8, 8), 13, 2, 1.0, 2.0
-mg_biome_np_humidity (Mapgen biome humidity noise parameters) noise_params 50, 50, (750, 750, 750), 842, 3, 0.5, 2.0
+mg_biome_np_humidity (Mapgen biome humidity noise parameters) noise_params 50, 50, (1000, 1000, 1000), 842, 3, 0.5, 2.0
 mg_biome_np_humidity_blend (Mapgen biome humidity blend noise parameters) noise_params 0, 1.5, (8, 8, 8), 90003, 2, 1.0, 2.0
 
 [***Mapgen v5]

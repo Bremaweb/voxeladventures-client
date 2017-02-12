@@ -415,8 +415,8 @@ void DungeonGen::makeCorridor(v3s16 doorplace, v3s16 doordir,
 		if (partcount != 0)
 			p.Y += make_stairs;
 
-		if (vm->m_area.contains(p) && vm->m_area.contains(p + v3s16(0, 1, 0)) &&
-				vm->m_area.contains(v3s16(p.X - dir.X, p.Y - 1, p.Z - dir.Z))) {
+		// Check segment of minimum size corridor is in voxelmanip
+		if (vm->m_area.contains(p) && vm->m_area.contains(p + v3s16(0, 1, 0))) {
 			if (make_stairs) {
 				makeFill(p + v3s16(-1, -1, -1),
 					dp.holesize + v3s16(2, 3, 2),
@@ -437,14 +437,24 @@ void DungeonGen::makeCorridor(v3s16 doorplace, v3s16 doordir,
 					// rotate face 180 deg if
 					// making stairs backwards
 					int facedir = dir_to_facedir(dir * make_stairs);
+					v3s16 ps = p;
+					u16 stair_width = (dir.Z != 0) ? dp.holesize.X : dp.holesize.Z;
+					// Stair width direction vector
+					v3s16 swv = (dir.Z != 0) ? v3s16(1, 0, 0) : v3s16(0, 0, 1);
 
-					u32 vi = vm->m_area.index(p.X - dir.X, p.Y - 1, p.Z - dir.Z);
-					if (vm->m_data[vi].getContent() == dp.c_wall)
-						vm->m_data[vi] = MapNode(dp.c_stair, 0, facedir);
+					for (u16 st = 0; st < stair_width; st++) {
+						u32 vi = vm->m_area.index(ps.X - dir.X, ps.Y - 1, ps.Z - dir.Z);
+						if (vm->m_area.contains(ps + v3s16(-dir.X, -1, -dir.Z)) &&
+								vm->m_data[vi].getContent() == dp.c_wall)
+							vm->m_data[vi] = MapNode(dp.c_stair, 0, facedir);
 
-					vi = vm->m_area.index(p.X, p.Y, p.Z);
-					if (vm->m_data[vi].getContent() == dp.c_wall)
-						vm->m_data[vi] = MapNode(dp.c_stair, 0, facedir);
+						vi = vm->m_area.index(ps.X, ps.Y, ps.Z);
+						if (vm->m_area.contains(ps) &&
+								vm->m_data[vi].getContent() == dp.c_wall)
+							vm->m_data[vi] = MapNode(dp.c_stair, 0, facedir);
+
+						ps += swv;
+					}
 				}
 			} else {
 				makeFill(p + v3s16(-1, -1, -1),
@@ -612,7 +622,7 @@ v3s16 rand_ortho_dir(PseudoRandom &random, bool diagonal_dirs)
 			dir.Z = random.next() % 3 - 1;
 			dir.Y = 0;
 			dir.X = random.next() % 3 - 1;
-		} while ((dir.X == 0 && dir.Z == 0) && trycount < 10);
+		} while ((dir.X == 0 || dir.Z == 0) && trycount < 10);
 
 		return dir;
 	} else {

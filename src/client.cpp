@@ -55,6 +55,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "database-sqlite3.h"
 #include "serialization.h"
 #include "guiscalingfilter.h"
+#include "raycast.h"
 
 
 extern gui::IGUIEnvironment* guienv;
@@ -223,7 +224,7 @@ Client::Client(
 	m_event(event),
 	m_mesh_update_thread(),
 	m_env(
-		new ClientMap(this, this, control,
+		new ClientMap(this, control,
 			device->getSceneManager()->getRootSceneNode(),
 			device->getSceneManager(), 666),
 		device->getSceneManager(),
@@ -510,9 +511,10 @@ void Client::step(float dtime)
 				m_client_event_queue.push(event);
 			}
 		}
-		else if(event.type == CEE_PLAYER_BREATH) {
-				u16 breath = event.player_breath.amount;
-				sendBreath(breath);
+		// Protocol v29 or greater obsoleted this event
+		else if (event.type == CEE_PLAYER_BREATH && m_proto_ver < 29) {
+			u16 breath = event.player_breath.amount;
+			sendBreath(breath);
 		}
 	}
 
@@ -1281,6 +1283,10 @@ void Client::sendBreath(u16 breath)
 {
 	DSTACK(FUNCTION_NAME);
 
+	// Protocol v29 make this obsolete
+	if (m_proto_ver >= 29)
+		return;
+
 	NetworkPacket pkt(TOSERVER_BREATH, sizeof(u16));
 	pkt << breath;
 	Send(&pkt);
@@ -1506,44 +1512,6 @@ void Client::inventoryAction(InventoryAction *a)
 	delete a;
 }
 
-ClientActiveObject * Client::getSelectedActiveObject(
-		f32 max_d,
-		v3f from_pos_f_on_map,
-		core::line3d<f32> shootline_on_map
-	)
-{
-	std::vector<DistanceSortedActiveObject> objects;
-
-	m_env.getActiveObjects(from_pos_f_on_map, max_d, objects);
-
-	// Sort them.
-	// After this, the closest object is the first in the array.
-	std::sort(objects.begin(), objects.end());
-
-	for(unsigned int i=0; i<objects.size(); i++)
-	{
-		ClientActiveObject *obj = objects[i].obj;
-
-		aabb3f *selection_box = obj->getSelectionBox();
-		if(selection_box == NULL)
-			continue;
-
-		v3f pos = obj->getPosition();
-
-		aabb3f offsetted_box(
-				selection_box->MinEdge + pos,
-				selection_box->MaxEdge + pos
-		);
-
-		if(offsetted_box.intersectsWithLine(shootline_on_map))
-		{
-			return obj;
-		}
-	}
-
-	return NULL;
-}
-
 float Client::getAnimationTime()
 {
 	return m_animation_time;
@@ -1606,10 +1574,13 @@ void Client::typeChatMessage(const std::wstring &message)
 	}
 	else
 	{
-		LocalPlayer *player = m_env.getLocalPlayer();
-		assert(player != NULL);
-		std::wstring name = narrow_to_wide(player->getName());
-		m_chat_queue.push((std::wstring)L"<" + name + L"> " + message);
+		// compatibility code
+		if (m_proto_ver < 29) {
+			LocalPlayer *player = m_env.getLocalPlayer();
+			assert(player != NULL);
+			std::wstring name = narrow_to_wide(player->getName());
+			m_chat_queue.push((std::wstring)L"<" + name + L"> " + message);
+		}
 	}
 }
 

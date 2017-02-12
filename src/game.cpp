@@ -265,271 +265,6 @@ public:
 	Client *m_client;
 };
 
-/*
-	Check if a node is pointable
-*/
-inline bool isPointableNode(const MapNode &n,
-			    Client *client, bool liquids_pointable)
-{
-	const ContentFeatures &features = client->getNodeDefManager()->get(n);
-	return features.pointable ||
-	       (liquids_pointable && features.isLiquid());
-}
-
-static inline void getNeighborConnectingFace(v3s16 p, INodeDefManager *nodedef,
-		ClientMap *map, MapNode n, u8 bitmask, u8 *neighbors)
-{
-	MapNode n2 = map->getNodeNoEx(p);
-	if (nodedef->nodeboxConnects(n, n2, bitmask))
-		*neighbors |= bitmask;
-}
-
-static inline u8 getNeighbors(v3s16 p, INodeDefManager *nodedef, ClientMap *map, MapNode n)
-{
-	u8 neighbors = 0;
-	const ContentFeatures &f = nodedef->get(n);
-	// locate possible neighboring nodes to connect to
-	if (f.drawtype == NDT_NODEBOX && f.node_box.type == NODEBOX_CONNECTED) {
-		v3s16 p2 = p;
-
-		p2.Y++;
-		getNeighborConnectingFace(p2, nodedef, map, n, 1, &neighbors);
-
-		p2 = p;
-		p2.Y--;
-		getNeighborConnectingFace(p2, nodedef, map, n, 2, &neighbors);
-
-		p2 = p;
-		p2.Z--;
-		getNeighborConnectingFace(p2, nodedef, map, n, 4, &neighbors);
-
-		p2 = p;
-		p2.X--;
-		getNeighborConnectingFace(p2, nodedef, map, n, 8, &neighbors);
-
-		p2 = p;
-		p2.Z++;
-		getNeighborConnectingFace(p2, nodedef, map, n, 16, &neighbors);
-
-		p2 = p;
-		p2.X++;
-		getNeighborConnectingFace(p2, nodedef, map, n, 32, &neighbors);
-	}
-
-	return neighbors;
-}
-
-/*
-	Find what the player is pointing at
-*/
-PointedThing getPointedThing(Client *client, Hud *hud, const v3f &player_position,
-		const v3f &camera_direction, const v3f &camera_position,
-		core::line3d<f32> shootline, f32 d, bool liquids_pointable,
-		bool look_for_object, const v3s16 &camera_offset,
-		ClientActiveObject *&selected_object)
-{
-	PointedThing result;
-
-	std::vector<aabb3f> *selectionboxes = hud->getSelectionBoxes();
-	selectionboxes->clear();
-	static const bool show_entity_selectionbox = g_settings->getBool("show_entity_selectionbox");
-
-	selected_object = NULL;
-
-	INodeDefManager *nodedef = client->getNodeDefManager();
-	ClientMap &map = client->getEnv().getClientMap();
-
-	f32 min_distance = BS * 1001;
-
-	// First try to find a pointed at active object
-	if (look_for_object) {
-		selected_object = client->getSelectedActiveObject(d * BS,
-				  camera_position, shootline);
-
-		if (selected_object != NULL) {
-			if (show_entity_selectionbox &&
-					selected_object->doShowSelectionBox()) {
-				aabb3f *selection_box = selected_object->getSelectionBox();
-				// Box should exist because object was
-				// returned in the first place
-				assert(selection_box);
-
-				v3f pos = selected_object->getPosition();
-				selectionboxes->push_back(aabb3f(
-					selection_box->MinEdge, selection_box->MaxEdge));
-				hud->setSelectionPos(pos, camera_offset);
-			}
-
-			min_distance = (selected_object->getPosition() - camera_position).getLength();
-
-			hud->setSelectedFaceNormal(v3f(0.0, 0.0, 0.0));
-			result.type = POINTEDTHING_OBJECT;
-			result.object_id = selected_object->getId();
-		}
-	}
-
-	// That didn't work, try to find a pointed at node
-
-	v3s16 pos_i = floatToInt(player_position, BS);
-
-	/*infostream<<"pos_i=("<<pos_i.X<<","<<pos_i.Y<<","<<pos_i.Z<<")"
-			<<std::endl;*/
-
-	s16 a = d;
-	s16 ystart = pos_i.Y - (camera_direction.Y < 0 ? a : 1);
-	s16 zstart = pos_i.Z - (camera_direction.Z < 0 ? a : 1);
-	s16 xstart = pos_i.X - (camera_direction.X < 0 ? a : 1);
-	s16 yend = pos_i.Y + 1 + (camera_direction.Y > 0 ? a : 1);
-	s16 zend = pos_i.Z + (camera_direction.Z > 0 ? a : 1);
-	s16 xend = pos_i.X + (camera_direction.X > 0 ? a : 1);
-
-	// Prevent signed number overflow
-	if (yend == 32767)
-		yend = 32766;
-
-	if (zend == 32767)
-		zend = 32766;
-
-	if (xend == 32767)
-		xend = 32766;
-
-	v3s16 pointed_pos(0, 0, 0);
-
-	for (s16 y = ystart; y <= yend; y++) {
-		for (s16 z = zstart; z <= zend; z++) {
-			for (s16 x = xstart; x <= xend; x++) {
-				MapNode n;
-				bool is_valid_position;
-				v3s16 p(x, y, z);
-
-				n = map.getNodeNoEx(p, &is_valid_position);
-				if (!is_valid_position) {
-					continue;
-				}
-				if (!isPointableNode(n, client, liquids_pointable)) {
-					continue;
-				}
-
-				std::vector<aabb3f> boxes;
-				n.getSelectionBoxes(nodedef, &boxes, getNeighbors(p, nodedef, &map, n));
-
-				v3s16 np(x, y, z);
-				v3f npf = intToFloat(np, BS);
-				for (std::vector<aabb3f>::const_iterator
-						i = boxes.begin();
-						i != boxes.end(); ++i) {
-					aabb3f box = *i;
-					box.MinEdge += npf;
-					box.MaxEdge += npf;
-
-					v3f centerpoint = box.getCenter();
-					f32 distance = (centerpoint - camera_position).getLength();
-					if (distance >= min_distance) {
-						continue;
-					}
-					if (!box.intersectsWithLine(shootline)) {
-						continue;
-					}
-					result.type = POINTEDTHING_NODE;
-					min_distance = distance;
-					pointed_pos = np;
-				}
-			}
-		}
-	}
-
-	if (result.type == POINTEDTHING_NODE) {
-		f32 d = 0.001 * BS;
-		MapNode n = map.getNodeNoEx(pointed_pos);
-		v3f npf = intToFloat(pointed_pos, BS);
-		std::vector<aabb3f> boxes;
-		n.getSelectionBoxes(nodedef, &boxes, getNeighbors(pointed_pos, nodedef, &map, n));
-		f32 face_min_distance = 1000 * BS;
-		for (std::vector<aabb3f>::const_iterator
-				i = boxes.begin();
-				i != boxes.end(); ++i) {
-			aabb3f box = *i;
-			box.MinEdge += npf;
-			box.MaxEdge += npf;
-			for (u16 j = 0; j < 6; j++) {
-				v3s16 facedir = g_6dirs[j];
-				aabb3f facebox = box;
-				if (facedir.X > 0) {
-					facebox.MinEdge.X = facebox.MaxEdge.X - d;
-				} else if (facedir.X < 0) {
-					facebox.MaxEdge.X = facebox.MinEdge.X + d;
-				} else if (facedir.Y > 0) {
-					facebox.MinEdge.Y = facebox.MaxEdge.Y - d;
-				} else if (facedir.Y < 0) {
-					facebox.MaxEdge.Y = facebox.MinEdge.Y + d;
-				} else if (facedir.Z > 0) {
-					facebox.MinEdge.Z = facebox.MaxEdge.Z - d;
-				} else if (facedir.Z < 0) {
-					facebox.MaxEdge.Z = facebox.MinEdge.Z + d;
-				}
-				v3f centerpoint = facebox.getCenter();
-				f32 distance = (centerpoint - camera_position).getLength();
-				if (distance >= face_min_distance)
-					continue;
-				if (!facebox.intersectsWithLine(shootline))
-					continue;
-				result.node_abovesurface = pointed_pos + facedir;
-				hud->setSelectedFaceNormal(v3f(facedir.X, facedir.Y, facedir.Z));
-				face_min_distance = distance;
-			}
-		}
-		selectionboxes->clear();
-		for (std::vector<aabb3f>::const_iterator
-				i = boxes.begin();
-				i != boxes.end(); ++i) {
-			aabb3f box = *i;
-			box.MinEdge += v3f(-d, -d, -d);
-			box.MaxEdge += v3f(d, d, d);
-			selectionboxes->push_back(box);
-		}
-		hud->setSelectionPos(intToFloat(pointed_pos, BS), camera_offset);
-		result.node_undersurface = pointed_pos;
-	}
-
-	// Update selection mesh light level and vertex colors
-	if (selectionboxes->size() > 0) {
-		v3f pf = hud->getSelectionPos();
-		v3s16 p = floatToInt(pf, BS);
-
-		// Get selection mesh light level
-		MapNode n = map.getNodeNoEx(p);
-		u16 node_light = getInteriorLight(n, -1, nodedef);
-		u16 light_level = node_light;
-
-		for (u8 i = 0; i < 6; i++) {
-			n = map.getNodeNoEx(p + g_6dirs[i]);
-			node_light = getInteriorLight(n, -1, nodedef);
-			if (node_light > light_level)
-				light_level = node_light;
-		}
-
-		video::SColor c = MapBlock_LightColor(255, light_level, 0);
-		u8 day = c.getRed();
-		u8 night = c.getGreen();
-		u32 daynight_ratio = client->getEnv().getDayNightRatio();
-		finalColorBlend(c, day, night, daynight_ratio);
-
-		// Modify final color a bit with time
-		u32 timer = porting::getTimeMs() % 5000;
-		float timerf = (float)(irr::core::PI * ((timer / 2500.0) - 0.5));
-		float sin_r = 0.08 * sin(timerf);
-		float sin_g = 0.08 * sin(timerf + irr::core::PI * 0.5);
-		float sin_b = 0.08 * sin(timerf + irr::core::PI);
-		c.setRed(core::clamp(core::round32(c.getRed() * (0.8 + sin_r)), 0, 255));
-		c.setGreen(core::clamp(core::round32(c.getGreen() * (0.8 + sin_g)), 0, 255));
-		c.setBlue(core::clamp(core::round32(c.getBlue() * (0.8 + sin_b)), 0, 255));
-
-		// Set mesh final color
-		hud->setSelectionMeshColor(c);
-	}
-	return result;
-}
-
 /* Profiler display */
 
 void update_profiler_gui(gui::IGUIStaticText *guitext_profiler, FontEngine *fe,
@@ -907,7 +642,7 @@ class GameGlobalShaderConstantSetter : public IShaderConstantSetter
 	CachedPixelShaderSetting<float> m_fog_distance;
 	CachedVertexShaderSetting<float> m_animation_timer_vertex;
 	CachedPixelShaderSetting<float> m_animation_timer_pixel;
-	CachedPixelShaderSetting<float> m_day_night_ratio;
+	CachedPixelShaderSetting<float, 3> m_day_light;
 	CachedPixelShaderSetting<float, 3> m_eye_position_pixel;
 	CachedVertexShaderSetting<float, 3> m_eye_position_vertex;
 	CachedPixelShaderSetting<float, 3> m_minimap_yaw;
@@ -939,7 +674,7 @@ public:
 		m_fog_distance("fogDistance"),
 		m_animation_timer_vertex("animationTimer"),
 		m_animation_timer_pixel("animationTimer"),
-		m_day_night_ratio("dayNightRatio"),
+		m_day_light("dayLight"),
 		m_eye_position_pixel("eyePosition"),
 		m_eye_position_vertex("eyePosition"),
 		m_minimap_yaw("yawVec"),
@@ -982,8 +717,14 @@ public:
 
 		m_fog_distance.set(&fog_distance, services);
 
-		float daynight_ratio = (float)m_client->getEnv().getDayNightRatio() / 1000.f;
-		m_day_night_ratio.set(&daynight_ratio, services);
+		u32 daynight_ratio = (float)m_client->getEnv().getDayNightRatio();
+		video::SColorf sunlight;
+		get_sunlight_color(&sunlight, daynight_ratio);
+		float dnc[3] = {
+			sunlight.r,
+			sunlight.g,
+			sunlight.b };
+		m_day_light.set(dnc, services);
 
 		u32 animation_timer = porting::getTimeMs() % 100000;
 		float animation_timer_f = (float)animation_timer / 100000.f;
@@ -1105,7 +846,8 @@ bool nodePlacementPrediction(Client &client,
 		// Predict param2 for facedir and wallmounted nodes
 		u8 param2 = 0;
 
-		if (nodedef->get(id).param_type_2 == CPT2_WALLMOUNTED) {
+		if (nodedef->get(id).param_type_2 == CPT2_WALLMOUNTED ||
+				nodedef->get(id).param_type_2 == CPT2_COLORED_WALLMOUNTED) {
 			v3s16 dir = nodepos - neighbourpos;
 
 			if (abs(dir.Y) > MYMAX(abs(dir.X), abs(dir.Z))) {
@@ -1117,7 +859,8 @@ bool nodePlacementPrediction(Client &client,
 			}
 		}
 
-		if (nodedef->get(id).param_type_2 == CPT2_FACEDIR) {
+		if (nodedef->get(id).param_type_2 == CPT2_FACEDIR ||
+				nodedef->get(id).param_type_2 == CPT2_COLORED_FACEDIR) {
 			v3s16 dir = nodepos - floatToInt(client.getEnv().getLocalPlayer()->getPosition(), BS);
 
 			if (abs(dir.X) > abs(dir.Z)) {
@@ -1181,16 +924,14 @@ bool nodePlacementPrediction(Client &client,
 }
 
 static inline void create_formspec_menu(GUIFormSpecMenu **cur_formspec,
-		InventoryManager *invmgr, IGameDef *gamedef,
-		IWritableTextureSource *tsrc, IrrlichtDevice *device,
-		JoystickController *joystick,
-		IFormSource *fs_src, TextDest *txt_dest, Client *client)
+		Client *client, IrrlichtDevice *device, JoystickController *joystick,
+		IFormSource *fs_src, TextDest *txt_dest)
 {
 
 	if (*cur_formspec == 0) {
 		*cur_formspec = new GUIFormSpecMenu(device, joystick,
-			guiroot, -1, &g_menumgr, invmgr, gamedef, tsrc,
-			fs_src, txt_dest, client);
+			guiroot, -1, &g_menumgr, client, client->getTextureSource(),
+			fs_src, txt_dest);
 		(*cur_formspec)->doPause = false;
 
 		/*
@@ -1215,9 +956,9 @@ static inline void create_formspec_menu(GUIFormSpecMenu **cur_formspec,
 #endif
 
 static void show_deathscreen(GUIFormSpecMenu **cur_formspec,
-		InventoryManager *invmgr, IGameDef *gamedef,
+		Client *client,
 		IWritableTextureSource *tsrc, IrrlichtDevice *device,
-		JoystickController *joystick, Client *client)
+		JoystickController *joystick)
 {
 	std::string formspec =
 		std::string(FORMSPEC_VERSION_STRING) +
@@ -1233,13 +974,12 @@ static void show_deathscreen(GUIFormSpecMenu **cur_formspec,
 	FormspecFormSource *fs_src = new FormspecFormSource(formspec);
 	LocalFormspecHandler *txt_dst = new LocalFormspecHandler("MT_DEATH_SCREEN", client);
 
-	create_formspec_menu(cur_formspec, invmgr, gamedef, tsrc, device,
-		joystick, fs_src, txt_dst, NULL);
+	create_formspec_menu(cur_formspec, client, device, joystick, fs_src, txt_dst);
 }
 
 /******************************************************************************/
 static void show_pause_menu(GUIFormSpecMenu **cur_formspec,
-		InventoryManager *invmgr, IGameDef *gamedef,
+		Client *client,
 		IWritableTextureSource *tsrc, IrrlichtDevice *device,
 		JoystickController *joystick, bool singleplayermode)
 {
@@ -1306,8 +1046,7 @@ static void show_pause_menu(GUIFormSpecMenu **cur_formspec,
 	FormspecFormSource *fs_src = new FormspecFormSource(os.str());
 	LocalFormspecHandler *txt_dst = new LocalFormspecHandler("MT_PAUSE_MENU");
 
-	create_formspec_menu(cur_formspec, invmgr, gamedef, tsrc, device,
-		joystick, fs_src, txt_dst, NULL);
+	create_formspec_menu(cur_formspec, client, device, joystick, fs_src, txt_dst);
 	std::string con("btn_continue");
 	(*cur_formspec)->setFocus(con);
 	(*cur_formspec)->doPause = true;
@@ -1633,7 +1372,7 @@ protected:
 
 	void dropSelectedItem();
 	void openInventory();
-	void openConsole(float height, const wchar_t *line=NULL);
+	void openConsole(float scale, const wchar_t *line=NULL);
 	void toggleFreeMove(float *statustext_time);
 	void toggleFreeMoveAlt(float *statustext_time, float *jump_timer);
 	void toggleFast(float *statustext_time);
@@ -1668,6 +1407,23 @@ protected:
 	void updateSound(f32 dtime);
 	void processPlayerInteraction(GameRunData *runData, f32 dtime, bool show_hud,
 			bool show_debug);
+	/*!
+	 * Returns the object or node the player is pointing at.
+	 * Also updates the selected thing in the Hud.
+	 *
+	 * @param[in]  shootline         the shootline, starting from
+	 * the camera position. This also gives the maximal distance
+	 * of the search.
+	 * @param[in]  liquids_pointable if false, liquids are ignored
+	 * @param[in]  look_for_object   if false, objects are ignored
+	 * @param[in]  camera_offset     offset of the camera
+	 * @param[out] selected_object   the selected object or
+	 * NULL if not found
+	 */
+	PointedThing updatePointedThing(
+			const core::line3d<f32> &shootline, bool liquids_pointable,
+			bool look_for_object, const v3s16 &camera_offset,
+			ClientActiveObject *&selected_object);
 	void handlePointingAtNothing(GameRunData *runData, const ItemStack &playerItem);
 	void handlePointingAtNode(GameRunData *runData,
 			const PointedThing &pointed, const ItemDefinition &playeritem_def,
@@ -1782,7 +1538,6 @@ private:
 	bool *kill;
 	std::string *error_message;
 	bool *reconnect_requested;
-	IGameDef *gamedef;                     // Convenience (same as *client)
 	scene::ISceneNode *skybox;
 
 	bool random_input;
@@ -2071,9 +1826,11 @@ void Game::run()
 
 void Game::shutdown()
 {
+#if IRRLICHT_VERSION_MAJOR == 1 && IRRLICHT_VERSION_MINOR <= 8
 	if (g_settings->get("3d_mode") == "pageflip") {
 		driver->setRenderTarget(irr::video::ERT_STEREO_BOTH_BUFFERS);
 	}
+#endif
 
 	showOverlayMessage(wgettext("Shutting down..."), 0, 0, false);
 
@@ -2257,7 +2014,7 @@ bool Game::createClient(const std::string &playername,
 
 	/* Camera
 	 */
-	camera = new Camera(smgr, *draw_control, gamedef);
+	camera = new Camera(smgr, *draw_control, client);
 	if (!camera || !camera->successfullyCreated(*error_message))
 		return false;
 	client->setCamera(camera);
@@ -2314,7 +2071,7 @@ bool Game::createClient(const std::string &playername,
 	player->hurt_tilt_timer = 0;
 	player->hurt_tilt_strength = 0;
 
-	hud = new Hud(driver, smgr, guienv, gamedef, player, local_inventory);
+	hud = new Hud(driver, smgr, guienv, client, player, local_inventory);
 
 	if (!hud) {
 		*error_message = "Memory error: could not create HUD";
@@ -2443,8 +2200,6 @@ bool Game::connectToServer(const std::string &playername,
 
 	if (!client)
 		return false;
-
-	gamedef = client;	// Client acts as our GameDef
 
 	infostream << "Connecting to server at ";
 	connect_address.print(&infostream);
@@ -2691,7 +2446,7 @@ inline bool Game::handleCallbacks()
 void Game::processQueues()
 {
 	texture_src->processQueue();
-	itemdef_manager->processQueue(gamedef);
+	itemdef_manager->processQueue(client);
 	shader_src->processQueue();
 }
 
@@ -2863,7 +2618,7 @@ void Game::processKeyInput(VolatileRunFlags *flags,
 		openInventory();
 	} else if (wasKeyDown(KeyType::ESC) || input->wasKeyDown(CancelKey)) {
 		if (!gui_chat_console->isOpenInhibited()) {
-			show_pause_menu(&current_formspec, client, gamedef,
+			show_pause_menu(&current_formspec, client,
 				texture_src, device, &input->joystick,
 				simple_singleplayer_mode);
 		}
@@ -2872,7 +2627,8 @@ void Game::processKeyInput(VolatileRunFlags *flags,
 	} else if (wasKeyDown(KeyType::CMD)) {
 		openConsole(0.2, L"/");
 	} else if (wasKeyDown(KeyType::CONSOLE)) {
-		openConsole(1);
+		openConsole(core::clamp(
+			g_settings->getFloat("console_height"), 0.1f, 1.0f));
 	} else if (wasKeyDown(KeyType::FREEMOVE)) {
 		toggleFreeMove(statustext_time);
 	} else if (wasKeyDown(KeyType::JUMP)) {
@@ -3066,8 +2822,7 @@ void Game::openInventory()
 	PlayerInventoryFormSource *fs_src = new PlayerInventoryFormSource(client);
 	TextDest *txt_dst = new TextDestPlayerInventory(client);
 
-	create_formspec_menu(&current_formspec, client, gamedef, texture_src,
-			device, &input->joystick, fs_src, txt_dst, client);
+	create_formspec_menu(&current_formspec, client, device, &input->joystick, fs_src, txt_dst);
 	cur_formname = "";
 
 	InventoryLocation inventoryloc;
@@ -3076,15 +2831,17 @@ void Game::openInventory()
 }
 
 
-void Game::openConsole(float height, const wchar_t *line)
+void Game::openConsole(float scale, const wchar_t *line)
 {
+	assert(scale > 0.0f && scale <= 1.0f);
+
 #ifdef __ANDROID__
 	porting::showInputDialog(gettext("ok"), "", "", 2);
 	m_android_chat_open = true;
 #else
 	if (gui_chat_console->isOpenInhibited())
 		return;
-	gui_chat_console->openConsole(height);
+	gui_chat_console->openConsole(scale);
 	if (line) {
 		gui_chat_console->setCloseOnEnter(true);
 		gui_chat_console->replaceAndAddToHistory(line);
@@ -3542,13 +3299,13 @@ void Game::processClientEvents(CameraOrientation *cam, float *damage_flash)
 				rangelim(event.player_damage.amount / 4, 1.0, 4.0);
 
 			MtEvent *e = new SimpleTriggerEvent("PlayerDamage");
-			gamedef->event()->put(e);
+			client->event()->put(e);
 		} else if (event.type == CE_PLAYER_FORCE_MOVE) {
 			cam->camera_yaw = event.player_force_move.yaw;
 			cam->camera_pitch = event.player_force_move.pitch;
 		} else if (event.type == CE_DEATHSCREEN) {
-			show_deathscreen(&current_formspec, client, gamedef, texture_src,
-				device, &input->joystick, client);
+			show_deathscreen(&current_formspec, client, texture_src,
+				device, &input->joystick);
 
 			chat_backend->addMessage(L"", L"You died.");
 
@@ -3568,9 +3325,8 @@ void Game::processClientEvents(CameraOrientation *cam, float *damage_flash)
 				TextDestPlayerInventory *txt_dst =
 					new TextDestPlayerInventory(client, *(event.show_formspec.formname));
 
-				create_formspec_menu(&current_formspec, client, gamedef,
-					texture_src, device, &input->joystick,
-					fs_src, txt_dst, client);
+				create_formspec_menu(&current_formspec, client, device, &input->joystick,
+					fs_src, txt_dst);
 				cur_formname = *(event.show_formspec.formname);
 			}
 
@@ -3579,7 +3335,7 @@ void Game::processClientEvents(CameraOrientation *cam, float *damage_flash)
 		} else if ((event.type == CE_SPAWN_PARTICLE) ||
 				(event.type == CE_ADD_PARTICLESPAWNER) ||
 				(event.type == CE_DELETE_PARTICLESPAWNER)) {
-			client->getParticleManager()->handleParticleEvent(&event, gamedef,
+			client->getParticleManager()->handleParticleEvent(&event, client,
 					smgr, player);
 		} else if (event.type == CE_HUDADD) {
 			u32 id = event.hudadd.id;
@@ -3826,7 +3582,8 @@ void Game::updateSound(f32 dtime)
 
 	v3s16 spos = player->getStandingNodePos();
 	ClientMap &map = client->getEnv().getClientMap();
-	MapNode n = map.getNodeNoEx(spos);
+
+	MapNode n = map.getNodeNoEx(player->getFootstepNodePos());
 	MapNode a = map.getNodeNoEx(v3s16(spos.X,(spos.Y+1),spos.Z));
 	if ( !nodedef_manager->get(a).isLiquid() ){
 		soundmaker->m_player_step_sound = nodedef_manager->get(n).sound_footstep;
@@ -3879,14 +3636,11 @@ void Game::processPlayerInteraction(GameRunData *runData,
 	core::line3d<f32> shootline;
 
 	if (camera->getCameraMode() != CAMERA_MODE_THIRD_FRONT) {
-
 		shootline = core::line3d<f32>(camera_position,
-						camera_position + camera_direction * BS * (d + 1));
-
+			camera_position + camera_direction * BS * d);
 	} else {
 	    // prevent player pointing anything in front-view
-		if (camera->getCameraMode() == CAMERA_MODE_THIRD_FRONT)
-			shootline = core::line3d<f32>(0, 0, 0, 0, 0, 0);
+		shootline = core::line3d<f32>(camera_position,camera_position);
 	}
 
 #ifdef HAVE_TOUCHSCREENGUI
@@ -3899,10 +3653,7 @@ void Game::processPlayerInteraction(GameRunData *runData,
 
 #endif
 
-	PointedThing pointed = getPointedThing(
-			// input
-			client, hud, player_position, camera_direction,
-			camera_position, shootline, d,
+	PointedThing pointed = updatePointedThing(shootline,
 			playeritem_def.liquids_pointable,
 			!runData->ldown_for_dig,
 			camera_offset,
@@ -3996,6 +3747,107 @@ void Game::processPlayerInteraction(GameRunData *runData,
 }
 
 
+PointedThing Game::updatePointedThing(
+	const core::line3d<f32> &shootline,
+	bool liquids_pointable,
+	bool look_for_object,
+	const v3s16 &camera_offset,
+	ClientActiveObject *&selected_object)
+{
+	std::vector<aabb3f> *selectionboxes = hud->getSelectionBoxes();
+	selectionboxes->clear();
+	hud->setSelectedFaceNormal(v3f(0.0, 0.0, 0.0));
+	static const bool show_entity_selectionbox = g_settings->getBool(
+		"show_entity_selectionbox");
+
+	ClientMap &map = client->getEnv().getClientMap();
+	INodeDefManager *nodedef=client->getNodeDefManager();
+
+	selected_object = NULL;
+
+	PointedThing result=client->getEnv().getPointedThing(
+		shootline, liquids_pointable, look_for_object);
+	if (result.type == POINTEDTHING_OBJECT) {
+		selected_object = client->getEnv().getActiveObject(result.object_id);
+		if (show_entity_selectionbox && selected_object->doShowSelectionBox()) {
+			aabb3f *selection_box = selected_object->getSelectionBox();
+
+			// Box should exist because object was
+			// returned in the first place
+
+			assert(selection_box);
+
+			v3f pos = selected_object->getPosition();
+			selectionboxes->push_back(aabb3f(
+				selection_box->MinEdge, selection_box->MaxEdge));
+			selectionboxes->push_back(
+				aabb3f(selection_box->MinEdge, selection_box->MaxEdge));
+			hud->setSelectionPos(pos, camera_offset);
+		}
+	} else if (result.type == POINTEDTHING_NODE) {
+		// Update selection boxes
+		MapNode n = map.getNodeNoEx(result.node_undersurface);
+		std::vector<aabb3f> boxes;
+		n.getSelectionBoxes(nodedef, &boxes,
+			n.getNeighbors(result.node_undersurface, &map));
+
+		f32 d = 0.002 * BS;
+		for (std::vector<aabb3f>::const_iterator i = boxes.begin();
+			i != boxes.end(); ++i) {
+			aabb3f box = *i;
+			box.MinEdge -= v3f(d, d, d);
+			box.MaxEdge += v3f(d, d, d);
+			selectionboxes->push_back(box);
+		}
+		hud->setSelectionPos(intToFloat(result.node_undersurface, BS),
+			camera_offset);
+		hud->setSelectedFaceNormal(v3f(
+			result.intersection_normal.X,
+			result.intersection_normal.Y,
+			result.intersection_normal.Z));
+	}
+
+	// Update selection mesh light level and vertex colors
+	if (selectionboxes->size() > 0) {
+		v3f pf = hud->getSelectionPos();
+		v3s16 p = floatToInt(pf, BS);
+
+		// Get selection mesh light level
+		MapNode n = map.getNodeNoEx(p);
+		u16 node_light = getInteriorLight(n, -1, nodedef);
+		u16 light_level = node_light;
+
+		for (u8 i = 0; i < 6; i++) {
+			n = map.getNodeNoEx(p + g_6dirs[i]);
+			node_light = getInteriorLight(n, -1, nodedef);
+			if (node_light > light_level)
+				light_level = node_light;
+		}
+
+		u32 daynight_ratio = client->getEnv().getDayNightRatio();
+		video::SColor c;
+		final_color_blend(&c, light_level, daynight_ratio);
+
+		// Modify final color a bit with time
+		u32 timer = porting::getTimeMs() % 5000;
+		float timerf = (float) (irr::core::PI * ((timer / 2500.0) - 0.5));
+		float sin_r = 0.08 * sin(timerf);
+		float sin_g = 0.08 * sin(timerf + irr::core::PI * 0.5);
+		float sin_b = 0.08 * sin(timerf + irr::core::PI);
+		c.setRed(
+			core::clamp(core::round32(c.getRed() * (0.8 + sin_r)), 0, 255));
+		c.setGreen(
+			core::clamp(core::round32(c.getGreen() * (0.8 + sin_g)), 0, 255));
+		c.setBlue(
+			core::clamp(core::round32(c.getBlue() * (0.8 + sin_b)), 0, 255));
+
+		// Set mesh final color
+		hud->setSelectionMeshColor(c);
+	}
+	return result;
+}
+
+
 void Game::handlePointingAtNothing(GameRunData *runData, const ItemStack &playerItem)
 {
 	infostream << "Right Clicked in Air" << std::endl;
@@ -4052,8 +3904,8 @@ void Game::handlePointingAtNode(GameRunData *runData,
 				&client->getEnv().getClientMap(), nodepos);
 			TextDest *txt_dst = new TextDestNodeMetadata(nodepos, client);
 
-			create_formspec_menu(&current_formspec, client, gamedef,
-				texture_src, device, &input->joystick, fs_src, txt_dst, client);
+			create_formspec_menu(&current_formspec, client,
+					device, &input->joystick, fs_src, txt_dst);
 			cur_formname = "";
 
 			current_formspec->setFormSpec(meta->getString("formspec"), inventoryloc);
@@ -4184,8 +4036,8 @@ void Game::handleDigging(GameRunData *runData,
 		if (m_cache_enable_particles) {
 			const ContentFeatures &features =
 					client->getNodeDefManager()->get(n);
-			client->getParticleManager()->addPunchingParticles(gamedef, smgr,
-					player, nodepos, features.tiles);
+			client->getParticleManager()->addPunchingParticles(client, smgr,
+					player, nodepos, n, features);
 		}
 	}
 
@@ -4231,8 +4083,8 @@ void Game::handleDigging(GameRunData *runData,
 		if (m_cache_enable_particles) {
 			const ContentFeatures &features =
 				client->getNodeDefManager()->get(wasnode);
-			client->getParticleManager()->addDiggingParticles(gamedef, smgr,
-					player, nodepos, features.tiles);
+			client->getParticleManager()->addDiggingParticles(client, smgr,
+					player, nodepos, wasnode, features);
 		}
 
 		runData->dig_time = 0;
@@ -4255,7 +4107,7 @@ void Game::handleDigging(GameRunData *runData,
 
 		// Send event to trigger sound
 		MtEvent *e = new NodeDugEvent(nodepos, wasnode);
-		gamedef->event()->put(e);
+		client->event()->put(e);
 	}
 
 	if (runData->dig_time_complete < 100000.0) {

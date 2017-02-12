@@ -16,9 +16,9 @@
 --51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 mt_color_grey  = "#AAAAAA"
-mt_color_blue  = "#0000DD"
-mt_color_green = "#00DD00"
-mt_color_dark_green = "#003300"
+mt_color_blue  = "#6389FF"
+mt_color_green = "#72FF63"
+mt_color_dark_green = "#25C191"
 
 --for all other colors ask sfan5 to complete his work!
 
@@ -128,7 +128,7 @@ local function init_globals()
 	end
 
 	-- Create main tabview
-	local tv_main = tabview_create("maintab", {x = 12, y = 5.2}, {x = 0, y = 0})
+	local tv_main = tabview_create("maintab", {x = 12, y = 5.4}, {x = 0, y = 0})
 
 	if PLATFORM == "Android" then
 		tv_main:add(tabs.simple_main)

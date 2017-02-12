@@ -1,4 +1,4 @@
-Minetest Lua Modding API Reference 0.4.14
+Minetest Lua Modding API Reference 0.4.15
 =========================================
 * More information at <http://www.minetest.net/>
 * Developer Wiki: <http://dev.minetest.net/>
@@ -403,6 +403,11 @@ Apply a mask to the base image.
 
 The mask is applied using binary AND.
 
+#### `[sheet:<w>x<h>:<x>,<y>`
+Retrieves a tile at position x,y from the base image
+which it assumes to be a tilesheet with dimensions w,h.
+
+
 #### `[colorize:<color>:<ratio>`
 Colorize the textures with the given color.
 `<color>` is specified as a `ColorString`.
@@ -413,6 +418,13 @@ omitted, the alpha of `<color>` will be used as the ratio.  If it is
 the word "`alpha`", then each texture pixel will contain the RGB of
 `<color>` and the alpha of `<color>` multiplied by the alpha of the
 texture pixel.
+
+#### `[multiply:<color>`
+Multiplies texture colors with the given color.
+`<color>` is specified as a `ColorString`.
+Result is more like what you'd expect if you put a color on top of another
+color. Meaning white surfaces get a lot of your new color while black parts don't
+change very much.
 
 Sounds
 ------
@@ -635,6 +647,19 @@ node definition:
         bit 4 (0x10) - Makes the plant mesh 1.4x larger
         bit 5 (0x20) - Moves each face randomly a small bit down (1/8 max)
         bits 6-7 are reserved for future use.
+    paramtype2 == "color"
+    ^ `param2` tells which color is picked from the palette.
+      The palette should have 256 pixels.
+    paramtype2 == "colorfacedir"
+    ^ Same as `facedir`, but with colors.
+      The first three bits of `param2` tells which color
+      is picked from the palette.
+      The palette should have 8 pixels.
+    paramtype2 == "colorwallmounted"
+    ^ Same as `wallmounted`, but with colors.
+      The first five bits of `param2` tells which color
+      is picked from the palette.
+      The palette should have 32 pixels.
     collision_box = {
       type = "fixed",
       fixed = {
@@ -1376,7 +1401,7 @@ a non-tool item, so that it can do something else than take damage.
 
 On the Lua side, every punch calls:
 
-    entity:on_punch(puncher, time_from_last_punch, tool_capabilities, direction)
+    entity:on_punch(puncher, time_from_last_punch, tool_capabilities, direction, damage)
 
 This should never be called directly, because damage is usually not handled by
 the entity itself.
@@ -1387,6 +1412,9 @@ the entity itself.
 * `tool_capabilities` can be `nil`.
 * `direction` is a unit vector, pointing from the source of the punch to
    the punched object.
+* `damage` damage that will be done to entity
+Return value of this function will determin if damage is done by this function
+(retval true) or shall be done by engine (retval false)
 
 To punch an entity/object in Lua, call:
 
@@ -1401,9 +1429,9 @@ Node Metadata
 -------------
 The instance of a node in the world normally only contains the three values
 mentioned in "Nodes". However, it is possible to insert extra data into a
-node. It is called "node metadata"; See "`NodeMetaRef`".
+node. It is called "node metadata"; See `NodeMetaRef`.
 
-Metadata contains two things:
+Node metadata contains two things:
 
 * A key-value store
 * An inventory
@@ -1440,6 +1468,22 @@ Example stuff:
             infotext = "Chest"
         }
     })
+
+Item Metadata
+-------------
+Item stacks can store metadata too. See `ItemStackMetaRef`.
+
+Item metadata only contains a key-value store.
+
+Some of the values in the key-value store are handled specially:
+
+* `description`: Set the itemstack's description. Defaults to idef.description
+
+Example stuff:
+
+    local meta = stack:get_meta()
+    meta:set_string("key", "value")
+    print(dump(meta:to_table()))
 
 Formspec
 --------
@@ -1834,6 +1878,7 @@ Spatial Vectors
 * `vector.round(v)`: returns a vector, each dimension rounded to nearest int
 * `vector.apply(v, func)`: returns a vector
 * `vector.equals(v1, v2)`: returns a boolean
+* `vector.sort(v1, v2)`: returns minp, maxp vectors of the cuboid defined by v1 and v2
 
 For the following functions `x` can be either a vector or a number:
 
@@ -2038,9 +2083,10 @@ Call these functions only at load time!
 * `minetest.register_on_cheat(func(ObjectRef, cheat))`
     * Called when a player cheats
     * `cheat`: `{type=<cheat_type>}`, where `<cheat_type>` is one of:
-        * `"moved_too_fast"`
-        * `"interacted_too_far"`
-        * `"finished_unknown_dig"`
+        * `moved_too_fast`
+        * `interacted_too_far`
+        * `interacted_while_dead`
+        * `finished_unknown_dig`
         * `dug_unbreakable`
         * `dug_too_fast`
 * `minetest.register_on_chat_message(func(name, message))`
@@ -2072,6 +2118,11 @@ Call these functions only at load time!
 
 ### Other registration functions
 * `minetest.register_chatcommand(cmd, chatcommand definition)`
+    * Adds definition to minetest.registered_chatcommands
+* `minetest.override_chatcommand(name, redefinition)`
+    * Overrides fields of a chatcommand registered with register_chatcommand.
+* `minetest.unregister_chatcommand(name)`
+    * Unregisters a chatcommands registered with register_chatcommand.
 * `minetest.register_privilege(name, definition)`
     * `definition`: `"description text"`
     * `definition`: `{ description = "description text", give_to_singleplayer = boolean}`
@@ -2168,7 +2219,7 @@ and `minetest.auth_reload` call the authetification handler.
 * `minetest.get_node_timer(pos)`
     * Get `NodeTimerRef`
 
-* `minetest.add_entity(pos, name)`: Spawn Lua-defined entity at position
+* `minetest.add_entity(pos, name, [staticdata])`: Spawn Lua-defined entity at position
     * Returns `ObjectRef`, or `nil` if failed
 * `minetest.add_item(pos, item)`: Spawn item
     * Returns `ObjectRef`, or `nil` if failed
@@ -2380,6 +2431,10 @@ and `minetest.auth_reload` call the authetification handler.
     * Convert a vector to a wallmounted value, used for `paramtype2="wallmounted"`
 * `minetest.wallmounted_to_dir(wallmounted)`
     * Convert a wallmounted value back into a vector aimed directly out the "back" of a node
+* `minetest.dir_to_yaw(dir)`
+    * Convert a vector into a yaw (angle)
+* `minetest.yaw_to_dir(yaw)`
+    * Convert yaw (angle) to a vector
 * `minetest.get_node_drops(nodename, toolname)`
     * Returns list of item names.
     * **Note**: This will be removed or modified in a future version.
@@ -2580,8 +2635,14 @@ These functions return the leftover itemstack.
 * `HTTPApiTable.fetch_async_get(handle)`: returns HTTPRequestResult
     * Return response data for given asynchronous HTTP request
 
+### Storage API:
+* `minetest.get_mod_storage()`:
+    * returns reference to mod private `StorageRef`
+    * must be called during mod load time
+
 ### Misc.
 * `minetest.get_connected_players()`: returns list of `ObjectRefs`
+* `minetest.player_exists(name)`: boolean, whether player exists (regardless of online status)
 * `minetest.hud_replace_builtin(name, hud_definition)`
     * Replaces definition of a builtin hud element
     * `name`: `"breath"` or `"health"`
@@ -2728,6 +2789,8 @@ These functions return the leftover itemstack.
     * Map of object references, indexed by active object id
 * `minetest.luaentities`
     * Map of Lua entities, indexed by active object id
+* `minetest.registered_chatcommands`
+    * Map of registered chat command definitions, indexed by name
 * `minetest.registered_ores`
     * List of registered ore definitions.
 * `minetest.registered_biomes`
@@ -2738,9 +2801,8 @@ These functions return the leftover itemstack.
 Class reference
 ---------------
 
-### `NodeMetaRef`
-Node metadata: reference extra data and functionality stored in a node.
-Can be gotten via `minetest.get_meta(pos)`.
+### `MetaDataRef`
+See `StorageRef`, `NodeMetaRef` and `ItemStackMetaRef`.
 
 #### Methods
 * `set_string(name, value)`
@@ -2749,11 +2811,35 @@ Can be gotten via `minetest.get_meta(pos)`.
 * `get_int(name)`
 * `set_float(name, value)`
 * `get_float(name)`
-* `get_inventory()`: returns `InvRef`
-* `to_table()`: returns `nil` or `{fields = {...}, inventory = {list1 = {}, ...}}`
+* `to_table()`: returns `nil` or a table with keys:
+    * `fields`: key-value storage
+    * `inventory`: `{list1 = {}, ...}}` (NodeMetaRef only)
 * `from_table(nil or {})`
-    * to clear metadata, use from_table(nil)
-    * See "Node Metadata"
+    * Any non-table value will clear the metadata
+    * See "Node Metadata" for an example
+    * returns `true` on success
+
+### `NodeMetaRef`
+Node metadata: reference extra data and functionality stored in a node.
+Can be obtained via `minetest.get_meta(pos)`.
+
+#### Methods
+* All methods in MetaDataRef
+* `get_inventory()`: returns `InvRef`
+
+### `ItemStackMetaRef`
+ItemStack metadata: reference extra data and functionality stored in a stack.
+Can be obtained via `item:get_meta()`.
+
+#### Methods
+* All methods in MetaDataRef
+
+### `StorageRef`
+Mod metadata: per mod metadata, saved automatically.
+Can be obtained via `minetest.get_mod_storage()` during load time.
+
+#### Methods
+* All methods in MetaDataRef
 
 ### `NodeTimerRef`
 Node Timers: a high resolution persistent per-node timer.
@@ -2785,9 +2871,9 @@ This is basically a reference to a C++ `ServerActiveObject`
 #### Methods
 * `remove()`: remove object (after returning from Lua)
     * Note: Doesn't work on players, use minetest.kick_player instead
-* `getpos()`: returns `{x=num, y=num, z=num}`
-* `setpos(pos)`; `pos`=`{x=num, y=num, z=num}`
-* `moveto(pos, continuous=false)`: interpolated move
+* `get_pos()`: returns `{x=num, y=num, z=num}`
+* `set_pos(pos)`; `pos`=`{x=num, y=num, z=num}`
+* `move_to(pos, continuous=false)`: interpolated move
 * `punch(puncher, time_from_last_punch, tool_capabilities, direction)`
     * `puncher` = another `ObjectRef`,
     * `time_from_last_punch` = time since last punch action of the puncher
@@ -2833,14 +2919,15 @@ This is basically a reference to a C++ `ServerActiveObject`
       }
 
 ##### LuaEntitySAO-only (no-op for other objects)
-* `setvelocity({x=num, y=num, z=num})`
-* `getvelocity()`: returns `{x=num, y=num, z=num}`
-* `setacceleration({x=num, y=num, z=num})`
-* `getacceleration()`: returns `{x=num, y=num, z=num}`
-* `setyaw(radians)`
-* `getyaw()`: returns number in radians
-* `settexturemod(mod)`
-* `setsprite(p={x=0,y=0}, num_frames=1, framelength=0.2,
+* `set_velocity({x=num, y=num, z=num})`
+* `get_velocity()`: returns `{x=num, y=num, z=num}`
+* `set_acceleration({x=num, y=num, z=num})`
+* `get_acceleration()`: returns `{x=num, y=num, z=num}`
+* `set_yaw(radians)`
+* `get_yaw()`: returns number in radians
+* `set_texture_mod(mod)`
+* `get_texture_mod()` returns current texture modifier
+* `set_sprite(p={x=0,y=0}, num_frames=1, framelength=0.2,
   select_horiz_by_yawpitch=false)`
     * Select sprite from spritesheet with optional animation and DM-style
       texture selection based on yaw relative to camera
@@ -2872,6 +2959,8 @@ This is basically a reference to a C++ `ServerActiveObject`
         * `0`: player is drowning,
         * `1`-`10`: remaining number of bubbles
         * `11`: bubbles bar is not shown
+* `set_attribute(attribute, value)`: sets an extra attribute with value on player
+* `get_attribute(attribute)`: returns value for extra attribute. Returns nil if no attribute found.
 * `set_inventory_formspec(formspec)`
     * Redefine player's inventory form
     * Should usually be called in on_joinplayer
@@ -3021,8 +3110,9 @@ an itemstring, a table or `nil`.
 * `set_count(count)`: Returns boolean whether item was cleared
 * `get_wear()`: Returns tool wear (`0`-`65535`), `0` for non-tools.
 * `set_wear(wear)`: Returns boolean whether item was cleared
-* `get_metadata()`: Returns metadata (a string attached to an item stack).
-* `set_metadata(metadata)`: Returns true.
+* `get_meta()`: Returns ItemStackMetaRef. See section for more details
+* `get_metadata()`: (DEPRECATED) Returns metadata (a string attached to an item stack).
+* `set_metadata(metadata)`: (DEPRECATED) Returns true.
 * `clear()`: removes all items from the stack, making it empty.
 * `replace(item)`: replace the contents of this stack.
     * `item` can also be an itemstring or table.
@@ -3698,11 +3788,33 @@ Definition tables
 	  when displacement mapping is used
 	  Directions are from the point of view of the tile texture,
 	  not the node it's on
+* `{name="image.png", color=ColorSpec}`
+    * the texture's color will be multiplied with this color.
+    * the tile's color overrides the owning node's color in all cases.
 * deprecated, yet still supported field names:
     * `image` (name)
 
 ### Tile animation definition
-* `{type="vertical_frames", aspect_w=16, aspect_h=16, length=3.0}`
+
+	{
+		type = "vertical_frames",
+		aspect_w = 16,
+		-- ^ specify width of a frame in pixels
+		aspect_h = 16,
+		-- ^ specify height of a frame in pixels
+		length = 3.0,
+		-- ^ specify full loop length
+	}
+
+	{
+		type = "sheet_2d",
+		frames_w = 5,
+		-- ^ specify width in number of frames
+		frames_h = 3,
+		-- ^ specify height in number of frames
+		frame_length = 0.5,
+		-- ^ specify length of a single frame
+	}
 
 ### Node definition (`register_node`)
 
@@ -3721,8 +3833,17 @@ Definition tables
         special_tiles = {tile definition 1, Tile definition 2}, --[[
         ^ Special textures of node; used rarely (old field name: special_materials)
         ^ List can be shortened to needed length ]]
-        alpha = 255,
+        color = ColorSpec, --[[
+        ^ The node's original color will be multiplied with this color.
+        ^ If the node has a palette, then this setting only has an effect
+        ^ in the inventory and on the wield item. ]]
         use_texture_alpha = false, -- Use texture's alpha channel
+        palette = "palette.png", --[[
+        ^ The node's `param2` is used to select a pixel from the image
+        ^ (pixels are arranged from left to right and from top to bottom).
+        ^ The node's color will be multiplied with the selected pixel's
+        ^ color. Tiles can override this behavior.
+        ^ Only when `paramtype2` supports palettes. ]]
         post_effect_color = "green#0F", -- If player is inside node, see "ColorSpec"
         paramtype = "none", -- See "Nodes" --[[
         ^ paramtype = "light" allows light to propagate from or through the node with light value
@@ -4157,9 +4278,14 @@ The Biome API is still in an experimental phase and subject to change.
     --  ^ vertical: if true faces player using y axis only
         texture = "image.png",
     --  ^ Uses texture (string)
-        playername = "singleplayer"
+        playername = "singleplayer",
     --  ^ optional, if specified spawns particle only on the player's client
+        animation = {Tile Animation definition},
+    --  ^ optional, specifies how to animate the particle texture
+        glow = 0
+    --  ^ optional, specify particle self-luminescence in darkness
     }
+
 
 ### `ParticleSpawner` definition (`add_particlespawner`)
 

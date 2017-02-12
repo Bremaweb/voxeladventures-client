@@ -117,6 +117,7 @@ LOCAL_SRC_FILES := \
 		jni/src/cavegen.cpp                       \
 		jni/src/chat.cpp                          \
 		jni/src/client.cpp                        \
+		jni/src/clientenvironment.cpp             \
 		jni/src/clientiface.cpp                   \
 		jni/src/clientmap.cpp                     \
 		jni/src/clientmedia.cpp                   \
@@ -163,6 +164,7 @@ LOCAL_SRC_FILES := \
 		jni/src/inventory.cpp                     \
 		jni/src/inventorymanager.cpp              \
 		jni/src/itemdef.cpp                       \
+		jni/src/itemstackmetadata.cpp             \
 		jni/src/keycode.cpp                       \
 		jni/src/light.cpp                         \
 		jni/src/localplayer.cpp                   \
@@ -183,6 +185,7 @@ LOCAL_SRC_FILES := \
 		jni/src/mapnode.cpp                       \
 		jni/src/mapsector.cpp                     \
 		jni/src/mesh.cpp                          \
+		jni/src/metadata.cpp                      \
 		jni/src/mg_biome.cpp                      \
 		jni/src/mg_decoration.cpp                 \
 		jni/src/mg_ore.cpp                        \
@@ -203,12 +206,14 @@ LOCAL_SRC_FILES := \
 		jni/src/porting.cpp                       \
 		jni/src/profiler.cpp                      \
 		jni/src/quicktune.cpp                     \
+		jni/src/raycast.cpp                       \
 		jni/src/reflowscan.cpp                    \
 		jni/src/remoteplayer.cpp                  \
 		jni/src/rollback.cpp                      \
 		jni/src/rollback_interface.cpp            \
 		jni/src/serialization.cpp                 \
 		jni/src/server.cpp                        \
+		jni/src/serverenvironment.cpp             \
 		jni/src/serverlist.cpp                    \
 		jni/src/serverobject.cpp                  \
 		jni/src/shader.cpp                        \
@@ -218,6 +223,7 @@ LOCAL_SRC_FILES := \
 		jni/src/sound_openal.cpp                  \
 		jni/src/staticobject.cpp                  \
 		jni/src/subgame.cpp                       \
+		jni/src/tileanimation.cpp                 \
 		jni/src/tool.cpp                          \
 		jni/src/treegen.cpp                       \
 		jni/src/version.cpp                       \
@@ -300,8 +306,10 @@ LOCAL_SRC_FILES += \
 		jni/src/script/lua_api/l_env.cpp          \
 		jni/src/script/lua_api/l_inventory.cpp    \
 		jni/src/script/lua_api/l_item.cpp         \
+		jni/src/script/lua_api/l_itemstackmeta.cpp\
 		jni/src/script/lua_api/l_mainmenu.cpp     \
 		jni/src/script/lua_api/l_mapgen.cpp       \
+		jni/src/script/lua_api/l_metadata.cpp     \
 		jni/src/script/lua_api/l_nodemeta.cpp     \
 		jni/src/script/lua_api/l_nodetimer.cpp    \
 		jni/src/script/lua_api/l_noise.cpp        \
@@ -311,6 +319,7 @@ LOCAL_SRC_FILES += \
 		jni/src/script/lua_api/l_server.cpp       \
 		jni/src/script/lua_api/l_settings.cpp     \
 		jni/src/script/lua_api/l_http.cpp         \
+		jni/src/script/lua_api/l_storage.cpp      \
 		jni/src/script/lua_api/l_util.cpp         \
 		jni/src/script/lua_api/l_vmanip.cpp       \
 		jni/src/script/scripting_game.cpp         \
@@ -380,4 +389,3 @@ ifdef GPROF
 $(call import-module,android-ndk-profiler)
 endif
 $(call import-module,android/native_app_glue)
-

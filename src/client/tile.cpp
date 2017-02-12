@@ -378,9 +378,6 @@ public:
 	video::ITexture* generateTextureFromMesh(
 			const TextureFromMeshParams &params);
 
-	// Generates an image from a full string like
-	// "stone.png^mineral_coal.png^[crack:1:0".
-	// Shall be called from the main thread.
 	video::IImage* generateImage(const std::string &name);
 
 	video::ITexture* getNormalTexture(const std::string &name);
@@ -558,7 +555,11 @@ static void blit_with_alpha_overlay(video::IImage *src, video::IImage *dst,
 // color alpha with the destination alpha.
 // Otherwise, any pixels that are not fully transparent get the color alpha.
 static void apply_colorize(video::IImage *dst, v2u32 dst_pos, v2u32 size,
-		video::SColor color, int ratio, bool keep_alpha);
+		const video::SColor &color, int ratio, bool keep_alpha);
+
+// paint a texture using the given color
+static void apply_multiplication(video::IImage *dst, v2u32 dst_pos, v2u32 size,
+		const video::SColor &color);
 
 // Apply a mask to an image
 static void apply_mask(video::IImage *mask, video::IImage *dst,
@@ -938,7 +939,7 @@ video::ITexture* TextureSource::generateTextureFromMesh(
 	smgr->drop();
 
 	// Unset render target
-	driver->setRenderTarget(0, false, true, 0);
+	driver->setRenderTarget(0, false, true, video::SColor(0,0,0,0));
 
 	if (params.delete_texture_on_shutdown)
 		m_texture_trash.push_back(rtt);
@@ -1660,6 +1661,30 @@ bool TextureSource::generateImagePart(std::string part_of_name,
 			}
 		}
 		/*
+		[multiply:color
+			multiplys a given color to any pixel of an image
+			color = color as ColorString
+		*/
+		else if (str_starts_with(part_of_name, "[multiply:")) {
+			Strfnd sf(part_of_name);
+			sf.next(":");
+			std::string color_str = sf.next(":");
+
+			if (baseimg == NULL) {
+				errorstream << "generateImagePart(): baseimg != NULL "
+						<< "for part_of_name=\"" << part_of_name
+						<< "\", cancelling." << std::endl;
+				return false;
+			}
+
+			video::SColor color;
+
+			if (!parseColorString(color_str, color, false))
+				return false;
+
+			apply_multiplication(baseimg, v2u32(0, 0), baseimg->getDimension(), color);
+		}
+		/*
 			[colorize:color
 			Overlays image with given color
 			color = color as ColorString
@@ -1716,6 +1741,12 @@ bool TextureSource::generateImagePart(std::string part_of_name,
 				 * equal to the target minimum.  If e.g. this is a vertical frames
 				 * animation, the short dimension will be the real size.
 				 */
+				if ((dim.Width == 0) || (dim.Height == 0)) {
+					errorstream << "generateImagePart(): Illegal 0 dimension "
+						<< "for part_of_name=\""<< part_of_name
+						<< "\", cancelling." << std::endl;
+					return false;
+				}
 				u32 xscale = scaleto / dim.Width;
 				u32 yscale = scaleto / dim.Height;
 				u32 scale = (xscale > yscale) ? xscale : yscale;
@@ -1827,6 +1858,49 @@ bool TextureSource::generateImagePart(std::string part_of_name,
 				baseimg->setPixel(x, y, c);
 			}
 		}
+		/*
+			[sheet:WxH:X,Y
+			Retrieves a tile at position X,Y (in tiles)
+			from the base image it assumes to be a
+			tilesheet with dimensions W,H (in tiles).
+		*/
+		else if (part_of_name.substr(0,7) == "[sheet:") {
+			if (baseimg == NULL) {
+				errorstream << "generateImagePart(): baseimg != NULL "
+						<< "for part_of_name=\"" << part_of_name
+						<< "\", cancelling." << std::endl;
+				return false;
+			}
+
+			Strfnd sf(part_of_name);
+			sf.next(":");
+			u32 w0 = stoi(sf.next("x"));
+			u32 h0 = stoi(sf.next(":"));
+			u32 x0 = stoi(sf.next(","));
+			u32 y0 = stoi(sf.next(":"));
+
+			core::dimension2d<u32> img_dim = baseimg->getDimension();
+			core::dimension2d<u32> tile_dim(v2u32(img_dim) / v2u32(w0, h0));
+
+			video::IImage *img = driver->createImage(
+					video::ECF_A8R8G8B8, tile_dim);
+			if (!img) {
+				errorstream << "generateImagePart(): Could not create image "
+						<< "for part_of_name=\"" << part_of_name
+						<< "\", cancelling." << std::endl;
+				return false;
+			}
+
+			img->fill(video::SColor(0,0,0,0));
+			v2u32 vdim(tile_dim);
+			core::rect<s32> rect(v2s32(x0 * vdim.X, y0 * vdim.Y), tile_dim);
+			baseimg->copyToWithAlpha(img, v2s32(0), rect,
+					video::SColor(255,255,255,255), NULL);
+
+			// Replace baseimg
+			baseimg->drop();
+			baseimg = img;
+		}
 		else
 		{
 			errorstream << "generateImagePart(): Invalid "
@@ -1920,7 +1994,7 @@ static void blit_with_interpolate_overlay(video::IImage *src, video::IImage *dst
 	Apply color to destination
 */
 static void apply_colorize(video::IImage *dst, v2u32 dst_pos, v2u32 size,
-		video::SColor color, int ratio, bool keep_alpha)
+		const video::SColor &color, int ratio, bool keep_alpha)
 {
 	u32 alpha = color.getAlpha();
 	video::SColor dst_c;
@@ -1951,6 +2025,27 @@ static void apply_colorize(video::IImage *dst, v2u32 dst_pos, v2u32 size,
 				dst->setPixel(x, y, dst_c);
 			}
 		}
+	}
+}
+
+/*
+	Apply color to destination
+*/
+static void apply_multiplication(video::IImage *dst, v2u32 dst_pos, v2u32 size,
+		const video::SColor &color)
+{
+	video::SColor dst_c;
+
+	for (u32 y = dst_pos.Y; y < dst_pos.Y + size.Y; y++)
+	for (u32 x = dst_pos.X; x < dst_pos.X + size.X; x++) {
+		dst_c = dst->getPixel(x, y);
+		dst_c.set(
+				dst_c.getAlpha(),
+				(dst_c.getRed() * color.getRed()) / 255,
+				(dst_c.getGreen() * color.getGreen()) / 255,
+				(dst_c.getBlue() * color.getBlue()) / 255
+				);
+		dst->setPixel(x, y, dst_c);
 	}
 }
 

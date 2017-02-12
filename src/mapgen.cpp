@@ -587,23 +587,24 @@ MapgenBasic::MapgenBasic(int mapgenid, MapgenParams *params, EmergeManager *emer
 
 	//// Look up some commonly used content
 	c_stone              = ndef->getId("mapgen_stone");
-	c_water_source       = ndef->getId("mapgen_water_source");
 	c_desert_stone       = ndef->getId("mapgen_desert_stone");
 	c_sandstone          = ndef->getId("mapgen_sandstone");
+	c_water_source       = ndef->getId("mapgen_water_source");
 	c_river_water_source = ndef->getId("mapgen_river_water_source");
 
 	// Fall back to more basic content if not defined
+	// river_water_source cannot fallback to water_source because river water
+	// needs to be non-renewable and have a short flow range.
 	if (c_desert_stone == CONTENT_IGNORE)
 		c_desert_stone = c_stone;
 	if (c_sandstone == CONTENT_IGNORE)
 		c_sandstone = c_stone;
-	if (c_river_water_source == CONTENT_IGNORE)
-		c_river_water_source = c_water_source;
 
 	//// Content used for dungeon generation
 	c_cobble               = ndef->getId("mapgen_cobble");
-	c_stair_cobble         = ndef->getId("mapgen_stair_cobble");
 	c_mossycobble          = ndef->getId("mapgen_mossycobble");
+	c_stair_cobble         = ndef->getId("mapgen_stair_cobble");
+	c_stair_desert_stone   = ndef->getId("mapgen_stair_desert_stone");
 	c_sandstonebrick       = ndef->getId("mapgen_sandstonebrick");
 	c_stair_sandstonebrick = ndef->getId("mapgen_stair_sandstonebrick");
 
@@ -612,10 +613,12 @@ MapgenBasic::MapgenBasic(int mapgenid, MapgenParams *params, EmergeManager *emer
 		c_mossycobble = c_cobble;
 	if (c_stair_cobble == CONTENT_IGNORE)
 		c_stair_cobble = c_cobble;
+	if (c_stair_desert_stone == CONTENT_IGNORE)
+		c_stair_desert_stone = c_desert_stone;
 	if (c_sandstonebrick == CONTENT_IGNORE)
 		c_sandstonebrick = c_sandstone;
 	if (c_stair_sandstonebrick == CONTENT_IGNORE)
-		c_stair_sandstonebrick = c_sandstone;
+		c_stair_sandstonebrick = c_sandstonebrick;
 }
 
 
@@ -867,7 +870,7 @@ void MapgenBasic::generateDungeons(s16 max_stone_y, MgStoneType stone_type)
 	case MGSTONE_DESERT_STONE:
 		dp.c_wall     = c_desert_stone;
 		dp.c_alt_wall = CONTENT_IGNORE;
-		dp.c_stair    = c_desert_stone;
+		dp.c_stair    = c_stair_desert_stone;
 
 		dp.diagonal_dirs = true;
 		dp.holesize      = v3s16(2, 3, 2);
@@ -877,7 +880,7 @@ void MapgenBasic::generateDungeons(s16 max_stone_y, MgStoneType stone_type)
 	case MGSTONE_SANDSTONE:
 		dp.c_wall     = c_sandstonebrick;
 		dp.c_alt_wall = CONTENT_IGNORE;
-		dp.c_stair    = c_sandstonebrick;
+		dp.c_stair    = c_stair_sandstonebrick;
 
 		dp.diagonal_dirs = false;
 		dp.holesize      = v3s16(2, 2, 2);

@@ -35,7 +35,7 @@ enum LocalPlayerAnimations {NO_ANIM, WALK_ANIM, DIG_ANIM, WD_ANIM};  // no local
 class LocalPlayer : public Player
 {
 public:
-	LocalPlayer(Client *gamedef, const char *name);
+	LocalPlayer(Client *client, const char *name);
 	virtual ~LocalPlayer();
 
 	ClientActiveObject *parent;
@@ -68,6 +68,7 @@ public:
 	void applyControl(float dtime);
 
 	v3s16 getStandingNodePos();
+	v3s16 getFootstepNodePos();
 
 	// Used to check if anything changed and prevent sending packets if not
 	v3f last_position;
@@ -105,10 +106,7 @@ public:
 	u16 getBreath() const { return m_breath; }
 	void setBreath(u16 breath) { m_breath = breath; }
 
-	v3s16 getLightPosition() const
-	{
-		return floatToInt(m_position + v3f(0,BS+BS/2,0), BS);
-	}
+	v3s16 getLightPosition() const;
 
 	void setYaw(f32 yaw)
 	{
@@ -131,11 +129,7 @@ public:
 
 	v3f getPosition() const { return m_position; }
 	v3f getEyePosition() const { return m_position + getEyeOffset(); }
-	v3f getEyeOffset() const
-	{
-		float eye_height = camera_barely_in_ceiling ? 1.5f : 1.625f;
-		return v3f(0, BS * eye_height, 0);
-	}
+	v3f getEyeOffset() const;
 private:
 	void accelerateHorizontal(const v3f &target_speed, const f32 max_increase);
 	void accelerateVertical(const v3f &target_speed, const f32 max_increase);
@@ -162,7 +156,7 @@ private:
 	aabb3f m_collisionbox;
 
 	GenericCAO* m_cao;
-	Client *m_gamedef;
+	Client *m_client;
 };
 
 #endif

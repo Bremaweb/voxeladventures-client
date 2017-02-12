@@ -89,13 +89,13 @@ private:
 //// EmergeManager
 ////
 
-EmergeManager::EmergeManager(IGameDef *gamedef)
+EmergeManager::EmergeManager(Server *server)
 {
-	this->ndef      = gamedef->getNodeDefManager();
-	this->biomemgr  = new BiomeManager(gamedef);
-	this->oremgr    = new OreManager(gamedef);
-	this->decomgr   = new DecorationManager(gamedef);
-	this->schemmgr  = new SchematicManager(gamedef);
+	this->ndef      = server->getNodeDefManager();
+	this->biomemgr  = new BiomeManager(server);
+	this->oremgr    = new OreManager(server);
+	this->decomgr   = new DecorationManager(server);
+	this->schemmgr  = new SchematicManager(server);
 	this->gen_notify_on = 0;
 
 	// Note that accesses to this variable are not synchronized.
@@ -128,7 +128,7 @@ EmergeManager::EmergeManager(IGameDef *gamedef)
 		m_qlimit_generate = 1;
 
 	for (s16 i = 0; i < nthreads; i++)
-		m_threads.push_back(new EmergeThread((Server *)gamedef, i));
+		m_threads.push_back(new EmergeThread(server, i));
 
 	infostream << "EmergeManager: using " << nthreads << " threads" << std::endl;
 }
@@ -508,13 +508,15 @@ EmergeAction EmergeThread::getBlockOrStartGen(
 
 	// 1). Attempt to fetch block from memory
 	*block = m_map->getBlockNoCreateNoEx(pos);
-	if (*block && !(*block)->isDummy() && (*block)->isGenerated())
-		return EMERGE_FROM_MEMORY;
-
-	// 2). Attempt to load block from disk
-	*block = m_map->loadBlock(pos);
-	if (*block && (*block)->isGenerated())
-		return EMERGE_FROM_DISK;
+	if (*block && !(*block)->isDummy()) {
+		if ((*block)->isGenerated())
+			return EMERGE_FROM_MEMORY;
+	} else {
+		// 2). Attempt to load block from disk if it was not in the memory
+		*block = m_map->loadBlock(pos);
+		if (*block && (*block)->isGenerated())
+			return EMERGE_FROM_DISK;
+	}
 
 	// 3). Attempt to start generation
 	if (allow_gen && m_map->initBlockMake(pos, bmdata))
@@ -562,7 +564,7 @@ MapBlock *EmergeThread::finishGen(v3s16 pos, BlockMakeData *bmdata,
 		m_server->getScriptIface()->environment_OnGenerated(
 			minp, maxp, m_mapgen->blockseed);
 	} catch (LuaError &e) {
-		m_server->setAsyncFatalError("Lua: " + std::string(e.what()));
+		m_server->setAsyncFatalError("Lua: finishGen" + std::string(e.what()));
 	}
 
 	EMERGE_DBG_OUT("ended up with: " << analyze_block(block));
