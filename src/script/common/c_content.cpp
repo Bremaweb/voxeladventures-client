@@ -20,7 +20,6 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "common/c_converter.h"
 #include "common/c_types.h"
 #include "nodedef.h"
-#include "itemdef.h"
 #include "object_properties.h"
 #include "cpp_api/s_node.h"
 #include "lua_api/l_object.h"
@@ -44,14 +43,11 @@ struct EnumString es_TileAnimationType[] =
 };
 
 /******************************************************************************/
-ItemDefinition read_item_definition(lua_State* L,int index,
-		ItemDefinition default_def)
+void read_item_definition(lua_State* L, int index,
+		const ItemDefinition &default_def, ItemDefinition &def)
 {
-	if(index < 0)
+	if (index < 0)
 		index = lua_gettop(L) + 1 + index;
-
-	// Read the item definition
-	ItemDefinition def = default_def;
 
 	def.type = (ItemType)getenumfield(L, index, "type",
 			es_ItemType, ITEM_NONE);
@@ -59,6 +55,12 @@ ItemDefinition read_item_definition(lua_State* L,int index,
 	getstringfield(L, index, "description", def.description);
 	getstringfield(L, index, "inventory_image", def.inventory_image);
 	getstringfield(L, index, "wield_image", def.wield_image);
+	getstringfield(L, index, "palette", def.palette_image);
+
+	// Read item color.
+	lua_getfield(L, index, "color");
+	read_color(L, -1, &def.color);
+	lua_pop(L, 1);
 
 	lua_getfield(L, index, "wield_scale");
 	if(lua_istable(L, -1)){
@@ -113,13 +115,11 @@ ItemDefinition read_item_definition(lua_State* L,int index,
 	// "" = no prediction
 	getstringfield(L, index, "node_placement_prediction",
 			def.node_placement_prediction);
-
-	return def;
 }
 
 /******************************************************************************/
 void read_object_properties(lua_State *L, int index,
-		ObjectProperties *prop)
+		ObjectProperties *prop, IItemDefManager *idef)
 {
 	if(index < 0)
 		index = lua_gettop(L) + 1 + index;
@@ -217,6 +217,10 @@ void read_object_properties(lua_State *L, int index,
 	}
 	lua_pop(L, 1);
 	getstringfield(L, -1, "infotext", prop->infotext);
+	lua_getfield(L, -1, "wield_item");
+	if (!lua_isnil(L, -1))
+		prop->wield_item = read_item(L, -1, idef).getItemString();
+	lua_pop(L, 1);
 }
 
 /******************************************************************************/
@@ -285,6 +289,8 @@ void push_object_properties(lua_State *L, ObjectProperties *prop)
 	lua_setfield(L, -2, "automatic_face_movement_max_rotation_per_sec");
 	lua_pushlstring(L, prop->infotext.c_str(), prop->infotext.size());
 	lua_setfield(L, -2, "infotext");
+	lua_pushlstring(L, prop->wield_item.c_str(), prop->wield_item.size());
+	lua_setfield(L, -2, "wield_item");
 }
 
 /******************************************************************************/
@@ -414,6 +420,34 @@ ContentFeatures read_content_features(lua_State *L, int index)
 			TileDef lasttile = f.tiledef[i-1];
 			while(i < 6){
 				f.tiledef[i] = lasttile;
+				i++;
+			}
+		}
+	}
+	lua_pop(L, 1);
+
+	// overlay_tiles = {}
+	lua_getfield(L, index, "overlay_tiles");
+	if (lua_istable(L, -1)) {
+		int table = lua_gettop(L);
+		lua_pushnil(L);
+		int i = 0;
+		while (lua_next(L, table) != 0) {
+			// Read tiledef from value
+			f.tiledef_overlay[i] = read_tiledef(L, -1, f.drawtype);
+			// removes value, keeps key for next iteration
+			lua_pop(L, 1);
+			i++;
+			if (i == 6) {
+				lua_pop(L, 1);
+				break;
+			}
+		}
+		// Copy last value to all remaining textures
+		if (i >= 1) {
+			TileDef lasttile = f.tiledef_overlay[i - 1];
+			while (i < 6) {
+				f.tiledef_overlay[i] = lasttile;
 				i++;
 			}
 		}
@@ -786,7 +820,7 @@ bool string_to_enum(const EnumString *spec, int &result,
 }
 
 /******************************************************************************/
-ItemStack read_item(lua_State* L, int index,Server* srv)
+ItemStack read_item(lua_State* L, int index, IItemDefManager *idef)
 {
 	if(index < 0)
 		index = lua_gettop(L) + 1 + index;
@@ -805,7 +839,6 @@ ItemStack read_item(lua_State* L, int index,Server* srv)
 	{
 		// Convert from itemstring
 		std::string itemstring = lua_tostring(L, index);
-		IItemDefManager *idef = srv->idef();
 		try
 		{
 			ItemStack item;
@@ -822,16 +855,18 @@ ItemStack read_item(lua_State* L, int index,Server* srv)
 	else if(lua_istable(L, index))
 	{
 		// Convert from table
-		IItemDefManager *idef = srv->idef();
 		std::string name = getstringfield_default(L, index, "name", "");
 		int count = getintfield_default(L, index, "count", 1);
 		int wear = getintfield_default(L, index, "wear", 0);
 
 		ItemStack istack(name, count, wear, idef);
 
-		lua_getfield(L, index, "metadata");
+		// BACKWARDS COMPATIBLITY
+		std::string value = getstringfield_default(L, index, "metadata", "");
+		istack.metadata.setString("", value);
 
-		// Support old metadata format by checking type
+		// Get meta
+		lua_getfield(L, index, "meta");
 		int fieldstable = lua_gettop(L);
 		if (lua_istable(L, fieldstable)) {
 			lua_pushnil(L);
@@ -841,26 +876,7 @@ ItemStack read_item(lua_State* L, int index,Server* srv)
 				size_t value_len;
 				const char *value_cs = lua_tolstring(L, -1, &value_len);
 				std::string value(value_cs, value_len);
-				istack.metadata.setString(name, value);
-				lua_pop(L, 1); // removes value, keeps key for next iteration
-			}
-		} else {
-			// BACKWARDS COMPATIBLITY
-			std::string value = getstringfield_default(L, index, "metadata", "");
-			istack.metadata.setString("", value);
-		}
-
-		lua_getfield(L, index, "meta");
-		fieldstable = lua_gettop(L);
-		if (lua_istable(L, fieldstable)) {
-			lua_pushnil(L);
-			while (lua_next(L, fieldstable) != 0) {
-				// key at index -2 and value at index -1
-				std::string key = lua_tostring(L, -2);
-				size_t value_len;
-				const char *value_cs = lua_tolstring(L, -1, &value_len);
-				std::string value(value_cs, value_len);
-				istack.metadata.setString(name, value);
+				istack.metadata.setString(key, value);
 				lua_pop(L, 1); // removes value, keeps key for next iteration
 			}
 		}
@@ -882,7 +898,7 @@ void push_tool_capabilities(lua_State *L,
 		lua_newtable(L);
 		// For each groupcap
 		for (ToolGCMap::const_iterator i = toolcap.groupcaps.begin();
-			i != toolcap.groupcaps.end(); i++) {
+			i != toolcap.groupcaps.end(); ++i) {
 			// Create groupcap table
 			lua_newtable(L);
 			const std::string &name = i->first;
@@ -890,7 +906,7 @@ void push_tool_capabilities(lua_State *L,
 			// Create subtable "times"
 			lua_newtable(L);
 			for (UNORDERED_MAP<int, float>::const_iterator
-					i = groupcap.times.begin(); i != groupcap.times.end(); i++) {
+					i = groupcap.times.begin(); i != groupcap.times.end(); ++i) {
 				lua_pushinteger(L, i->first);
 				lua_pushnumber(L, i->second);
 				lua_settable(L, -3);
@@ -909,7 +925,7 @@ void push_tool_capabilities(lua_State *L,
 		lua_newtable(L);
 		// For each damage group
 		for (DamageGroup::const_iterator i = toolcap.damageGroups.begin();
-			i != toolcap.damageGroups.end(); i++) {
+			i != toolcap.damageGroups.end(); ++i) {
 			// Create damage group table
 			lua_pushinteger(L, i->second);
 			lua_setfield(L, -2, i->first.c_str());
@@ -948,7 +964,7 @@ void read_inventory_list(lua_State *L, int tableindex,
 	InventoryList *invlist = inv->addList(name, listsize);
 	int index = 0;
 	for(std::vector<ItemStack>::const_iterator
-			i = items.begin(); i != items.end(); i++){
+			i = items.begin(); i != items.end(); ++i){
 		if(forcesize != -1 && index == forcesize)
 			break;
 		invlist->changeItem(index, *i);
@@ -1205,7 +1221,7 @@ std::vector<ItemStack> read_items(lua_State *L, int index, Server *srv)
 		if (items.size() < (u32) key) {
 			items.resize(key);
 		}
-		items[key - 1] = read_item(L, -1, srv);
+		items[key - 1] = read_item(L, -1, srv->idef());
 		lua_pop(L, 1);
 	}
 	return items;

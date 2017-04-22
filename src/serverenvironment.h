@@ -33,7 +33,7 @@ class ServerEnvironment;
 class ActiveBlockModifier;
 class ServerActiveObject;
 class Server;
-class GameScripting;
+class ServerScripting;
 
 /*
 	{Active, Loading} block modifier interface.
@@ -194,7 +194,7 @@ typedef UNORDERED_MAP<u16, ServerActiveObject *> ActiveObjectMap;
 class ServerEnvironment : public Environment
 {
 public:
-	ServerEnvironment(ServerMap *map, GameScripting *scriptIface,
+	ServerEnvironment(ServerMap *map, ServerScripting *scriptIface,
 		Server *server, const std::string &path_world);
 	~ServerEnvironment();
 
@@ -203,7 +203,7 @@ public:
 	ServerMap & getServerMap();
 
 	//TODO find way to remove this fct!
-	GameScripting* getScriptIface()
+	ServerScripting* getScriptIface()
 	{ return m_script; }
 
 	Server *getGameDef()
@@ -320,7 +320,7 @@ public:
 	//check if there's a line of sight between two positions
 	bool line_of_sight(v3f pos1, v3f pos2, float stepsize=1.0, v3s16 *p=NULL);
 
-	u32 getGameTime() { return m_game_time; }
+	u32 getGameTime() const { return m_game_time; }
 
 	void reportMaxLagEstimate(float f) { m_max_lag_estimate = f; }
 	float getMaxLagEstimate() { return m_max_lag_estimate; }
@@ -381,7 +381,7 @@ private:
 	// The map
 	ServerMap *m_map;
 	// Lua state
-	GameScripting* m_script;
+	ServerScripting* m_script;
 	// Server definition
 	Server *m_server;
 	// World path

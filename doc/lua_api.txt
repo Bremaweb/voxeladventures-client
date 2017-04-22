@@ -660,6 +660,10 @@ node definition:
       The first five bits of `param2` tells which color
       is picked from the palette.
       The palette should have 32 pixels.
+    paramtype2 == "glasslikeliquidlevel"
+    ^ Only valid for "glasslike_framed" or "glasslike_framed_optional" drawtypes.
+      param2 defines 64 levels of internal liquid.
+      Liquid texture is defined using `special_tiles = {"modname_tilename.png"},`
     collision_box = {
       type = "fixed",
       fixed = {
@@ -1229,9 +1233,8 @@ Another example: Make red wool from white wool and red dye:
      * `0` is something that is directly accessible at the start of gameplay
      * There is no upper limit
 * `dig_immediate`: (player can always pick up node without tool wear)
-    * `2`: node is removed without tool wear after 0.5 seconds or so
-      (rail, sign)
-    * `3`: node is removed without tool wear immediately (torch)
+    * `2`: node is removed without tool wear after 0.5 seconds (rail, sign)
+    * `3`: node is removed without tool wear after 0.15 seconds (torch)
 * `disable_jump`: Player (and possibly other things) cannot jump from node
 * `fall_damage_add_percent`: damage speed = `speed * (1 + value/100)`
 * `bouncy`: value is bounce speed in percent
@@ -1478,6 +1481,9 @@ Item metadata only contains a key-value store.
 Some of the values in the key-value store are handled specially:
 
 * `description`: Set the itemstack's description. Defaults to idef.description
+* `color`: A `ColorString`, which sets the stack's color.
+* `palette_index`: If the item has a palette, this is used to get the
+                  current color from the palette.
 
 Example stuff:
 
@@ -1523,6 +1529,16 @@ examples.
 * Define the size of the menu in inventory slots
 * `fixed_size`: `true`/`false` (optional)
 * deprecated: `invsize[<W>,<H>;]`
+
+#### `position[<X>,<Y>]`
+* Define the position of the formspec
+* A value between 0.0 and 1.0 represents a position inside the screen
+* The default value is the center of the screen (0.5, 0.5)
+
+#### `anchor[<X>,<Y>]`
+* Define the anchor of the formspec
+* A value between 0.0 and 1.0 represents an anchor inside the formspec
+* The default value is the center of the formspec (0.5, 0.5)
 
 #### `container[<X>,<Y>]`
 * Start of a container block, moves all physical elements in the container by (X, Y)
@@ -1864,6 +1880,12 @@ The following functions provide escape sequences:
     * `color` is a ColorString
     * The escape sequence sets the background of the whole text element to
       `color`. Only defined for item descriptions and tooltips.
+* `color.strip_foreground_colors(str)`
+    * Removes foreground colors added by `get_color_escape_sequence`.
+* `color.strip_background_colors(str)`
+    * Removes background colors added by `get_background_escape_sequence`.
+* `color.strip_colors(str)`
+    * Removes all color escape sequences.
 
 Spatial Vectors
 ---------------
@@ -1916,11 +1938,13 @@ Helper functions
 * `minetest.formspec_escape(string)`: returns a string
     * escapes the characters "[", "]", "\", "," and ";", which can not be used in formspecs
 * `minetest.is_yes(arg)`
-    * returns whether `arg` can be interpreted as yes
+    * returns true if passed 'y', 'yes', 'true' or a number that isn't zero.
 * `minetest.get_us_time()`
     * returns time with microsecond precision. May not return wall time.
 * `table.copy(table)`: returns a table
     * returns a deep copy of `table`
+* `minetest.pointed_thing_to_face_pos(placer, pointed_thing)`: returns a position
+    * returns the exact position on the surface of a pointed node
 
 `minetest` namespace reference
 ------------------------------
@@ -1935,13 +1959,31 @@ Helper functions
 * `minetest.get_worldpath()`: returns e.g. `"/home/user/.minetest/world"`
     * Useful for storing custom data
 * `minetest.is_singleplayer()`
-* `minetest.features`
-    * Table containing API feature flags: `{foo=true, bar=true}`
+* `minetest.features`: Table containing API feature flags
+      {
+         glasslike_framed = true,
+         nodebox_as_selectionbox = true,
+         chat_send_player_param3 = true,
+         get_all_craft_recipes_works = true,
+         use_texture_alpha = true,
+      -- ^ The transparency channel of textures can be used optionally
+         no_legacy_abms = true,
+      -- ^ Tree and grass ABMs are no longer done from C++
+         texture_names_parens = true,
+      -- ^ Texture grouping is possible using parentheses
+         area_store_custom_ids = true,
+      -- ^ Unique Area ID for AreaStore:insert_area
+         add_entity_with_staticdata = true,
+      -- ^ add_entity supports passing initial staticdata to on_activate
+         no_chat_message_prediction = true,
+      -- ^ Chat messages are no longer predicted
+      }
 * `minetest.has_feature(arg)`: returns `boolean, missing_features`
     * `arg`: string or table in format `{foo=true, bar=true}`
     * `missing_features`: `{foo=true, bar=true}`
-* `minetest.get_player_information(player_name)`: returns a table containing
-  information about player. Example return value:
+* `minetest.get_player_information(player_name)`:
+    * Returns a table containing information about a player
+      Example return value:
         {
             address = "127.0.0.1",     -- IP address of client
             ip_version = 4,            -- IPv4 / IPv6
@@ -2211,6 +2253,9 @@ and `minetest.auth_reload` call the authetification handler.
     * Returns `true` if successful, `false` on failure (e.g. protected location)
 * `minetest.punch_node(pos)`
     * Punch node with the same effects that a player would cause
+* `minetest.spawn_falling_node(pos)`
+    * Change node into falling node
+    * Returns `true` if successful, `false` on failure
 
 * `minetest.find_nodes_with_meta(pos1, pos2)`
     * Get a table of positions of nodes that have metadata within a region {pos1, pos2}
@@ -2355,6 +2400,22 @@ and `minetest.auth_reload` call the authetification handler.
     * increase level of leveled node by level, default `level` equals `1`
     * if `totallevel > maxlevel`, returns rest (`total-max`)
     * can be negative for decreasing
+* `minetest.fix_light(pos1, pos2)`: returns `true`/`false`
+    * resets the light in a cuboid-shaped part of
+      the map and removes lighting bugs.
+    * Loads the area if it is not loaded.
+    * `pos1` is the corner of the cuboid with the least coordinates
+      (in node coordinates), inclusive.
+    * `pos2` is the opposite corner of the cuboid, inclusive.
+    * The actual updated cuboid might be larger than the specified one,
+      because only whole map blocks can be updated.
+      The actual updated area consists of those map blocks that intersect
+      with the given cuboid.
+    * However, the neighborhood of the updated area might change
+      as well, as light can spread out of the cuboid, also light
+      might be removed.
+    * returns `false` if the area is not fully generated,
+      `true` otherwise
 * `core.check_single_for_falling(pos)`
     * causes an unsupported `group:falling_node` node to fall and causes an
       unattached `group:attached_node` node to fall.
@@ -2536,8 +2597,12 @@ These functions return the leftover itemstack.
     * Optional: Variable number of arguments that are passed to `func`
 
 ### Server
-* `minetest.request_shutdown([message],[reconnect])`: request for server shutdown. Will display `message` to clients,
-    and `reconnect` == true displays a reconnect button.
+* `minetest.request_shutdown([message],[reconnect],[delay])`: request for server shutdown. Will display `message` to clients,
+    `reconnect` == true displays a reconnect button,
+    `delay` adds an optional delay (in seconds) before shutdown
+        negative delay cancels the current active shutdown
+        zero delay triggers an immediate shutdown.
+* `minetest.cancel_shutdown_requests()`: cancel current delayed shutdown
 * `minetest.get_server_status()`: returns server status string
 * `minetest.get_server_uptime()`: returns the server uptime in seconds
 
@@ -2672,7 +2737,7 @@ These functions return the leftover itemstack.
 * `minetest.write_json(data[, styled])`: returns a string or `nil` and an error message
     * Convert a Lua table into a JSON string
     * styled: Outputs in a human-readable format if this is set, defaults to false
-    * Unserializable things like functions and userdata are saved as null.
+    * Unserializable things like functions and userdata will cause an error.
     * **Warning**: JSON is more strict than the Lua table format.
         1. You can only use strings and positive integers of at least one as keys.
         2. You can not mix string and integer keys.
@@ -2818,6 +2883,8 @@ See `StorageRef`, `NodeMetaRef` and `ItemStackMetaRef`.
     * Any non-table value will clear the metadata
     * See "Node Metadata" for an example
     * returns `true` on success
+* `equals(other)`
+    * returns `true` if this metadata has the same key-value pairs as `other`
 
 ### `NodeMetaRef`
 Node metadata: reference extra data and functionality stored in a node.
@@ -2975,7 +3042,11 @@ This is basically a reference to a C++ `ServerActiveObject`
         * `jump`: multiplier to default jump value (default: `1`)
         * `gravity`: multiplier to default gravity value (default: `1`)
         * `sneak`: whether player can sneak (default: `true`)
-        * `sneak_glitch`: whether player can use the sneak glitch (default: `true`)
+        * `sneak_glitch`: whether player can use the new move code replications
+          of the old sneak side-effects: sneak ladders and 2 node sneak jump
+          (default: `false`)
+        * `new_move`: use new move/sneak code. When `false` the exact old code
+          is used for the specific old sneak behaviour (default: `true`)
 * `get_physics_override()`: returns the table given to set_physics_override
 * `hud_add(hud definition)`: add a HUD element described by HUD def, returns ID
    number on success
@@ -3275,9 +3346,6 @@ format as produced by get_data() et al. and is *not required* to be a table retr
 Once the internal VoxelManip state has been modified to your liking, the changes can be committed back
 to the map by calling `VoxelManip:write_to_map()`.
 
-Finally, a call to `VoxelManip:update_map()` is required to re-calculate lighting and set the blocks
-as being modified so that connected clients are sent the updated parts of map.
-
 
 ##### Flat array format
 Let
@@ -3342,8 +3410,6 @@ but with a few differences:
   will also update the Mapgen VoxelManip object's internal state active on the current thread.
 * After modifying the Mapgen VoxelManip object's internal buffer, it may be necessary to update lighting
   information using either: `VoxelManip:calc_lighting()` or `VoxelManip:set_lighting()`.
-* `VoxelManip:update_map()` does not need to be called after `write_to_map()`.  The map update is performed
-  automatically after all on_generated callbacks have been run for that generated block.
 
 ##### Other API functions operating on a VoxelManip
 If any VoxelManip contents were set to a liquid node, `VoxelManip:update_liquids()` must be called
@@ -3377,8 +3443,14 @@ will place the schematic inside of the VoxelManip.
 * `read_from_map(p1, p2)`:  Loads a chunk of map into the VoxelManip object containing
   the region formed by `p1` and `p2`.
     * returns actual emerged `pmin`, actual emerged `pmax`
-* `write_to_map()`: Writes the data loaded from the `VoxelManip` back to the map.
+* `write_to_map([light])`: Writes the data loaded from the `VoxelManip` back to the map.
     * **important**: data must be set using `VoxelManip:set_data()` before calling this
+    * if `light` is true, then lighting is automatically recalculated.
+      The default value is true.
+      If `light` is false, no light calculations happen, and you should correct
+      all modified blocks with `minetest.fix_light()` as soon as possible.
+      Keep in mind that modifying the map where light is incorrect can cause
+      more lighting bugs. 
 * `get_node_at(pos)`: Returns a `MapNode` table of the node currently loaded in
   the `VoxelManip` at that position
 * `set_node_at(pos, node)`: Sets a specific `MapNode` in the `VoxelManip` at that position
@@ -3386,9 +3458,7 @@ will place the schematic inside of the VoxelManip.
     * returns raw node data in the form of an array of node content IDs
     * if the param `buffer` is present, this table will be used to store the result instead
 * `set_data(data)`: Sets the data contents of the `VoxelManip` object
-* `update_map()`: Update map after writing chunk back to map.
-    * To be used only by `VoxelManip` objects created by the mod itself;
-      not a `VoxelManip` that was retrieved from `minetest.get_mapgen_object`
+* `update_map()`: Does nothing, kept for compatibility.
 * `set_lighting(light, [p1, p2])`: Set the lighting within the `VoxelManip` to a uniform value
     * `light` is a table, `{day=<0...15>, night=<0...15>}`
     * To be used only by a `VoxelManip` object from `minetest.get_mapgen_object`
@@ -3705,6 +3775,19 @@ Definition tables
                             {hard = 1, metal = 1, spikes = 1}
         inventory_image = "default_tool_steelaxe.png",
         wield_image = "",
+        palette = "",
+        --[[
+        ^ An image file containing the palette of a node.
+        ^ You can set the currently used color as the
+        ^ "palette_index" field of the item stack metadata.
+        ^ The palette is always stretched to fit indices
+        ^ between 0 and 255, to ensure compatibility with
+        ^ "colorfacedir" and "colorwallmounted" nodes.
+        ]]
+        color = "0xFFFFFFFF",
+        --[[
+        ^ The color of the item. The palette overrides this.
+        ]]
         wield_scale = {x = 1, y = 1, z = 1},
         stack_max = 99,
         range = 4.0,
@@ -3823,13 +3906,20 @@ Definition tables
 
         drawtype = "normal", -- See "Node drawtypes"
         visual_scale = 1.0, --[[
-        ^ Supported for drawtypes "plantlike", "signlike", "torchlike", "mesh".
-        ^ For plantlike, the image will start at the bottom of the node; for the
-        ^ other drawtypes, the image will be centered on the node.
+        ^ Supported for drawtypes "plantlike", "signlike", "torchlike",
+        ^ "firelike", "mesh".
+        ^ For plantlike and firelike, the image will start at the bottom of the
+        ^ node, for the other drawtypes the image will be centered on the node.
         ^ Note that positioning for "torchlike" may still change. ]]
         tiles = {tile definition 1, def2, def3, def4, def5, def6}, --[[
         ^ Textures of node; +Y, -Y, +X, -X, +Z, -Z (old field name: tile_images)
         ^ List can be shortened to needed length ]]
+        overlay_tiles = {tile definition 1, def2, def3, def4, def5, def6}, --[[
+        ^ Same as `tiles`, but these textures are drawn on top of the
+        ^ base tiles. You can use this to colorize only specific parts of
+        ^ your texture. If the texture name is an empty string, that
+        ^ overlay is not drawn. Since such tiles are drawn twice, it
+        ^ is not recommended to use overlays on very common nodes.
         special_tiles = {tile definition 1, Tile definition 2}, --[[
         ^ Special textures of node; used rarely (old field name: special_materials)
         ^ List can be shortened to needed length ]]
@@ -3918,6 +4008,13 @@ Definition tables
         ^ Node destructor; called after removing node
         ^ Not called for bulk node placement (i.e. schematics and VoxelManip)
         ^ default: nil ]]
+        on_flood = func(pos, oldnode, newnode), --[[
+        ^ Called when a liquid (newnode) is about to flood oldnode, if
+        ^ it has `floodable = true` in the nodedef. Not called for bulk
+        ^ node placement (i.e. schematics and VoxelManip) or air nodes. If
+        ^ return true the node is not flooded, but on_flood callback will
+        ^ most likely be called over and over again every liquid update
+        ^ interval. Default: nil ]]
 
         after_place_node = func(pos, placer, itemstack, pointed_thing) --[[
         ^ Called after constructing node when node was placed using

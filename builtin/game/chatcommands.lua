@@ -1,46 +1,28 @@
--- Minetest: builtin/chatcommands.lua
+-- Minetest: builtin/game/chatcommands.lua
 
 --
 -- Chat command handler
 --
 
-core.registered_chatcommands = {}
 core.chatcommands = core.registered_chatcommands -- BACKWARDS COMPATIBILITY
-function core.register_chatcommand(cmd, def)
-	def = def or {}
-	def.params = def.params or ""
-	def.description = def.description or ""
-	def.privs = def.privs or {}
-	def.mod_origin = core.get_current_modname() or "??"
-	core.registered_chatcommands[cmd] = def
-end
-
-function core.unregister_chatcommand(name)
-	if core.registered_chatcommands[name] then
-		core.registered_chatcommands[name] = nil
-	else
-		core.log("warning", "Not unregistering chatcommand " ..name..
-			" because it doesn't exist.")
-	end
-end
-
-function core.override_chatcommand(name, redefinition)
-	local chatcommand = core.registered_chatcommands[name]
-	assert(chatcommand, "Attempt to override non-existent chatcommand "..name)
-	for k, v in pairs(redefinition) do
-		rawset(chatcommand, k, v)
-	end
-	core.registered_chatcommands[name] = chatcommand
-end
 
 core.register_on_chat_message(function(name, message)
-	local cmd, param = string.match(message, "^/([^ ]+) *(.*)")
-	if not param then
-		param = ""
+	if message:sub(1,1) ~= "/" then
+		return
 	end
+
+	local cmd, param = string.match(message, "^/([^ ]+) *(.*)")
+	if not cmd then
+		core.chat_send_player(name, "-!- Empty command")
+		return true
+	end
+
+	param = param or ""
+
 	local cmd_def = core.registered_chatcommands[cmd]
 	if not cmd_def then
-		return false
+		core.chat_send_player(name, "-!- Invalid command: " .. cmd)
+		return true
 	end
 	local has_privs, missing_privs = core.check_player_privs(name, cmd_def.privs)
 	if has_privs then
@@ -105,61 +87,6 @@ core.register_chatcommand("admin", {
 			return true, "The administrator of this server is "..admin.."."
 		else
 			return false, "There's no administrator named in the config file."
-		end
-	end,
-})
-
-core.register_chatcommand("help", {
-	privs = {},
-	params = "[all/privs/<cmd>]",
-	description = "Get help for commands or list privileges",
-	func = function(name, param)
-		local function format_help_line(cmd, def)
-			local msg = core.colorize("#00ffff", "/"..cmd)
-			if def.params and def.params ~= "" then
-				msg = msg .. " " .. def.params
-			end
-			if def.description and def.description ~= "" then
-				msg = msg .. ": " .. def.description
-			end
-			return msg
-		end
-		if param == "" then
-			local msg = ""
-			local cmds = {}
-			for cmd, def in pairs(core.registered_chatcommands) do
-				if core.check_player_privs(name, def.privs) then
-					cmds[#cmds + 1] = cmd
-				end
-			end
-			table.sort(cmds)
-			return true, "Available commands: " .. table.concat(cmds, " ") .. "\n"
-					.. "Use '/help <cmd>' to get more information,"
-					.. " or '/help all' to list everything."
-		elseif param == "all" then
-			local cmds = {}
-			for cmd, def in pairs(core.registered_chatcommands) do
-				if core.check_player_privs(name, def.privs) then
-					cmds[#cmds + 1] = format_help_line(cmd, def)
-				end
-			end
-			table.sort(cmds)
-			return true, "Available commands:\n"..table.concat(cmds, "\n")
-		elseif param == "privs" then
-			local privs = {}
-			for priv, def in pairs(core.registered_privileges) do
-				privs[#privs + 1] = priv .. ": " .. def.description
-			end
-			table.sort(privs)
-			return true, "Available privileges:\n"..table.concat(privs, "\n")
-		else
-			local cmd = param
-			local def = core.registered_chatcommands[cmd]
-			if not def then
-				return false, "Command not available: "..cmd
-			else
-				return true, format_help_line(cmd, def)
-			end
 		end
 	end,
 })
@@ -385,7 +312,7 @@ core.register_chatcommand("teleport", {
 		p.y = tonumber(p.y)
 		p.z = tonumber(p.z)
 		if p.x and p.y and p.z then
-			local lm = tonumber(minetest.setting_get("map_generation_limit") or 31000)
+			local lm = 31000
 			if p.x < -lm or p.x > lm or p.y < -lm or p.y > lm or p.z < -lm or p.z > lm then
 				return false, "Cannot teleport out of map bounds!"
 			end
@@ -556,6 +483,25 @@ core.register_chatcommand("deleteblocks", {
 				core.pos_to_string(p1, 1) .. " to " .. core.pos_to_string(p2, 1)
 		else
 			return false, "Failed to clear one or more blocks in area"
+		end
+	end,
+})
+
+core.register_chatcommand("fixlight", {
+	params = "(here [radius]) | (<pos1> <pos2>)",
+	description = "Resets lighting in the area between pos1 and pos2",
+	privs = {server = true},
+	func = function(name, param)
+		local p1, p2 = parse_range_str(name, param)
+		if p1 == false then
+			return false, p2
+		end
+
+		if core.fix_light(p1, p2) then
+			return true, "Successfully reset light in the area ranging from " ..
+				core.pos_to_string(p1, 1) .. " to " .. core.pos_to_string(p2, 1)
+		else
+			return false, "Failed to load one or more blocks in area"
 		end
 	end,
 })
@@ -836,11 +782,20 @@ core.register_chatcommand("days", {
 
 core.register_chatcommand("shutdown", {
 	description = "Shutdown server",
+	params = "[delay_in_seconds(0..inf) or -1 for cancel] [reconnect] [message]",
 	privs = {server=true},
 	func = function(name, param)
-		core.log("action", name .. " shuts down server")
-		core.request_shutdown()
-		core.chat_send_all("*** Server shutting down (operator request).")
+		local delay, reconnect, message = param:match("([^ ][-]?[0-9]+)([^ ]+)(.*)")
+		message = message or ""
+
+		if delay ~= "" then
+			delay = tonumber(param) or 0
+		else
+			delay = 0
+			core.log("action", name .. " shuts down server")
+			core.chat_send_all("*** Server shutting down (operator request).")
+		end
+		core.request_shutdown(message:trim(), core.is_yes(reconnect), delay)
 	end,
 })
 

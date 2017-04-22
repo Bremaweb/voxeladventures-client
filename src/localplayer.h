@@ -58,11 +58,16 @@ public:
 	float physics_override_gravity;
 	bool physics_override_sneak;
 	bool physics_override_sneak_glitch;
+	// Temporary option for old move code
+	bool physics_override_new_move;
 
 	v3f overridePosition;
 
 	void move(f32 dtime, Environment *env, f32 pos_max_d);
 	void move(f32 dtime, Environment *env, f32 pos_max_d,
+			std::vector<CollisionInfo> *collision_info);
+	// Temporary option for old move code
+	void old_move(f32 dtime, Environment *env, f32 pos_max_d,
 			std::vector<CollisionInfo> *collision_info);
 
 	void applyControl(float dtime);
@@ -135,15 +140,24 @@ private:
 	void accelerateVertical(const v3f &target_speed, const f32 max_increase);
 
 	v3f m_position;
-	// This is used for determining the sneaking range
+
 	v3s16 m_sneak_node;
+	// Stores the max player uplift by m_sneak_node
+	// To support temporary option for old move code
+	f32 m_sneak_node_bb_ymax;
+	// Stores the top bounding box of m_sneak_node
+	aabb3f m_sneak_node_bb_top;
 	// Whether the player is allowed to sneak
 	bool m_sneak_node_exists;
-	// Whether recalculation of the sneak node is needed
+	// Whether recalculation of m_sneak_node and its top bbox is needed
 	bool m_need_to_get_new_sneak_node;
-	// Stores the max player uplift by m_sneak_node and is updated
-	// when m_need_to_get_new_sneak_node == true
-	f32 m_sneak_node_bb_ymax;
+	// Whether a "sneak ladder" structure is detected at the players pos
+	// see detectSneakLadder() in the .cpp for more info (always false if disabled)
+	bool m_sneak_ladder_detected;
+	// Whether a 2-node-up ledge is detected at the players pos,
+	// see detectLedge() in the .cpp for more info (always false if disabled).
+	bool m_ledge_detected;
+
 	// Node below player, used to determine whether it has been removed,
 	// and its old type
 	v3s16 m_old_node_below;

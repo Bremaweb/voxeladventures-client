@@ -50,6 +50,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 		ContentFeatures and NodeDefManager use a different serialization
 		    format; better for future version cross-compatibility
 		Many things
+		Obsolete TOCLIENT_PLAYERITEM
 	PROTOCOL_VERSION 10:
 		TOCLIENT_PRIVILEGES
 		Version raised to force 'fly' and 'fast' privileges into effect.
@@ -104,7 +105,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 	PROTOCOL_VERSION 22:
 		add swap_node
 	PROTOCOL_VERSION 23:
-		TOSERVER_CLIENT_READY
+		Obsolete TOSERVER_RECEIVED_MEDIA
+		Add TOSERVER_CLIENT_READY
 	PROTOCOL_VERSION 24:
 		ContentFeatures version 7
 		ContentFeatures: change number of special tiles to 6 (CF_SPECIAL_COUNT)
@@ -148,19 +150,21 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 		Add node and tile color and palette
 		Fix plantlike visual_scale being applied squared and add compatibility
 			with pre-30 clients by sending sqrt(visual_scale)
+	PROTOCOL VERSION 31:
+		Add tile overlay
 */
 
-#define LATEST_PROTOCOL_VERSION 30
+#define LATEST_PROTOCOL_VERSION 31
 
 // Server's supported network protocol range
-#define SERVER_PROTOCOL_VERSION_MIN 13
+#define SERVER_PROTOCOL_VERSION_MIN 24
 #define SERVER_PROTOCOL_VERSION_MAX LATEST_PROTOCOL_VERSION
 
 // Client's supported network protocol range
 // The minimal version depends on whether
 // send_pre_v25_init is enabled or not
 #define CLIENT_PROTOCOL_VERSION_MIN 25
-#define CLIENT_PROTOCOL_VERSION_MIN_LEGACY 13
+#define CLIENT_PROTOCOL_VERSION_MIN_LEGACY 24
 #define CLIENT_PROTOCOL_VERSION_MAX LATEST_PROTOCOL_VERSION
 
 // Constant that differentiates the protocol from random data and other protocols

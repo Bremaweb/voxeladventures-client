@@ -128,6 +128,9 @@ private:
 	// nodenames: eg. {"ignore", "group:tree"} or "default:dirt"
 	static int l_find_nodes_in_area_under_air(lua_State *L);
 
+	// fix_light(p1, p2) -> true/false
+	static int l_fix_light(lua_State *L);
+
 	// emerge_area(p1, p2)
 	static int l_emerge_area(lua_State *L);
 
@@ -173,6 +176,7 @@ private:
 
 public:
 	static void Initialize(lua_State *L, int top);
+	static void InitializeClient(lua_State *L, int top);
 
 	static struct EnumString es_ClearObjectsMode[];
 };
@@ -242,7 +246,7 @@ public:
 };
 
 struct ScriptCallbackState {
-	GameScripting *script;
+	ServerScripting *script;
 	int callback_ref;
 	int args_ref;
 	unsigned int refcount;

@@ -27,7 +27,8 @@ struct HTTPFetchRequest;
 struct HTTPFetchResult;
 class AsyncEngine;
 
-class ModApiUtil : public ModApiBase {
+class ModApiUtil : public ModApiBase
+{
 private:
 	/*
 		NOTE:
@@ -114,9 +115,9 @@ private:
 public:
 	static void Initialize(lua_State *L, int top);
 
-	static void InitializeAsync(AsyncEngine& engine);
+	static void InitializeClient(lua_State *L, int top);
 
+	static void InitializeAsync(AsyncEngine &engine);
 };
 
 #endif /* L_UTIL_H_ */
-

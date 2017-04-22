@@ -61,11 +61,10 @@ void NodeBox::reset()
 
 void NodeBox::serialize(std::ostream &os, u16 protocol_version) const
 {
-	int version = 1;
+	// Protocol >= 21
+	int version = 2;
 	if (protocol_version >= 27)
 		version = 3;
-	else if (protocol_version >= 21)
-		version = 2;
 	writeU8(os, version);
 
 	switch (type) {
@@ -195,14 +194,12 @@ void TileDef::serialize(std::ostream &os, u16 protocol_version) const
 		writeU8(os, 3);
 	else if (protocol_version >= 26)
 		writeU8(os, 2);
-	else if (protocol_version >= 17)
-		writeU8(os, 1);
 	else
-		writeU8(os, 0);
-	os<<serializeString(name);
+		writeU8(os, 1);
+
+	os << serializeString(name);
 	animation.serialize(os, protocol_version);
-	if (protocol_version >= 17)
-		writeU8(os, backface_culling);
+	writeU8(os, backface_culling);
 	if (protocol_version >= 26) {
 		writeU8(os, tileable_horizontal);
 		writeU8(os, tileable_vertical);
@@ -381,13 +378,13 @@ void ContentFeatures::reset()
 
 void ContentFeatures::serialize(std::ostream &os, u16 protocol_version) const
 {
-	if (protocol_version < 30) {
+	if (protocol_version < 31) {
 		serializeOld(os, protocol_version);
 		return;
 	}
 
 	// version
-	writeU8(os, 9);
+	writeU8(os, 10);
 
 	// general
 	os << serializeString(name);
@@ -407,6 +404,8 @@ void ContentFeatures::serialize(std::ostream &os, u16 protocol_version) const
 	writeU8(os, 6);
 	for (u32 i = 0; i < 6; i++)
 		tiledef[i].serialize(os, protocol_version);
+	for (u32 i = 0; i < 6; i++)
+		tiledef_overlay[i].serialize(os, protocol_version);
 	writeU8(os, CF_SPECIAL_COUNT);
 	for (u32 i = 0; i < CF_SPECIAL_COUNT; i++) {
 		tiledef_special[i].serialize(os, protocol_version);
@@ -495,7 +494,7 @@ void ContentFeatures::deSerialize(std::istream &is)
 	if (version < 9) {
 		deSerializeOld(is, version);
 		return;
-	} else if (version > 9) {
+	} else if (version > 10) {
 		throw SerializationError("unsupported ContentFeatures version");
 	}
 
@@ -519,6 +518,9 @@ void ContentFeatures::deSerialize(std::istream &is)
 		throw SerializationError("unsupported tile count");
 	for (u32 i = 0; i < 6; i++)
 		tiledef[i].deSerialize(is, version, drawtype);
+	if (version >= 10)
+		for (u32 i = 0; i < 6; i++)
+			tiledef_overlay[i].deSerialize(is, version, drawtype);
 	if (readU8(is) != CF_SPECIAL_COUNT)
 		throw SerializationError("unsupported CF_SPECIAL_COUNT");
 	for (u32 i = 0; i < CF_SPECIAL_COUNT; i++)
@@ -584,7 +586,7 @@ void ContentFeatures::deSerialize(std::istream &is)
 }
 
 #ifndef SERVER
-void ContentFeatures::fillTileAttribs(ITextureSource *tsrc, TileSpec *tile,
+void ContentFeatures::fillTileAttribs(ITextureSource *tsrc, TileLayer *tile,
 		TileDef *tiledef, u32 shader_id, bool use_normal_texture,
 		bool backface_culling, u8 material_type)
 {
@@ -777,17 +779,26 @@ void ContentFeatures::updateTextures(ITextureSource *tsrc, IShaderSource *shdsrc
 
 	// Tiles (fill in f->tiles[])
 	for (u16 j = 0; j < 6; j++) {
-		fillTileAttribs(tsrc, &tiles[j], &tdef[j], tile_shader[j],
+		fillTileAttribs(tsrc, &tiles[j].layers[0], &tdef[j], tile_shader[j],
 			tsettings.use_normal_texture,
 			tiledef[j].backface_culling, material_type);
+		if (tiledef_overlay[j].name!="")
+			fillTileAttribs(tsrc, &tiles[j].layers[1], &tiledef_overlay[j],
+				tile_shader[j], tsettings.use_normal_texture,
+				tiledef[j].backface_culling, material_type);
 	}
 
 	// Special tiles (fill in f->special_tiles[])
 	for (u16 j = 0; j < CF_SPECIAL_COUNT; j++) {
-		fillTileAttribs(tsrc, &special_tiles[j], &tiledef_special[j],
+		fillTileAttribs(tsrc, &special_tiles[j].layers[0], &tiledef_special[j],
 			tile_shader[j], tsettings.use_normal_texture,
 			tiledef_special[j].backface_culling, material_type);
 	}
+
+	if (param_type_2 == CPT2_COLOR ||
+			param_type_2 == CPT2_COLORED_FACEDIR ||
+			param_type_2 == CPT2_COLORED_WALLMOUNTED)
+		palette = tsrc->getPalette(palette_name);
 
 	if ((drawtype == NDT_MESH) && (mesh != "")) {
 		// Meshnode drawtype
@@ -862,9 +873,6 @@ public:
 	virtual void removeNode(const std::string &name);
 	virtual void updateAliases(IItemDefManager *idef);
 	virtual void applyTextureOverrides(const std::string &override_filepath);
-	//! Returns a palette or NULL if not found. Only on client.
-	std::vector<video::SColor> *getPalette(const ContentFeatures &f,
-		const IGameDef *gamedef);
 	virtual void updateTextures(IGameDef *gamedef,
 		void (*progress_cbk)(void *progress_args, u32 progress, u32 max_progress),
 		void *progress_cbk_args);
@@ -912,9 +920,6 @@ private:
 
 	// Next possibly free id
 	content_t m_next_id;
-
-	// Maps image file names to loaded palettes.
-	UNORDERED_MAP<std::string, std::vector<video::SColor> > m_palettes;
 
 	// NodeResolvers to callback once node registration has ended
 	std::vector<NodeResolver *> m_pending_resolve_callbacks;
@@ -1335,12 +1340,13 @@ void CNodeDefManager::removeNode(const std::string &name)
 
 void CNodeDefManager::updateAliases(IItemDefManager *idef)
 {
-	std::set<std::string> all = idef->getAll();
+	std::set<std::string> all;
+	idef->getAll(all);
 	m_name_id_mapping_with_aliases.clear();
-	for (std::set<std::string>::iterator
+	for (std::set<std::string>::const_iterator
 			i = all.begin(); i != all.end(); ++i) {
-		std::string name = *i;
-		std::string convert_to = idef->getAlias(name);
+		const std::string &name = *i;
+		const std::string &convert_to = idef->getAlias(name);
 		content_t id;
 		if (m_name_id_mapping.getId(convert_to, id)) {
 			m_name_id_mapping_with_aliases.insert(
@@ -1403,78 +1409,6 @@ void CNodeDefManager::applyTextureOverrides(const std::string &override_filepath
 	}
 }
 
-std::vector<video::SColor> *CNodeDefManager::getPalette(
-	const ContentFeatures &f, const IGameDef *gamedef)
-{
-#ifndef SERVER
-	// This works because colors always use the most significant bits
-	// of param2. If you add a new colored type which uses param2
-	// in a more advanced way, you should change this code, too.
-	u32 palette_pixels = 0;
-	switch (f.param_type_2) {
-		case CPT2_COLOR:
-			palette_pixels = 256;
-			break;
-		case CPT2_COLORED_FACEDIR:
-			palette_pixels = 8;
-			break;
-		case CPT2_COLORED_WALLMOUNTED:
-			palette_pixels = 32;
-			break;
-		default:
-			return NULL;
-	}
-	// This many param2 values will have the same color
-	u32 step = 256 / palette_pixels;
-	const std::string &name = f.palette_name;
-	if (name == "")
-		return NULL;
-	Client *client = (Client *) gamedef;
-	ITextureSource *tsrc = client->tsrc();
-
-	UNORDERED_MAP<std::string, std::vector<video::SColor> >::iterator it =
-	m_palettes.find(name);
-	if (it == m_palettes.end()) {
-		// Create palette
-		if (!tsrc->isKnownSourceImage(name)) {
-			warningstream << "CNodeDefManager::getPalette(): palette \"" << name
-				<< "\" could not be loaded." << std::endl;
-			return NULL;
-		}
-		video::IImage *img = tsrc->generateImage(name);
-		std::vector<video::SColor> new_palette;
-		u32 w = img->getDimension().Width;
-		u32 h = img->getDimension().Height;
-		// Real area of the image
-		u32 area = h * w;
-		if (area != palette_pixels)
-			warningstream << "CNodeDefManager::getPalette(): the "
-				<< "specified palette image \"" << name << "\" does not "
-				<< "contain exactly " << palette_pixels
-				<< " pixels." << std::endl;
-		if (area > palette_pixels)
-			area = palette_pixels;
-		// For each pixel in the image
-		for (u32 i = 0; i < area; i++) {
-			video::SColor c = img->getPixel(i % w, i / w);
-			// Fill in palette with 'step' colors
-			for (u32 j = 0; j < step; j++)
-				new_palette.push_back(c);
-		}
-		img->drop();
-		// Fill in remaining elements
-		while (new_palette.size() < 256)
-			new_palette.push_back(video::SColor(0xFFFFFFFF));
-		m_palettes[name] = new_palette;
-		it = m_palettes.find(name);
-	}
-	if (it != m_palettes.end())
-		return &((*it).second);
-
-#endif
-	return NULL;
-}
-
 void CNodeDefManager::updateTextures(IGameDef *gamedef,
 	void (*progress_callback)(void *progress_args, u32 progress, u32 max_progress),
 	void *progress_callback_args)
@@ -1491,12 +1425,10 @@ void CNodeDefManager::updateTextures(IGameDef *gamedef,
 	TextureSettings tsettings;
 	tsettings.readSettings();
 
-	m_palettes.clear();
 	u32 size = m_content_features.size();
 
 	for (u32 i = 0; i < size; i++) {
 		ContentFeatures *f = &(m_content_features[i]);
-		f->palette = getPalette(*f, gamedef);
 		f->updateTextures(tsrc, shdsrc, meshmanip, client, tsettings);
 		progress_callback(progress_callback_args, i, size);
 	}
@@ -1615,109 +1547,19 @@ void ContentFeatures::serializeOld(std::ostream &os, u16 protocol_version) const
 	if (protocol_version < 30 && drawtype == NDT_PLANTLIKE)
 		compatible_visual_scale = sqrt(visual_scale);
 
-	if (protocol_version == 13)
-	{
-		writeU8(os, 5); // version
-		os<<serializeString(name);
-		writeU16(os, groups.size());
-		for (ItemGroupList::const_iterator
-				i = groups.begin(); i != groups.end(); ++i) {
-			os<<serializeString(i->first);
-			writeS16(os, i->second);
+	TileDef compatible_tiles[6];
+	for (u8 i = 0; i < 6; i++) {
+		compatible_tiles[i] = tiledef[i];
+		if (tiledef_overlay[i].name != "") {
+			std::stringstream s;
+			s << "(" << tiledef[i].name << ")^(" << tiledef_overlay[i].name
+				<< ")";
+			compatible_tiles[i].name = s.str();
 		}
-		writeU8(os, drawtype);
-		writeF1000(os, compatible_visual_scale);
-		writeU8(os, 6);
-		for (u32 i = 0; i < 6; i++)
-			tiledef[i].serialize(os, protocol_version);
-		//CF_SPECIAL_COUNT = 2 before cf ver. 7 and protocol ver. 24
-		writeU8(os, 2);
-		for (u32 i = 0; i < 2; i++)
-			tiledef_special[i].serialize(os, protocol_version);
-		writeU8(os, alpha);
-		writeU8(os, post_effect_color.getAlpha());
-		writeU8(os, post_effect_color.getRed());
-		writeU8(os, post_effect_color.getGreen());
-		writeU8(os, post_effect_color.getBlue());
-		writeU8(os, param_type);
-		writeU8(os, compatible_param_type_2);
-		writeU8(os, is_ground_content);
-		writeU8(os, light_propagates);
-		writeU8(os, sunlight_propagates);
-		writeU8(os, walkable);
-		writeU8(os, pointable);
-		writeU8(os, diggable);
-		writeU8(os, climbable);
-		writeU8(os, buildable_to);
-		os<<serializeString(""); // legacy: used to be metadata_name
-		writeU8(os, liquid_type);
-		os<<serializeString(liquid_alternative_flowing);
-		os<<serializeString(liquid_alternative_source);
-		writeU8(os, liquid_viscosity);
-		writeU8(os, light_source);
-		writeU32(os, damage_per_second);
-		node_box.serialize(os, protocol_version);
-		selection_box.serialize(os, protocol_version);
-		writeU8(os, legacy_facedir_simple);
-		writeU8(os, legacy_wallmounted);
-		serializeSimpleSoundSpec(sound_footstep, os);
-		serializeSimpleSoundSpec(sound_dig, os);
-		serializeSimpleSoundSpec(sound_dug, os);
 	}
-	else if (protocol_version > 13 && protocol_version < 24) {
-		writeU8(os, 6); // version
-		os<<serializeString(name);
-		writeU16(os, groups.size());
-		for (ItemGroupList::const_iterator
-				i = groups.begin(); i != groups.end(); ++i) {
-			os<<serializeString(i->first);
-			writeS16(os, i->second);
-		}
-		writeU8(os, drawtype);
-		writeF1000(os, compatible_visual_scale);
-		writeU8(os, 6);
-		for (u32 i = 0; i < 6; i++)
-			tiledef[i].serialize(os, protocol_version);
-		//CF_SPECIAL_COUNT = 2 before cf ver. 7 and protocol ver. 24
-		writeU8(os, 2);
-		for (u32 i = 0; i < 2; i++)
-			tiledef_special[i].serialize(os, protocol_version);
-		writeU8(os, alpha);
-		writeU8(os, post_effect_color.getAlpha());
-		writeU8(os, post_effect_color.getRed());
-		writeU8(os, post_effect_color.getGreen());
-		writeU8(os, post_effect_color.getBlue());
-		writeU8(os, param_type);
-		writeU8(os, compatible_param_type_2);
-		writeU8(os, is_ground_content);
-		writeU8(os, light_propagates);
-		writeU8(os, sunlight_propagates);
-		writeU8(os, walkable);
-		writeU8(os, pointable);
-		writeU8(os, diggable);
-		writeU8(os, climbable);
-		writeU8(os, buildable_to);
-		os<<serializeString(""); // legacy: used to be metadata_name
-		writeU8(os, liquid_type);
-		os<<serializeString(liquid_alternative_flowing);
-		os<<serializeString(liquid_alternative_source);
-		writeU8(os, liquid_viscosity);
-		writeU8(os, liquid_renewable);
-		writeU8(os, light_source);
-		writeU32(os, damage_per_second);
-		node_box.serialize(os, protocol_version);
-		selection_box.serialize(os, protocol_version);
-		writeU8(os, legacy_facedir_simple);
-		writeU8(os, legacy_wallmounted);
-		serializeSimpleSoundSpec(sound_footstep, os);
-		serializeSimpleSoundSpec(sound_dig, os);
-		serializeSimpleSoundSpec(sound_dug, os);
-		writeU8(os, rightclickable);
-		writeU8(os, drowning);
-		writeU8(os, leveled);
-		writeU8(os, liquid_range);
-	}
-	else if(protocol_version >= 24 && protocol_version < 30) {
+
+	// Protocol >= 24
+	if (protocol_version < 31) {
 		writeU8(os, protocol_version < 27 ? 7 : 8);
 
 		os << serializeString(name);
@@ -1731,7 +1573,7 @@ void ContentFeatures::serializeOld(std::ostream &os, u16 protocol_version) const
 		writeF1000(os, compatible_visual_scale);
 		writeU8(os, 6);
 		for (u32 i = 0; i < 6; i++)
-			tiledef[i].serialize(os, protocol_version);
+			compatible_tiles[i].serialize(os, protocol_version);
 		writeU8(os, CF_SPECIAL_COUNT);
 		for (u32 i = 0; i < CF_SPECIAL_COUNT; i++)
 			tiledef_special[i].serialize(os, protocol_version);
@@ -1778,9 +1620,10 @@ void ContentFeatures::serializeOld(std::ostream &os, u16 protocol_version) const
 				i != connects_to_ids.end(); ++i)
 			writeU16(os, *i);
 		writeU8(os, connect_sides);
-	} else
+	} else {
 		throw SerializationError("ContentFeatures::serialize(): "
 			"Unsupported version requested");
+	}
 }
 
 void ContentFeatures::deSerializeOld(std::istream &is, int version)

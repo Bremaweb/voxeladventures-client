@@ -53,7 +53,7 @@ class PlayerSAO;
 class IRollbackManager;
 struct RollbackAction;
 class EmergeManager;
-class GameScripting;
+class ServerScripting;
 class ServerEnvironment;
 struct SimpleSoundSpec;
 class ServerThread;
@@ -150,6 +150,7 @@ public:
 		const SubgameSpec &gamespec,
 		bool simple_singleplayer_mode,
 		bool ipv6,
+		bool dedicated,
 		ChatInterface *iface = NULL
 	);
 	~Server();
@@ -175,7 +176,6 @@ public:
 	void handleCommand_Init_Legacy(NetworkPacket* pkt);
 	void handleCommand_Init2(NetworkPacket* pkt);
 	void handleCommand_RequestMedia(NetworkPacket* pkt);
-	void handleCommand_ReceivedMedia(NetworkPacket* pkt);
 	void handleCommand_ClientReady(NetworkPacket* pkt);
 	void handleCommand_GotBlocks(NetworkPacket* pkt);
 	void handleCommand_PlayerPos(NetworkPacket* pkt);
@@ -228,12 +228,7 @@ public:
 	inline bool getShutdownRequested() const { return m_shutdown_requested; }
 
 	// request server to shutdown
-	void requestShutdown(const std::string &msg, bool reconnect)
-	{
-		m_shutdown_requested = true;
-		m_shutdown_msg = msg;
-		m_shutdown_ask_reconnect = reconnect;
-	}
+	void requestShutdown(const std::string &msg, bool reconnect, float delay = 0.0f);
 
 	// Returns -1 if failed, sound handle on success
 	// Envlock
@@ -278,7 +273,7 @@ public:
 	Inventory* createDetachedInventory(const std::string &name, const std::string &player="");
 
 	// Envlock and conlock should be locked when using scriptapi
-	GameScripting *getScriptIface(){ return m_script; }
+	ServerScripting *getScriptIface(){ return m_script; }
 
 	// actions: time-reversed list
 	// Return value: success/failure
@@ -299,12 +294,12 @@ public:
 	IWritableNodeDefManager* getWritableNodeDefManager();
 	IWritableCraftDefManager* getWritableCraftDefManager();
 
-	const std::vector<ModSpec> &getMods() const { return m_mods; }
-	const ModSpec* getModSpec(const std::string &modname) const;
+	virtual const std::vector<ModSpec> &getMods() const { return m_mods; }
+	virtual const ModSpec* getModSpec(const std::string &modname) const;
 	void getModNames(std::vector<std::string> &modlist);
 	std::string getBuiltinLuaPath();
-	inline const std::string &getWorldPath() const { return m_path_world; }
-	std::string getModStoragePath() const;
+	virtual std::string getWorldPath() const { return m_path_world; }
+	virtual std::string getModStoragePath() const;
 
 	inline bool isSingleplayer()
 			{ return m_simple_singleplayer_mode; }
@@ -365,8 +360,8 @@ public:
 	void SendInventory(PlayerSAO* playerSAO);
 	void SendMovePlayer(u16 peer_id);
 
-	bool registerModStorage(ModMetadata *storage);
-	void unregisterModStorage(const std::string &name);
+	virtual bool registerModStorage(ModMetadata *storage);
+	virtual void unregisterModStorage(const std::string &name);
 
 	// Bind address
 	Address m_bind_addr;
@@ -514,6 +509,8 @@ private:
 	// functionality
 	bool m_simple_singleplayer_mode;
 	u16 m_max_chatmessage_length;
+	// For "dedicated" server list flag
+	bool m_dedicated;
 
 	// Thread can set; step() will throw as ServerError
 	MutexedVariable<std::string> m_async_fatal_error;
@@ -544,7 +541,7 @@ private:
 
 	// Scripting
 	// Envlock and conlock should be locked when using Lua
-	GameScripting *m_script;
+	ServerScripting *m_script;
 
 	// Item definition manager
 	IWritableItemDefManager *m_itemdef;
@@ -603,6 +600,7 @@ private:
 	bool m_shutdown_requested;
 	std::string m_shutdown_msg;
 	bool m_shutdown_ask_reconnect;
+	float m_shutdown_timer;
 
 	ChatInterface *m_admin_chat;
 	std::string m_admin_nick;

@@ -29,7 +29,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "content_sao.h"
 #include "server.h"
 #include "hud.h"
-#include "scripting_game.h"
+#include "serverscripting.h"
 
 struct EnumString es_HudElementType[] =
 {
@@ -364,7 +364,7 @@ int ObjectRef::l_set_wielded_item(lua_State *L)
 	ServerActiveObject *co = getobject(ref);
 	if (co == NULL) return 0;
 	// Do it
-	ItemStack item = read_item(L, 2, getServer(L));
+	ItemStack item = read_item(L, 2, getServer(L)->idef());
 	bool success = co->setWieldedItem(item);
 	if (success && co->getType() == ACTIVEOBJECT_TYPE_PLAYER) {
 		getServer(L)->SendInventory(((PlayerSAO*)co));
@@ -401,7 +401,7 @@ int ObjectRef::l_get_armor_groups(lua_State *L)
 }
 
 // set_physics_override(self, physics_override_speed, physics_override_jump,
-//                      physics_override_gravity, sneak, sneak_glitch)
+//                      physics_override_gravity, sneak, sneak_glitch, new_move)
 int ObjectRef::l_set_physics_override(lua_State *L)
 {
 	NO_MAP_LOCK_REQUIRED;
@@ -410,11 +410,18 @@ int ObjectRef::l_set_physics_override(lua_State *L)
 	if (co == NULL) return 0;
 	// Do it
 	if (lua_istable(L, 2)) {
-		co->m_physics_override_speed = getfloatfield_default(L, 2, "speed", co->m_physics_override_speed);
-		co->m_physics_override_jump = getfloatfield_default(L, 2, "jump", co->m_physics_override_jump);
-		co->m_physics_override_gravity = getfloatfield_default(L, 2, "gravity", co->m_physics_override_gravity);
-		co->m_physics_override_sneak = getboolfield_default(L, 2, "sneak", co->m_physics_override_sneak);
-		co->m_physics_override_sneak_glitch = getboolfield_default(L, 2, "sneak_glitch", co->m_physics_override_sneak_glitch);
+		co->m_physics_override_speed = getfloatfield_default(
+				L, 2, "speed", co->m_physics_override_speed);
+		co->m_physics_override_jump = getfloatfield_default(
+				L, 2, "jump", co->m_physics_override_jump);
+		co->m_physics_override_gravity = getfloatfield_default(
+				L, 2, "gravity", co->m_physics_override_gravity);
+		co->m_physics_override_sneak = getboolfield_default(
+				L, 2, "sneak", co->m_physics_override_sneak);
+		co->m_physics_override_sneak_glitch = getboolfield_default(
+				L, 2, "sneak_glitch", co->m_physics_override_sneak_glitch);
+		co->m_physics_override_new_move = getboolfield_default(
+				L, 2, "new_move", co->m_physics_override_new_move);
 		co->m_physics_override_sent = false;
 	} else {
 		// old, non-table format
@@ -454,6 +461,8 @@ int ObjectRef::l_get_physics_override(lua_State *L)
 	lua_setfield(L, -2, "sneak");
 	lua_pushboolean(L, co->m_physics_override_sneak_glitch);
 	lua_setfield(L, -2, "sneak_glitch");
+	lua_pushboolean(L, co->m_physics_override_new_move);
+	lua_setfield(L, -2, "new_move");
 	return 1;
 }
 
@@ -737,7 +746,7 @@ int ObjectRef::l_set_properties(lua_State *L)
 	ObjectProperties *prop = co->accessObjectProperties();
 	if (!prop)
 		return 0;
-	read_object_properties(L, 2, prop);
+	read_object_properties(L, 2, prop, getServer(L)->idef());
 	co->notifyObjectPropertiesModified();
 	return 0;
 }
@@ -1823,7 +1832,7 @@ void ObjectRef::Register(lua_State *L)
 }
 
 const char ObjectRef::className[] = "ObjectRef";
-const luaL_reg ObjectRef::methods[] = {
+const luaL_Reg ObjectRef::methods[] = {
 	// ServerActiveObject
 	luamethod(ObjectRef, remove),
 	luamethod_aliased(ObjectRef, get_pos, getpos),

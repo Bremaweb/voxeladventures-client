@@ -62,6 +62,7 @@ struct EnumString ScriptApiNode::es_ContentParamType2[] =
 		{CPT2_COLOR, "color"},
 		{CPT2_COLORED_FACEDIR, "colorfacedir"},
 		{CPT2_COLORED_WALLMOUNTED, "colorwallmounted"},
+		{CPT2_GLASSLIKE_LIQUID_LEVEL, "glasslikeliquidlevel"},
 		{0, NULL},
 	};
 
@@ -175,6 +176,27 @@ void ScriptApiNode::node_on_destruct(v3s16 p, MapNode node)
 	push_v3s16(L, p);
 	PCALL_RES(lua_pcall(L, 1, 0, error_handler));
 	lua_pop(L, 1);  // Pop error handler
+}
+
+bool ScriptApiNode::node_on_flood(v3s16 p, MapNode node, MapNode newnode)
+{
+	SCRIPTAPI_PRECHECKHEADER
+
+	int error_handler = PUSH_ERROR_HANDLER(L);
+
+	INodeDefManager *ndef = getServer()->ndef();
+
+	// Push callback function on stack
+	if (!getItemCallback(ndef->get(node).name.c_str(), "on_flood"))
+		return false;
+
+	// Call function
+	push_v3s16(L, p);
+	pushnode(L, node, ndef);
+	pushnode(L, newnode, ndef);
+	PCALL_RES(lua_pcall(L, 3, 1, error_handler));
+	lua_remove(L, error_handler);
+	return (bool) lua_isboolean(L, -1) && (bool) lua_toboolean(L, -1) == true;
 }
 
 void ScriptApiNode::node_after_destruct(v3s16 p, MapNode node)

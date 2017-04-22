@@ -38,7 +38,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "settings.h"
 #include "profiler.h"
 #include "log.h"
-#include "scripting_game.h"
+#include "serverscripting.h"
 #include "nodedef.h"
 #include "itemdef.h"
 #include "craftdef.h"
@@ -148,11 +148,13 @@ Server::Server(
 		const SubgameSpec &gamespec,
 		bool simple_singleplayer_mode,
 		bool ipv6,
+		bool dedicated,
 		ChatInterface *iface
 	):
 	m_path_world(path_world),
 	m_gamespec(gamespec),
 	m_simple_singleplayer_mode(simple_singleplayer_mode),
+	m_dedicated(dedicated),
 	m_async_fatal_error(""),
 	m_env(NULL),
 	m_con(PROTOCOL_ID,
@@ -175,6 +177,7 @@ Server::Server(
 	m_clients(&m_con),
 	m_shutdown_requested(false),
 	m_shutdown_ask_reconnect(false),
+	m_shutdown_timer(0.0f),
 	m_admin_chat(iface),
 	m_ignore_map_edit_events(false),
 	m_ignore_map_edit_events_peer_id(0),
@@ -218,20 +221,12 @@ Server::Server(
 	std::string ban_path = m_path_world + DIR_DELIM "ipban.txt";
 	m_banmanager = new BanManager(ban_path);
 
-	ModConfiguration modconf(m_path_world);
+	ServerModConfiguration modconf(m_path_world);
 	m_mods = modconf.getMods();
 	std::vector<ModSpec> unsatisfied_mods = modconf.getUnsatisfiedMods();
 	// complain about mods with unsatisfied dependencies
-	if(!modconf.isConsistent()) {
-		for(std::vector<ModSpec>::iterator it = unsatisfied_mods.begin();
-			it != unsatisfied_mods.end(); ++it) {
-			ModSpec mod = *it;
-			errorstream << "mod \"" << mod.name << "\" has unsatisfied dependencies: ";
-			for(std::set<std::string>::iterator dep_it = mod.unsatisfied_depends.begin();
-				dep_it != mod.unsatisfied_depends.end(); ++dep_it)
-				errorstream << " \"" << *dep_it << "\"";
-			errorstream << std::endl;
-		}
+	if (!modconf.isConsistent()) {
+		modconf.printUnsatisfiedModsError();
 	}
 
 	Settings worldmt_settings;
@@ -269,22 +264,19 @@ Server::Server(
 	// Initialize scripting
 	infostream<<"Server: Initializing Lua"<<std::endl;
 
-	m_script = new GameScripting(this);
+	m_script = new ServerScripting(this);
 
-	std::string script_path = getBuiltinLuaPath() + DIR_DELIM "init.lua";
-
-	m_script->loadMod(script_path, BUILTIN_MOD_NAME);
+	m_script->loadMod(getBuiltinLuaPath() + DIR_DELIM "init.lua", BUILTIN_MOD_NAME);
 
 	// Print mods
 	infostream << "Server: Loading mods: ";
-	for(std::vector<ModSpec>::iterator i = m_mods.begin();
+	for (std::vector<ModSpec>::const_iterator i = m_mods.begin();
 			i != m_mods.end(); ++i) {
-		const ModSpec &mod = *i;
-		infostream << mod.name << " ";
+		infostream << (*i).name << " ";
 	}
 	infostream << std::endl;
 	// Load and run "mod" scripts
-	for (std::vector<ModSpec>::iterator it = m_mods.begin();
+	for (std::vector<ModSpec>::const_iterator it = m_mods.begin();
 			it != m_mods.end(); ++it) {
 		const ModSpec &mod = *it;
 		if (!string_allowed(mod.name, MODNAME_ALLOWED_CHARS)) {
@@ -609,7 +601,7 @@ void Server::AsyncRunStep(bool initial_step)
 		ScopeProfiler sp(g_profiler, "Server: liquid transform");
 
 		std::map<v3s16, MapBlock*> modified_blocks;
-		m_env->getMap().transformLiquids(modified_blocks);
+		m_env->getMap().transformLiquids(modified_blocks, m_env);
 #if 0
 		/*
 			Update lighting
@@ -642,10 +634,10 @@ void Server::AsyncRunStep(bool initial_step)
 	// send masterserver announce
 	{
 		float &counter = m_masterserver_timer;
-		if(!isSingleplayer() && (!counter || counter >= 300.0) &&
-				g_settings->getBool("server_announce"))
-		{
-			ServerList::sendAnnounce(counter ? "update" : "start",
+		if (!isSingleplayer() && (!counter || counter >= 300.0) &&
+				g_settings->getBool("server_announce")) {
+			ServerList::sendAnnounce(counter ? ServerList::AA_UPDATE :
+						ServerList::AA_START,
 					m_bind_addr.getPort(),
 					m_clients.getPlayerNames(),
 					m_uptime.get(),
@@ -653,7 +645,8 @@ void Server::AsyncRunStep(bool initial_step)
 					_max_lag,
 					m_gamespec.id,
 					Mapgen::getMapgenName(m_emerge->mgparams->mgtype),
-					m_mods);
+					m_mods,
+					m_dedicated);
 			counter = 0.01;
 		}
 		counter += dtime;
@@ -1039,6 +1032,39 @@ void Server::AsyncRunStep(bool initial_step)
 			m_env->saveMeta();
 		}
 	}
+
+	// Timed shutdown
+	static const float shutdown_msg_times[] =
+	{
+		1, 2, 3, 4, 5, 10, 15, 20, 25, 30, 45, 60, 120, 180, 300, 600, 1200, 1800, 3600
+	};
+
+	if (m_shutdown_timer > 0.0f) {
+		// Automated messages
+		if (m_shutdown_timer < shutdown_msg_times[ARRLEN(shutdown_msg_times) - 1]) {
+			for (u16 i = 0; i < ARRLEN(shutdown_msg_times) - 1; i++) {
+				// If shutdown timer matches an automessage, shot it
+				if (m_shutdown_timer > shutdown_msg_times[i] &&
+					m_shutdown_timer - dtime < shutdown_msg_times[i]) {
+					std::wstringstream ws;
+
+					ws << L"*** Server shutting down in "
+						<< duration_to_string(myround(m_shutdown_timer - dtime)).c_str()
+						<< ".";
+
+					infostream << wide_to_utf8(ws.str()).c_str() << std::endl;
+					SendChatMessage(PEER_ID_INEXISTENT, ws.str());
+					break;
+				}
+			}
+		}
+
+		m_shutdown_timer -= dtime;
+		if (m_shutdown_timer < 0.0f) {
+			m_shutdown_timer = 0.0f;
+			m_shutdown_requested = true;
+		}
+	}
 }
 
 void Server::Receive()
@@ -1121,15 +1147,14 @@ PlayerSAO* Server::StageTwoClientInit(u16 peer_id)
 	// Send inventory
 	SendInventory(playersao);
 
-	// Send HP
-	SendPlayerHPOrDie(playersao);
+	// Send HP or death screen
+	if (playersao->isDead())
+		SendDeathscreen(peer_id, false, v3f(0,0,0));
+	else
+		SendPlayerHPOrDie(playersao);
 
 	// Send Breath
 	SendPlayerBreath(playersao);
-
-	// Show death screen if necessary
-	if (playersao->isDead())
-		SendDeathscreen(peer_id, false, v3f(0,0,0));
 
 	// Note things in chat if not in simple singleplayer mode
 	if (!m_simple_singleplayer_mode && g_settings->getBool("show_statusline_on_connect")) {
@@ -1653,7 +1678,7 @@ void Server::SendChatMessage(u16 peer_id, const std::wstring &message)
 		Send(&pkt);
 	}
 	else {
-		m_clients.sendToAll(0, &pkt, true);
+		m_clients.sendToAll(&pkt);
 	}
 }
 
@@ -1772,7 +1797,7 @@ void Server::SendDeleteParticleSpawner(u16 peer_id, u32 id)
 		Send(&pkt);
 	}
 	else {
-		m_clients.sendToAll(0, &pkt, true);
+		m_clients.sendToAll(&pkt);
 	}
 
 }
@@ -1877,7 +1902,7 @@ void Server::SendTimeOfDay(u16 peer_id, u16 time, f32 time_speed)
 	pkt << time << time_speed;
 
 	if (peer_id == PEER_ID_INEXISTENT) {
-		m_clients.sendToAll(0, &pkt, true);
+		m_clients.sendToAll(&pkt);
 	}
 	else {
 		Send(&pkt);
@@ -2178,14 +2203,6 @@ void Server::sendAddNode(v3s16 p, MapNode n, u16 ignore_id,
 		if (client != 0) {
 			pkt << p << n.param0 << n.param1 << n.param2
 					<< (u8) (remove_metadata ? 0 : 1);
-
-			if (!remove_metadata) {
-				if (client->net_proto_version <= 21) {
-					// Old clients always clear metadata; fix it
-					// by sending the full block again.
-					client->SetBlockNotSent(getNodeBlockPos(p));
-				}
-			}
 		}
 		m_clients.unlock();
 
@@ -2219,7 +2236,7 @@ void Server::SendBlockNoLock(u16 peer_id, MapBlock *block, u8 ver, u16 net_proto
 
 	std::ostringstream os(std::ios_base::binary);
 	block->serialize(os, ver, false);
-	block->serializeNetworkSpecific(os, net_proto_version);
+	block->serializeNetworkSpecific(os);
 	std::string s = os.str();
 
 	NetworkPacket pkt(TOCLIENT_BLOCKDATA, 2 + 2 + 2 + 2 + s.size(), peer_id);
@@ -2559,7 +2576,7 @@ void Server::sendDetachedInventory(const std::string &name, u16 peer_id)
 	const std::string &check = m_detached_inventories_player[name];
 	if (peer_id == PEER_ID_INEXISTENT) {
 		if (check == "")
-			return m_clients.sendToAll(0, &pkt, true);
+			return m_clients.sendToAll(&pkt);
 		RemotePlayer *p = m_env->getPlayer(check.c_str());
 		if (p)
 			m_clients.send(p->peer_id, 0, &pkt, true);
@@ -2860,25 +2877,14 @@ std::wstring Server::handleChat(const std::string &name, const std::wstring &wna
 	// Whether to send line to the player that sent the message, or to all players
 	bool broadcast_line = true;
 
-	// Commands are implemented in Lua, so only catch invalid
-	// commands that were not "eaten" and send an error back
-	if (wmessage[0] == L'/') {
-		std::wstring wcmd = wmessage.substr(1);
+	if (check_shout_priv && !checkPriv(name, "shout")) {
+		line += L"-!- You don't have permission to shout.";
 		broadcast_line = false;
-		if (wcmd.length() == 0)
-			line += L"-!- Empty command";
-		else
-			line += L"-!- Invalid command: " + str_split(wcmd, L' ')[0];
 	} else {
-		if (check_shout_priv && !checkPriv(name, "shout")) {
-			line += L"-!- You don't have permission to shout.";
-			broadcast_line = false;
-		} else {
-			line += L"<";
-			line += wname;
-			line += L"> ";
-			line += wmessage;
-		}
+		line += L"<";
+		line += wname;
+		line += L"> ";
+		line += wmessage;
 	}
 
 	/*
@@ -3495,6 +3501,43 @@ v3f Server::findSpawnPos()
 	return nodeposf;
 }
 
+void Server::requestShutdown(const std::string &msg, bool reconnect, float delay)
+{
+	m_shutdown_timer = delay;
+	m_shutdown_msg = msg;
+	m_shutdown_ask_reconnect = reconnect;
+
+	if (delay == 0.0f) {
+	// No delay, shutdown immediately
+		m_shutdown_requested = true;
+		// only print to the infostream, a chat message saying 
+		// "Server Shutting Down" is sent when the server destructs.
+		infostream << "*** Immediate Server shutdown requested." << std::endl;
+	} else if (delay < 0.0f && m_shutdown_timer > 0.0f) {
+	// Negative delay, cancel shutdown if requested
+		m_shutdown_timer = 0.0f;
+		m_shutdown_msg = "";
+		m_shutdown_ask_reconnect = false;
+		m_shutdown_requested = false;
+		std::wstringstream ws;
+
+		ws << L"*** Server shutdown canceled.";
+
+		infostream << wide_to_utf8(ws.str()).c_str() << std::endl;
+		SendChatMessage(PEER_ID_INEXISTENT, ws.str());
+	} else if (delay > 0.0f) {
+	// Positive delay, tell the clients when the server will shut down
+		std::wstringstream ws;
+
+		ws << L"*** Server shutting down in "
+				<< duration_to_string(myround(m_shutdown_timer)).c_str()
+				<< ".";
+
+		infostream << wide_to_utf8(ws.str()).c_str() << std::endl;
+		SendChatMessage(PEER_ID_INEXISTENT, ws.str());
+	}
+}
+
 PlayerSAO* Server::emergePlayer(const char *name, u16 peer_id, u16 proto_version)
 {
 	bool newplayer = false;
@@ -3609,15 +3652,8 @@ void dedicated_server_loop(Server &server, bool &kill)
 		}
 		server.step(steplen);
 
-		if(server.getShutdownRequested() || kill)
-		{
-			infostream<<"Dedicated server quitting"<<std::endl;
-#if USE_CURL
-			if(g_settings->getBool("server_announce"))
-				ServerList::sendAnnounce("delete", server.m_bind_addr.getPort());
-#endif
+		if (server.getShutdownRequested() || kill)
 			break;
-		}
 
 		/*
 			Profiler
@@ -3631,4 +3667,11 @@ void dedicated_server_loop(Server &server, bool &kill)
 			}
 		}
 	}
+
+	infostream << "Dedicated server quitting" << std::endl;
+#if USE_CURL
+	if (g_settings->getBool("server_announce"))
+		ServerList::sendAnnounce(ServerList::AA_DELETE,
+			server.m_bind_addr.getPort());
+#endif
 }

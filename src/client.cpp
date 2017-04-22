@@ -34,165 +34,24 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "ambiance.h"
 #include "network/clientopcodes.h"
 #include "filesys.h"
-#include "porting.h"
 #include "mapblock_mesh.h"
 #include "mapblock.h"
 #include "minimap.h"
-#include "settings.h"
+#include "mods.h"
 #include "profiler.h"
 #include "gettext.h"
-#include "log.h"
-#include "nodemetadata.h"
-#include "itemdef.h"
-#include "shader.h"
 #include "clientmap.h"
 #include "clientmedia.h"
-#include "sound.h"
-#include "IMeshCache.h"
-#include "config.h"
 #include "version.h"
 #include "drawscene.h"
 #include "database-sqlite3.h"
 #include "serialization.h"
 #include "guiscalingfilter.h"
-#include "raycast.h"
+#include "script/clientscripting.h"
+#include "game.h"
 
 
 extern gui::IGUIEnvironment* guienv;
-
-/*
-	QueuedMeshUpdate
-*/
-
-QueuedMeshUpdate::QueuedMeshUpdate():
-	p(-1337,-1337,-1337),
-	data(NULL),
-	ack_block_to_server(false)
-{
-}
-
-QueuedMeshUpdate::~QueuedMeshUpdate()
-{
-	if(data)
-		delete data;
-}
-
-/*
-	MeshUpdateQueue
-*/
-
-MeshUpdateQueue::MeshUpdateQueue()
-{
-}
-
-MeshUpdateQueue::~MeshUpdateQueue()
-{
-	MutexAutoLock lock(m_mutex);
-
-	for(std::vector<QueuedMeshUpdate*>::iterator
-			i = m_queue.begin();
-			i != m_queue.end(); ++i)
-	{
-		QueuedMeshUpdate *q = *i;
-		delete q;
-	}
-}
-
-/*
-	peer_id=0 adds with nobody to send to
-*/
-void MeshUpdateQueue::addBlock(v3s16 p, MeshMakeData *data, bool ack_block_to_server, bool urgent)
-{
-	DSTACK(FUNCTION_NAME);
-
-	assert(data);	// pre-condition
-
-	MutexAutoLock lock(m_mutex);
-
-	if(urgent)
-		m_urgents.insert(p);
-
-	/*
-		Find if block is already in queue.
-		If it is, update the data and quit.
-	*/
-	for(std::vector<QueuedMeshUpdate*>::iterator
-			i = m_queue.begin();
-			i != m_queue.end(); ++i)
-	{
-		QueuedMeshUpdate *q = *i;
-		if(q->p == p)
-		{
-			if(q->data)
-				delete q->data;
-			q->data = data;
-			if(ack_block_to_server)
-				q->ack_block_to_server = true;
-			return;
-		}
-	}
-
-	/*
-		Add the block
-	*/
-	QueuedMeshUpdate *q = new QueuedMeshUpdate;
-	q->p = p;
-	q->data = data;
-	q->ack_block_to_server = ack_block_to_server;
-	m_queue.push_back(q);
-}
-
-// Returned pointer must be deleted
-// Returns NULL if queue is empty
-QueuedMeshUpdate *MeshUpdateQueue::pop()
-{
-	MutexAutoLock lock(m_mutex);
-
-	bool must_be_urgent = !m_urgents.empty();
-	for(std::vector<QueuedMeshUpdate*>::iterator
-			i = m_queue.begin();
-			i != m_queue.end(); ++i)
-	{
-		QueuedMeshUpdate *q = *i;
-		if(must_be_urgent && m_urgents.count(q->p) == 0)
-			continue;
-		m_queue.erase(i);
-		m_urgents.erase(q->p);
-		return q;
-	}
-	return NULL;
-}
-
-/*
-	MeshUpdateThread
-*/
-
-void MeshUpdateThread::enqueueUpdate(v3s16 p, MeshMakeData *data,
-		bool ack_block_to_server, bool urgent)
-{
-	m_queue_in.addBlock(p, data, ack_block_to_server, urgent);
-	deferUpdate();
-}
-
-void MeshUpdateThread::doUpdate()
-{
-	QueuedMeshUpdate *q;
-	while ((q = m_queue_in.pop())) {
-
-		ScopeProfiler sp(g_profiler, "Client: Mesh making");
-
-		MapBlockMesh *mesh_new = new MapBlockMesh(q->data, m_camera_offset);
-
-		MeshUpdateResult r;
-		r.p = q->p;
-		r.mesh = mesh_new;
-		r.ack_block_to_server = q->ack_block_to_server;
-
-		m_queue_out.push_back(r);
-
-		delete q;
-	}
-}
 
 /*
 	Client
@@ -201,7 +60,7 @@ void MeshUpdateThread::doUpdate()
 Client::Client(
 		IrrlichtDevice *device,
 		const char *playername,
-		std::string password,
+		const std::string &password,
 		MapDrawControl &control,
 		IWritableTextureSource *tsrc,
 		IWritableShaderSource *shsrc,
@@ -209,7 +68,8 @@ Client::Client(
 		IWritableNodeDefManager *nodedef,
 		ISoundManager *sound,
 		MtEventManager *event,
-		bool ipv6
+		bool ipv6,
+		GameUIFlags *game_ui_flags
 ):
 	m_packetcounter_timer(0.0),
 	m_connection_reinit_timer(0.1),
@@ -222,7 +82,7 @@ Client::Client(
 	m_nodedef(nodedef),
 	m_sound(sound),
 	m_event(event),
-	m_mesh_update_thread(),
+	m_mesh_update_thread(this),
 	m_env(
 		new ClientMap(this, control,
 			device->getSceneManager()->getRootSceneNode(),
@@ -259,26 +119,94 @@ Client::Client(
 	m_recommended_send_interval(0.1),
 	m_removed_sounds_check_timer(0),
 	m_state(LC_Created),
-	m_localdb(NULL)
+	m_localdb(NULL),
+	m_script(NULL),
+	m_mod_storage_save_timer(10.0f),
+	m_game_ui_flags(game_ui_flags),
+	m_shutdown(false)
 {
 	// Add local player
 	m_env.setLocalPlayer(new LocalPlayer(this, playername));
 
-	m_mapper = new Mapper(device, this);
+	m_minimap = new Minimap(device, this);
 	m_cache_save_interval = g_settings->getU16("server_map_save_interval");
 
-	m_cache_smooth_lighting = g_settings->getBool("smooth_lighting");
-	m_cache_enable_shaders  = g_settings->getBool("enable_shaders");
+	m_modding_enabled = g_settings->getBool("enable_client_modding");
+	m_script = new ClientScripting(this);
+	m_env.setScript(m_script);
+	m_script->setEnv(&m_env);
+}
 
-	m_ambiance = new Ambiance(m_sound, m_env);
+void Client::initMods()
+{
+	m_script->loadMod(getBuiltinLuaPath() + DIR_DELIM "init.lua", BUILTIN_MOD_NAME);
 
-	m_cache_use_tangent_vertices = m_cache_enable_shaders && (
-		g_settings->getBool("enable_bumpmapping") ||
-		g_settings->getBool("enable_parallax_occlusion"));
+	// If modding is not enabled, don't load mods, just builtin
+	if (!m_modding_enabled) {
+		return;
+	}
+
+	ClientModConfiguration modconf(getClientModsLuaPath());
+	std::vector<ModSpec> mods = modconf.getMods();
+	std::vector<ModSpec> unsatisfied_mods = modconf.getUnsatisfiedMods();
+	// complain about mods with unsatisfied dependencies
+	if (!modconf.isConsistent()) {
+		modconf.printUnsatisfiedModsError();
+	}
+
+	// Print mods
+	infostream << "Client Loading mods: ";
+	for (std::vector<ModSpec>::const_iterator i = mods.begin();
+		i != mods.end(); ++i) {
+		infostream << (*i).name << " ";
+	}
+
+	infostream << std::endl;
+	// Load and run "mod" scripts
+	for (std::vector<ModSpec>::const_iterator it = mods.begin();
+		it != mods.end(); ++it) {
+		const ModSpec &mod = *it;
+		if (!string_allowed(mod.name, MODNAME_ALLOWED_CHARS)) {
+			throw ModError("Error loading mod \"" + mod.name +
+				"\": Mod name does not follow naming conventions: "
+					"Only chararacters [a-z0-9_] are allowed.");
+		}
+		std::string script_path = mod.path + DIR_DELIM + "init.lua";
+		infostream << "  [" << padStringRight(mod.name, 12) << "] [\""
+			<< script_path << "\"]" << std::endl;
+		m_script->loadMod(script_path, mod.name);
+	}
+}
+
+const std::string &Client::getBuiltinLuaPath()
+{
+	static const std::string builtin_dir = porting::path_share + DIR_DELIM + "builtin";
+	return builtin_dir;
+}
+
+const std::string &Client::getClientModsLuaPath()
+{
+	static const std::string clientmods_dir = porting::path_share + DIR_DELIM + "clientmods";
+	return clientmods_dir;
+}
+
+const std::vector<ModSpec>& Client::getMods() const
+{
+	static std::vector<ModSpec> client_modspec_temp;
+	return client_modspec_temp;
+}
+
+const ModSpec* Client::getModSpec(const std::string &modname) const
+{
+	return NULL;
+>>>>>>> minetest/master
 }
 
 void Client::Stop()
 {
+	m_shutdown = true;
+	// Don't disable this part when modding is disabled, it's used in builtin
+	m_script->on_shutdown();
 	//request all client managed threads to stop
 	m_mesh_update_thread.stop();
 	// Save local server map
@@ -286,18 +214,18 @@ void Client::Stop()
 		infostream << "Local map saving ended." << std::endl;
 		m_localdb->endSave();
 	}
+
+	delete m_script;
 }
 
 bool Client::isShutdown()
 {
-
-	if (!m_mesh_update_thread.isRunning()) return true;
-
-	return false;
+	return m_shutdown || !m_mesh_update_thread.isRunning();
 }
 
 Client::~Client()
 {
+	m_shutdown = true;
 	m_con.Disconnect();
 
 	m_mesh_update_thread.stop();
@@ -326,7 +254,7 @@ Client::~Client()
 			m_device->getSceneManager()->getMeshCache()->removeMesh(mesh);
 	}
 
-	delete m_mapper;
+	delete m_minimap;
 }
 
 void Client::connect(Address address,
@@ -568,20 +496,24 @@ void Client::step(float dtime)
 					minimap_mapblock = r.mesh->moveMinimapMapblock();
 					if (minimap_mapblock == NULL)
 						do_mapper_update = false;
-				}
 
-				if (r.mesh && r.mesh->getMesh()->getMeshBufferCount() == 0) {
-					delete r.mesh;
-				} else {
-					// Replace with the new mesh
-					block->mesh = r.mesh;
+					bool is_empty = true;
+					for (int l = 0; l < MAX_TILE_LAYERS; l++)
+						if (r.mesh->getMesh(l)->getMeshBufferCount() != 0)
+							is_empty = false;
+
+					if (is_empty)
+						delete r.mesh;
+					else
+						// Replace with the new mesh
+						block->mesh = r.mesh;
 				}
 			} else {
 				delete r.mesh;
 			}
 
 			if (do_mapper_update)
-				m_mapper->addBlock(r.p, minimap_mapblock);
+				m_minimap->addBlock(r.p, minimap_mapblock);
 
 			if (r.ack_block_to_server) {
 				/*
@@ -673,6 +605,18 @@ void Client::step(float dtime)
 		// Sync to server
 		if(!removed_server_ids.empty()) {
 			sendRemovedSounds(removed_server_ids);
+		}
+	}
+
+	m_mod_storage_save_timer -= dtime;
+	if (m_mod_storage_save_timer <= 0.0f) {
+		verbosestream << "Saving registered mod storages." << std::endl;
+		m_mod_storage_save_timer = g_settings->getFloat("server_map_save_interval");
+		for (UNORDERED_MAP<std::string, ModMetadata *>::const_iterator
+				it = m_mod_storages.begin(); it != m_mod_storages.end(); ++it) {
+			if (it->second->isModified()) {
+				it->second->save(getModStoragePath());
+			}
 		}
 	}
 
@@ -1401,6 +1345,11 @@ void Client::removeNode(v3s16 p)
 	}
 }
 
+MapNode Client::getNode(v3s16 p, bool *is_valid_position)
+{
+	return m_env.getMap().getNodeNoEx(p, is_valid_position);
+}
+
 void Client::addNode(v3s16 p, MapNode n, bool remove_metadata)
 {
 	//TimeTaker timer1("Client::addNode()");
@@ -1522,6 +1471,11 @@ int Client::getCrackLevel()
 	return m_crack_level;
 }
 
+v3s16 Client::getCrackPos()
+{
+	return m_crack_pos;
+}
+
 void Client::setCrack(int level, v3s16 pos)
 {
 	int old_crack_level = m_crack_level;
@@ -1564,50 +1518,37 @@ void Client::typeChatMessage(const std::wstring &message)
 	if(message == L"")
 		return;
 
+	// If message was ate by script API, don't send it to server
+	if (m_script->on_sending_message(wide_to_utf8(message))) {
+		return;
+	}
+
 	// Send to others
 	sendChatMessage(message);
 
 	// Show locally
-	if (message[0] == L'/')
-	{
-		m_chat_queue.push((std::wstring)L"issued command: " + message);
-	}
-	else
+	if (message[0] != L'/')
 	{
 		// compatibility code
 		if (m_proto_ver < 29) {
 			LocalPlayer *player = m_env.getLocalPlayer();
 			assert(player != NULL);
 			std::wstring name = narrow_to_wide(player->getName());
-			m_chat_queue.push((std::wstring)L"<" + name + L"> " + message);
+			pushToChatQueue((std::wstring)L"<" + name + L"> " + message);
 		}
 	}
 }
 
 void Client::addUpdateMeshTask(v3s16 p, bool ack_to_server, bool urgent)
 {
+	// Check if the block exists to begin with. In the case when a non-existing
+	// neighbor is automatically added, it may not. In that case we don't want
+	// to tell the mesh update thread about it.
 	MapBlock *b = m_env.getMap().getBlockNoCreateNoEx(p);
-	if(b == NULL)
+	if (b == NULL)
 		return;
 
-	/*
-		Create a task to update the mesh of the block
-	*/
-
-	MeshMakeData *data = new MeshMakeData(this, m_cache_enable_shaders,
-		m_cache_use_tangent_vertices);
-
-	{
-		//TimeTaker timer("data fill");
-		// Release: ~0ms
-		// Debug: 1-6ms, avg=2ms
-		data->fill(b);
-		data->setCrack(m_crack_level, m_crack_pos);
-		data->setSmoothLighting(m_cache_smooth_lighting);
-	}
-
-	// Add task to queue
-	m_mesh_update_thread.enqueueUpdate(p, data, ack_to_server, urgent);
+	m_mesh_update_thread.updateBlock(&m_env.getMap(), p, ack_to_server, urgent);
 }
 
 void Client::addUpdateMeshTaskWithEdge(v3s16 blockpos, bool ack_to_server, bool urgent)
@@ -1698,6 +1639,7 @@ typedef struct TextureUpdateArgs {
 	u32 last_time_ms;
 	u16 last_percent;
 	const wchar_t* text_base;
+	ITextureSource *tsrc;
 } TextureUpdateArgs;
 
 void texture_update_progress(void *args, u32 progress, u32 max_progress)
@@ -1719,8 +1661,8 @@ void texture_update_progress(void *args, u32 progress, u32 max_progress)
 			targs->last_time_ms = time_ms;
 			std::basic_stringstream<wchar_t> strm;
 			strm << targs->text_base << " " << targs->last_percent << "%...";
-			draw_load_screen(strm.str(), targs->device, targs->guienv, 0,
-				72 + (u16) ((18. / 100.) * (double) targs->last_percent));
+			draw_load_screen(strm.str(), targs->device, targs->guienv, targs->tsrc, 0,
+				72 + (u16) ((18. / 100.) * (double) targs->last_percent), true);
 		}
 }
 
@@ -1740,21 +1682,21 @@ void Client::afterContentReceived(IrrlichtDevice *device)
 
 	// Rebuild inherited images and recreate textures
 	infostream<<"- Rebuilding images and textures"<<std::endl;
-	draw_load_screen(text,device, guienv, 0, 70);
+	draw_load_screen(text,device, guienv, m_tsrc, 0, 70);
 	m_tsrc->rebuildImagesAndTextures();
 	delete[] text;
 
 	// Rebuild shaders
 	infostream<<"- Rebuilding shaders"<<std::endl;
 	text = wgettext("Rebuilding shaders...");
-	draw_load_screen(text, device, guienv, 0, 71);
+	draw_load_screen(text, device, guienv, m_tsrc, 0, 71);
 	m_shsrc->rebuildShaders();
 	delete[] text;
 
 	// Update node aliases
 	infostream<<"- Updating node aliases"<<std::endl;
 	text = wgettext("Initializing nodes...");
-	draw_load_screen(text, device, guienv, 0, 72);
+	draw_load_screen(text, device, guienv, m_tsrc, 0, 72);
 	m_nodedef->updateAliases(m_itemdef);
 	std::string texture_path = g_settings->get("texture_path");
 	if (texture_path != "" && fs::IsDir(texture_path))
@@ -1771,6 +1713,7 @@ void Client::afterContentReceived(IrrlichtDevice *device)
 	tu_args.last_time_ms = getTimeMs();
 	tu_args.last_percent = 0;
 	tu_args.text_base =  wgettext("Initializing nodes");
+	tu_args.tsrc = m_tsrc;
 	m_nodedef->updateTextures(this, texture_update_progress, &tu_args);
 	delete[] tu_args.text_base;
 
@@ -1780,27 +1723,27 @@ void Client::afterContentReceived(IrrlichtDevice *device)
 
 	m_state = LC_Ready;
 	sendReady();
+
+	if (g_settings->getBool("enable_client_modding")) {
+		m_script->on_client_ready(m_env.getLocalPlayer());
+		m_script->on_connect();
+	}
+
 	text = wgettext("Done!");
-	draw_load_screen(text, device, guienv, 0, 100);
+	draw_load_screen(text, device, guienv, m_tsrc, 0, 100);
 	infostream<<"Client::afterContentReceived() done"<<std::endl;
 	delete[] text;
 }
 
-float Client::getRTT(void)
+float Client::getRTT()
 {
 	return m_con.getPeerStat(PEER_ID_SERVER,con::AVG_RTT);
 }
 
-float Client::getCurRate(void)
+float Client::getCurRate()
 {
 	return ( m_con.getLocalStat(con::CUR_INC_RATE) +
 			m_con.getLocalStat(con::CUR_DL_RATE));
-}
-
-float Client::getAvgRate(void)
-{
-	return ( m_con.getLocalStat(con::AVG_INC_RATE) +
-			m_con.getLocalStat(con::AVG_DL_RATE));
 }
 
 void Client::makeScreenshot(IrrlichtDevice *device)
@@ -1853,13 +1796,48 @@ void Client::makeScreenshot(IrrlichtDevice *device)
 			} else {
 				sstr << "Failed to save screenshot '" << filename << "'";
 			}
-			m_chat_queue.push(narrow_to_wide(sstr.str()));
+			pushToChatQueue(narrow_to_wide(sstr.str()));
 			infostream << sstr.str() << std::endl;
 			image->drop();
 		}
 	}
 
 	raw_image->drop();
+}
+
+bool Client::shouldShowMinimap() const
+{
+	return !m_minimap_disabled_by_server;
+}
+
+void Client::showGameChat(const bool show)
+{
+	m_game_ui_flags->show_chat = show;
+}
+
+void Client::showGameHud(const bool show)
+{
+	m_game_ui_flags->show_hud = show;
+}
+
+void Client::showMinimap(const bool show)
+{
+	m_game_ui_flags->show_minimap = show;
+}
+
+void Client::showProfiler(const bool show)
+{
+	m_game_ui_flags->show_profiler_graph = show;
+}
+
+void Client::showGameFog(const bool show)
+{
+	m_game_ui_flags->force_fog_off = !show;
+}
+
+void Client::showGameDebug(const bool show)
+{
+	m_game_ui_flags->show_debug = show;
 }
 
 // IGameDef interface
@@ -1938,3 +1916,31 @@ scene::IAnimatedMesh* Client::getMesh(const std::string &filename)
 	smgr->getMeshCache()->removeMesh(mesh);
 	return mesh;
 }
+
+bool Client::registerModStorage(ModMetadata *storage)
+{
+	if (m_mod_storages.find(storage->getModName()) != m_mod_storages.end()) {
+		errorstream << "Unable to register same mod storage twice. Storage name: "
+				<< storage->getModName() << std::endl;
+		return false;
+	}
+
+	m_mod_storages[storage->getModName()] = storage;
+	return true;
+}
+
+void Client::unregisterModStorage(const std::string &name)
+{
+	UNORDERED_MAP<std::string, ModMetadata *>::const_iterator it = m_mod_storages.find(name);
+	if (it != m_mod_storages.end()) {
+		// Save unconditionaly on unregistration
+		it->second->save(getModStoragePath());
+		m_mod_storages.erase(name);
+	}
+}
+
+std::string Client::getModStoragePath() const
+{
+	return porting::path_user + DIR_DELIM + "client" + DIR_DELIM + "mod_storage";
+}
+

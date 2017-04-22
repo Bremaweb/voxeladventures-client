@@ -254,6 +254,7 @@ public:
 	InventoryLocation getInventoryLocation() const;
 	std::string getWieldList() const;
 	ItemStack getWieldedItem() const;
+	ItemStack getWieldedItemOrHand() const;
 	bool setWieldedItem(const ItemStack &item);
 	int getWieldIndex() const;
 	void setWieldIndex(int i);
@@ -374,6 +375,7 @@ private:
 	// Timers
 	IntervalLimiter m_breathing_interval;
 	IntervalLimiter m_drowning_interval;
+	IntervalLimiter m_node_hurt_interval;
 
 	int m_wield_index;
 	bool m_position_not_sent;
@@ -395,6 +397,7 @@ public:
 	float m_physics_override_gravity;
 	bool m_physics_override_sneak;
 	bool m_physics_override_sneak_glitch;
+	bool m_physics_override_new_move;
 	bool m_physics_override_sent;
 };
 

@@ -30,6 +30,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "server.h"
 #include "util/strfnd.h"
 #include "network/clientopcodes.h"
+#include "script/clientscripting.h"
 #include "util/serialize.h"
 #include "util/srp.h"
 #include "tileanimation.h"
@@ -141,7 +142,7 @@ void Client::handleCommand_AcceptSudoMode(NetworkPacket* pkt)
 }
 void Client::handleCommand_DenySudoMode(NetworkPacket* pkt)
 {
-	m_chat_queue.push(L"Password change denied. Password NOT changed.");
+	pushToChatQueue(L"Password change denied. Password NOT changed.");
 	// reset everything and be sad
 	deleteAuthData();
 }
@@ -411,7 +412,10 @@ void Client::handleCommand_ChatMessage(NetworkPacket* pkt)
 		message += (wchar_t)read_wchar;
 	}
 
-	m_chat_queue.push(message);
+	// If chat message not consummed by client lua API
+	if (!moddingEnabled() || !m_script->on_receiving_message(wide_to_utf8(message))) {
+		pushToChatQueue(message);
+	}
 }
 
 void Client::handleCommand_ActiveObjectRemoveAdd(NetworkPacket* pkt)
@@ -522,6 +526,10 @@ void Client::handleCommand_HP(NetworkPacket* pkt)
 
 	player->hp = hp;
 
+	if (moddingEnabled()) {
+		m_script->on_hp_modification(hp);
+	}
+
 	if (hp < oldhp) {
 		// Add to ClientEvent queue
 		ClientEvent event;
@@ -577,11 +585,6 @@ void Client::handleCommand_MovePlayer(NetworkPacket* pkt)
 	// Ignore damage for a few seconds, so that the player doesn't
 	// get damage from falling on ground
 	m_ignore_damage_timer = 3.0;
-}
-
-void Client::handleCommand_PlayerItem(NetworkPacket* pkt)
-{
-	warningstream << "Client: Ignoring TOCLIENT_PLAYERITEM" << std::endl;
 }
 
 void Client::handleCommand_DeathScreen(NetworkPacket* pkt)
@@ -710,11 +713,6 @@ void Client::handleCommand_Media(NetworkPacket* pkt)
 	}
 }
 
-void Client::handleCommand_ToolDef(NetworkPacket* pkt)
-{
-	warningstream << "Client: Ignoring TOCLIENT_TOOLDEF" << std::endl;
-}
-
 void Client::handleCommand_NodeDef(NetworkPacket* pkt)
 {
 	infostream << "Client: Received node definitions: packet size: "
@@ -725,9 +723,7 @@ void Client::handleCommand_NodeDef(NetworkPacket* pkt)
 	sanity_check(!m_mesh_update_thread.isRunning());
 
 	// Decompress node definitions
-	std::string datastring(pkt->getString(0), pkt->getSize());
-	std::istringstream is(datastring, std::ios_base::binary);
-	std::istringstream tmp_is(deSerializeLongString(is), std::ios::binary);
+	std::istringstream tmp_is(pkt->readLongString(), std::ios::binary);
 	std::ostringstream tmp_os;
 	decompressZlib(tmp_is, tmp_os);
 
@@ -735,11 +731,6 @@ void Client::handleCommand_NodeDef(NetworkPacket* pkt)
 	std::istringstream tmp_is2(tmp_os.str());
 	m_nodedef->deSerialize(tmp_is2);
 	m_nodedef_received = true;
-}
-
-void Client::handleCommand_CraftItemDef(NetworkPacket* pkt)
-{
-	warningstream << "Client: Ignoring TOCLIENT_CRAFTITEMDEF" << std::endl;
 }
 
 void Client::handleCommand_ItemDef(NetworkPacket* pkt)
@@ -752,9 +743,7 @@ void Client::handleCommand_ItemDef(NetworkPacket* pkt)
 	sanity_check(!m_mesh_update_thread.isRunning());
 
 	// Decompress item definitions
-	std::string datastring(pkt->getString(0), pkt->getSize());
-	std::istringstream is(datastring, std::ios_base::binary);
-	std::istringstream tmp_is(deSerializeLongString(is), std::ios::binary);
+	std::istringstream tmp_is(pkt->readLongString(), std::ios::binary);
 	std::ostringstream tmp_os;
 	decompressZlib(tmp_is, tmp_os);
 
@@ -1153,7 +1142,7 @@ void Client::handleCommand_HudSetFlags(NetworkPacket* pkt)
 	if (m_minimap_disabled_by_server && was_minimap_visible) {
 		// defers a minimap update, therefore only call it if really
 		// needed, by checking that minimap was visible before
-		m_mapper->setMinimapMode(MINIMAP_MODE_OFF);
+		m_minimap->setMinimapMode(MINIMAP_MODE_OFF);
 	}
 }
 

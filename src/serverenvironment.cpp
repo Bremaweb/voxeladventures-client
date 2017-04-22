@@ -28,7 +28,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "profiler.h"
 #include "raycast.h"
 #include "remoteplayer.h"
-#include "scripting_game.h"
+#include "serverscripting.h"
 #include "server.h"
 #include "voxelalgorithms.h"
 #include "util/serialize.h"
@@ -352,8 +352,9 @@ void ActiveBlockList::update(std::vector<v3s16> &active_positions,
 */
 
 ServerEnvironment::ServerEnvironment(ServerMap *map,
-	GameScripting *scriptIface, Server *server,
-	const std::string &path_world) :
+	ServerScripting *scriptIface, Server *server,
+	const std::string &path_world):
+	Environment(server),
 	m_map(map),
 	m_script(scriptIface),
 	m_server(server),
@@ -1667,7 +1668,7 @@ u16 ServerEnvironment::addActiveObjectRaw(ServerActiveObject *object,
 
 	if (objectpos_over_limit(object->getBasePosition())) {
 		v3f p = object->getBasePosition();
-		errorstream << "ServerEnvironment::addActiveObjectRaw(): "
+		warningstream << "ServerEnvironment::addActiveObjectRaw(): "
 			<< "object position (" << p.X << "," << p.Y << "," << p.Z
 			<< ") outside maximum range" << std::endl;
 		if (object->environmentDeletes())
@@ -1941,11 +1942,14 @@ void ServerEnvironment::activateObjects(MapBlock *block, u32 dtime_s)
 
 	If block wasn't generated (not in memory or on disk),
 */
-void ServerEnvironment::deactivateFarObjects(bool force_delete)
+void ServerEnvironment::deactivateFarObjects(bool _force_delete)
 {
 	std::vector<u16> objects_to_remove;
 	for(ActiveObjectMap::iterator i = m_active_objects.begin();
 		i != m_active_objects.end(); ++i) {
+		// force_delete might be overriden per object
+		bool force_delete = _force_delete;
+
 		ServerActiveObject* obj = i->second;
 		assert(obj);
 
@@ -2144,13 +2148,6 @@ void ServerEnvironment::deactivateFarObjects(bool force_delete)
 				<<"; not deleting yet"<<std::endl;
 
 			obj->m_pending_deactivation = true;
-			continue;
-		}
-
-		if (!force_delete && obj->getType() == ACTIVEOBJECT_TYPE_PLAYER) {
-			warningstream << "ServerEnvironment::deactivateFarObjects(): "
-				<< "Trying to delete player object, THIS SHOULD NEVER HAPPEN!"
-				<< std::endl;
 			continue;
 		}
 

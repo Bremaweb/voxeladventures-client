@@ -7,20 +7,20 @@ msgstr ""
 "Project-Id-Version: minetest\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2016-08-30 06:18+0200\n"
-"PO-Revision-Date: 2016-06-11 10:56+0000\n"
-"Last-Translator: arsdragonfly <arsdragonfly@gmail.com>\n"
-"Language-Team: Chinese (China) <https://hosted.weblate.org/projects/minetest/"
-"minetest/zh_CN/>\n"
+"PO-Revision-Date: 2017-02-26 14:56+0000\n"
+"Last-Translator: 黄冠恒 <gauntHanHuang@foxmail.com>\n"
+"Language-Team: Chinese (China) "
+"<https://hosted.weblate.org/projects/minetest/minetest/zh_CN/>\n"
 "Language: zh_CN\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
-"X-Generator: Weblate 2.7-dev\n"
+"X-Generator: Weblate 2.12-dev\n"
 
 #: builtin/fstk/ui.lua
 msgid "An error occured in a Lua script, such as a mod:"
-msgstr "Lua 脚本发生错误，如一个 mod："
+msgstr "Lua 脚本发生错误，如一个模组："
 
 #: builtin/fstk/ui.lua
 msgid "An error occured:"
@@ -435,7 +435,7 @@ msgstr "用户名/密码"
 
 #: builtin/mainmenu/tab_multiplayer.lua builtin/mainmenu/tab_simple_main.lua
 msgid "PvP enabled"
-msgstr "启用 PvP"
+msgstr "启用玩家互相攻击"
 
 #: builtin/mainmenu/tab_server.lua
 msgid "Bind Address"
@@ -565,9 +565,8 @@ msgid "Node Highlighting"
 msgstr "节点高亮"
 
 #: builtin/mainmenu/tab_settings.lua
-#, fuzzy
 msgid "Node Outlining"
-msgstr "方块高亮"
+msgstr "方块轮廓"
 
 #: builtin/mainmenu/tab_settings.lua builtin/mainmenu/tab_texturepacks.lua
 msgid "None"
@@ -1463,7 +1462,7 @@ msgstr "自动报告到服务器列表。"
 
 #: src/settings_translation_file.cpp
 msgid "Autorun key"
-msgstr ""
+msgstr "自动奔跑键"
 
 #: src/settings_translation_file.cpp
 msgid "Backward key"
@@ -1499,7 +1498,7 @@ msgstr "建立内部玩家"
 
 #: src/settings_translation_file.cpp
 msgid "Builtin"
-msgstr ""
+msgstr "内置"
 
 #: src/settings_translation_file.cpp
 msgid "Bumpmapping"
@@ -1713,7 +1712,7 @@ msgstr ""
 
 #: src/settings_translation_file.cpp
 msgid "Controls steepness/depth of lake depressions."
-msgstr ""
+msgstr "控制湖泊洼地的坡度/深度。"
 
 #: src/settings_translation_file.cpp
 msgid "Controls steepness/height of hills."
@@ -1736,13 +1735,12 @@ msgstr ""
 "这可以使挖掘更加困难。0 表示禁用。 (0-10)"
 
 #: src/settings_translation_file.cpp
-#, fuzzy
 msgid ""
 "Creates unpredictable water features in caves.\n"
 "These can make mining difficult. Zero disables them. (0-10)"
 msgstr ""
 "在洞穴中创建随机的水域。\n"
-"会使挖矿变得困难。值为0则禁用。（0-10）"
+"水域会使挖矿变得困难。值为0则禁用。（0-10）"
 
 #: src/settings_translation_file.cpp
 msgid "Crosshair alpha"
@@ -1810,7 +1808,7 @@ msgstr "默认权限"
 
 #: src/settings_translation_file.cpp
 msgid "Default report format"
-msgstr ""
+msgstr "默认报告格式"
 
 #: src/settings_translation_file.cpp
 msgid ""
@@ -1830,11 +1828,11 @@ msgstr ""
 
 #: src/settings_translation_file.cpp
 msgid "Defines the maximal player transfer distance in blocks (0 = unlimited)."
-msgstr ""
+msgstr "定义玩家可传送的最大距离，以方块为单位 (0 = 不限制)。"
 
 #: src/settings_translation_file.cpp
 msgid "Delay in sending blocks after building"
-msgstr ""
+msgstr "建造后发送方块的延迟时间"
 
 #: src/settings_translation_file.cpp
 msgid "Delay showing tooltips, stated in milliseconds."
@@ -1879,7 +1877,7 @@ msgstr "禁用反作弊"
 
 #: src/settings_translation_file.cpp
 msgid "Disable escape sequences"
-msgstr ""
+msgstr "禁用转义序列"
 
 #: src/settings_translation_file.cpp
 msgid ""
@@ -1915,7 +1913,7 @@ msgstr "转储地图生成器调试信息。"
 
 #: src/settings_translation_file.cpp
 msgid "Enable Joysticks"
-msgstr ""
+msgstr "启用摇杆"
 
 #: src/settings_translation_file.cpp
 msgid "Enable VBO"
@@ -1942,6 +1940,7 @@ msgstr ""
 "禁用可影响速度和获得不同外观。"
 
 #: src/settings_translation_file.cpp
+#, fuzzy
 msgid ""
 "Enable to disallow old clients from connecting.\n"
 "Older clients are compatible in the sense that they will not crash when "
@@ -1949,6 +1948,9 @@ msgid ""
 "to new servers, but they may not support all new features that you are "
 "expecting."
 msgstr ""
+"启用以禁止来自旧版本客户端的连接。\n"
+"所谓旧版本客户端，是指能兼容于新版本服务器的客户端，它们不会在连接\n"
+"服务器时崩溃，但可能不支持某些您所期望的新特性。"
 
 #: src/settings_translation_file.cpp
 msgid ""
@@ -1959,11 +1961,15 @@ msgid ""
 msgstr ""
 
 #: src/settings_translation_file.cpp
+#, fuzzy
 msgid ""
 "Enable/disable running an IPv6 server.  An IPv6 server may be restricted\n"
 "to IPv6 clients, depending on system configuration.\n"
 "Ignored if bind_address is set."
 msgstr ""
+"允许/禁止运行 IPv6 服务器。 IPv6 服务器可能仅限\n"
+" IPv6 客户端，具体取决于系统配置。\n"
+"如果设置了 bind_address ，则本项被忽略。"
 
 #: src/settings_translation_file.cpp
 msgid "Enables animation of inventory items."
@@ -2004,13 +2010,13 @@ msgstr ""
 "需要着色器已启用。"
 
 #: src/settings_translation_file.cpp
-#, fuzzy
 msgid "Engine profiling data print interval"
 msgstr "剖析印出间隔"
 
 #: src/settings_translation_file.cpp
+#, fuzzy
 msgid "Entity methods"
-msgstr ""
+msgstr "实体方法"
 
 #: src/settings_translation_file.cpp
 msgid ""
@@ -2077,14 +2083,13 @@ msgstr "视界"
 #: src/settings_translation_file.cpp
 #, fuzzy
 msgid "Field of view for zoom"
-msgstr "视界"
+msgstr "放大时的视界。"
 
 #: src/settings_translation_file.cpp
 msgid "Field of view in degrees."
 msgstr "视界程度。"
 
 #: src/settings_translation_file.cpp
-#, fuzzy
 msgid ""
 "Field of view while zooming in degrees.\n"
 "This requires the \"zoom\" privilege on the server."
@@ -2164,9 +2169,8 @@ msgid "Font size"
 msgstr "字体大小"
 
 #: src/settings_translation_file.cpp
-#, fuzzy
 msgid "Format of screenshots."
-msgstr "屏幕截图保存位置。"
+msgstr "屏幕截图格式。"
 
 #: src/settings_translation_file.cpp
 msgid "Forward key"
@@ -2229,8 +2233,9 @@ msgid "Generate normalmaps"
 msgstr "生成常规地图"
 
 #: src/settings_translation_file.cpp
+#, fuzzy
 msgid "Global callbacks"
-msgstr ""
+msgstr "全局回调"
 
 #: src/settings_translation_file.cpp
 msgid ""
@@ -4287,7 +4292,7 @@ msgstr "初始化窗口尺寸之宽度组件。"
 
 #: src/settings_translation_file.cpp
 msgid "Width of the selectionbox's lines around nodes."
-msgstr ""
+msgstr "节点周围选择的盒子的线宽"
 
 #: src/settings_translation_file.cpp
 msgid ""

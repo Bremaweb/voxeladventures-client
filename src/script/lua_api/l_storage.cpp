@@ -33,10 +33,9 @@ int ModApiStorage::l_get_mod_storage(lua_State *L)
 	std::string mod_name = lua_tostring(L, -1);
 
 	ModMetadata *store = new ModMetadata(mod_name);
-	// For server side
-	if (Server *server = getServer(L)) {
-		store->load(server->getModStoragePath());
-		server->registerModStorage(store);
+	if (IGameDef *gamedef = getGameDef(L)) {
+		store->load(gamedef->getModStoragePath());
+		gamedef->registerModStorage(store);
 	} else {
 		assert(false); // this should not happen
 	}
@@ -70,8 +69,8 @@ int StorageRef::gc_object(lua_State *L)
 {
 	StorageRef *o = *(StorageRef **)(lua_touserdata(L, 1));
 	// Server side
-	if (Server *server = getServer(L))
-		server->unregisterModStorage(getobject(o)->getModName());
+	if (IGameDef *gamedef = getGameDef(L))
+		gamedef->unregisterModStorage(getobject(o)->getModName());
 	delete o;
 	return 0;
 }
@@ -97,6 +96,10 @@ void StorageRef::Register(lua_State *L)
 
 	lua_pushliteral(L, "__gc");
 	lua_pushcfunction(L, gc_object);
+	lua_settable(L, metatable);
+
+	lua_pushliteral(L, "__eq");
+	lua_pushcfunction(L, l_equals);
 	lua_settable(L, metatable);
 
 	lua_pop(L, 1);  // drop metatable
@@ -130,7 +133,7 @@ void StorageRef::clearMeta()
 }
 
 const char StorageRef::className[] = "StorageRef";
-const luaL_reg StorageRef::methods[] = {
+const luaL_Reg StorageRef::methods[] = {
 	luamethod(MetaDataRef, get_string),
 	luamethod(MetaDataRef, set_string),
 	luamethod(MetaDataRef, get_int),
@@ -139,5 +142,6 @@ const luaL_reg StorageRef::methods[] = {
 	luamethod(MetaDataRef, set_float),
 	luamethod(MetaDataRef, to_table),
 	luamethod(MetaDataRef, from_table),
+	luamethod(MetaDataRef, equals),
 	{0,0}
 };

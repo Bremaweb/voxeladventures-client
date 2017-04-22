@@ -92,6 +92,10 @@ void ItemStackMetaRef::Register(lua_State *L)
 	lua_pushcfunction(L, gc_object);
 	lua_settable(L, metatable);
 
+	lua_pushliteral(L, "__eq");
+	lua_pushcfunction(L, l_equals);
+	lua_settable(L, metatable);
+
 	lua_pop(L, 1);  // drop metatable
 
 	luaL_openlib(L, 0, methods, 0);  // fill methodtable
@@ -102,7 +106,7 @@ void ItemStackMetaRef::Register(lua_State *L)
 }
 
 const char ItemStackMetaRef::className[] = "ItemStackMetaRef";
-const luaL_reg ItemStackMetaRef::methods[] = {
+const luaL_Reg ItemStackMetaRef::methods[] = {
 	luamethod(MetaDataRef, get_string),
 	luamethod(MetaDataRef, set_string),
 	luamethod(MetaDataRef, get_int),
@@ -111,5 +115,6 @@ const luaL_reg ItemStackMetaRef::methods[] = {
 	luamethod(MetaDataRef, set_float),
 	luamethod(MetaDataRef, to_table),
 	luamethod(MetaDataRef, from_table),
+	luamethod(MetaDataRef, equals),
 	{0,0}
 };

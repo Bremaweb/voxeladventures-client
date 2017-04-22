@@ -23,5 +23,10 @@ set(common_SCRIPT_LUA_API_SRCS
 	PARENT_SCOPE)
 
 set(client_SCRIPT_LUA_API_SRCS
+	${CMAKE_CURRENT_SOURCE_DIR}/l_client.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/l_mainmenu.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/l_minimap.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/l_storage.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/l_sound.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/l_localplayer.cpp
 	PARENT_SCOPE)
