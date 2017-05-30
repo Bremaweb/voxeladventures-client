@@ -2175,7 +2175,6 @@ void Server::fadeSound(s32 handle, float step, float gain)
 		// Play new sound volume on older clients
 		playSound(compat_psound.spec, compat_psound.params);
 	}
->>>>>>> minetest/master
 }
 
 void Server::sendRemoveNode(v3s16 p, u16 ignore_id,

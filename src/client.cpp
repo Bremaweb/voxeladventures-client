@@ -206,7 +206,6 @@ const std::vector<ModSpec>& Client::getMods() const
 const ModSpec* Client::getModSpec(const std::string &modname) const
 {
 	return NULL;
->>>>>>> minetest/master
 }
 
 void Client::Stop()
