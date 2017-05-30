@@ -469,21 +469,18 @@ void ContentFeatures::serialize(std::ostream &os, u16 protocol_version) const
 	writeU8(os, legacy_wallmounted);
 }
 
-void ContentFeatures::correctAlpha()
+void ContentFeatures::correctAlpha(TileDef *tiles, int length)
 {
+	// alpha == 0 means that the node is using texture alpha
 	if (alpha == 0 || alpha == 255)
 		return;
 
-	for (u32 i = 0; i < 6; i++) {
+	for (int i = 0; i < length; i++) {
+		if (tiles[i].name == "")
+			continue;
 		std::stringstream s;
-		s << tiledef[i].name << "^[noalpha^[opacity:" << ((int)alpha);
-		tiledef[i].name = s.str();
-	}
-
-	for (u32 i = 0; i < CF_SPECIAL_COUNT; i++) {
-		std::stringstream s;
-		s << tiledef_special[i].name << "^[noalpha^[opacity:" << ((int)alpha);
-		tiledef_special[i].name = s.str();
+		s << tiles[i].name << "^[noalpha^[opacity:" << ((int)alpha);
+		tiles[i].name = s.str();
 	}
 }
 
@@ -668,9 +665,16 @@ void ContentFeatures::updateTextures(ITextureSource *tsrc, IShaderSource *shdsrc
 		if (tdef[j].name == "")
 			tdef[j].name = "unknown_node.png";
 	}
+	// also the overlay tiles
+	TileDef tdef_overlay[6];
+	for (u32 j = 0; j < 6; j++)
+		tdef_overlay[j] = tiledef_overlay[j];
+	// also the special tiles
+	TileDef tdef_spec[6];
+	for (u32 j = 0; j < CF_SPECIAL_COUNT; j++)
+		tdef_spec[j] = tiledef_special[j];
 
 	bool is_liquid = false;
-	bool is_water_surface = false;
 
 	u8 material_type = (alpha == 255) ?
 		TILE_MATERIAL_BASIC : TILE_MATERIAL_ALPHA;
@@ -721,8 +725,8 @@ void ContentFeatures::updateTextures(ITextureSource *tsrc, IShaderSource *shdsrc
 			visual_solidness = 1;
 		} else if (tsettings.leaves_style == LEAVES_SIMPLE) {
 			for (u32 j = 0; j < 6; j++) {
-				if (tiledef_special[j].name != "")
-					tdef[j].name = tiledef_special[j].name;
+				if (tdef_spec[j].name != "")
+					tdef[j].name = tdef_spec[j].name;
 			}
 			drawtype = NDT_GLASSLIKE;
 			solidness = 0;
@@ -733,38 +737,41 @@ void ContentFeatures::updateTextures(ITextureSource *tsrc, IShaderSource *shdsrc
 			for (u32 i = 0; i < 6; i++)
 				tdef[i].name += std::string("^[noalpha");
 		}
-		if (waving == 1)
+		if (waving >= 1)
 			material_type = TILE_MATERIAL_WAVING_LEAVES;
 		break;
 	case NDT_PLANTLIKE:
 		solidness = 0;
-		if (waving == 1)
+		if (waving >= 1)
 			material_type = TILE_MATERIAL_WAVING_PLANTS;
 		break;
 	case NDT_FIRELIKE:
 		solidness = 0;
 		break;
 	case NDT_MESH:
+	case NDT_NODEBOX:
 		solidness = 0;
+		if (waving == 1)
+			material_type = TILE_MATERIAL_WAVING_PLANTS;
+		else if (waving == 2)
+			material_type = TILE_MATERIAL_WAVING_LEAVES;
 		break;
 	case NDT_TORCHLIKE:
 	case NDT_SIGNLIKE:
 	case NDT_FENCELIKE:
 	case NDT_RAILLIKE:
-	case NDT_NODEBOX:
 		solidness = 0;
 		break;
 	}
 
 	if (is_liquid) {
+		// Vertex alpha is no longer supported, correct if necessary.
+		correctAlpha(tdef, 6);
+		correctAlpha(tdef_overlay, 6);
+		correctAlpha(tdef_spec, CF_SPECIAL_COUNT);
 		material_type = (alpha == 255) ?
 			TILE_MATERIAL_LIQUID_OPAQUE : TILE_MATERIAL_LIQUID_TRANSPARENT;
-		if (name == "default:water_source")
-			is_water_surface = true;
 	}
-
-	// Vertex alpha is no longer supported, correct if necessary.
-	correctAlpha();
 
 	u32 tile_shader[6];
 	for (u16 j = 0; j < 6; j++) {
@@ -772,27 +779,22 @@ void ContentFeatures::updateTextures(ITextureSource *tsrc, IShaderSource *shdsrc
 			material_type, drawtype);
 	}
 
-	if (is_water_surface) {
-		tile_shader[0] = shdsrc->getShader("water_surface_shader",
-			material_type, drawtype);
-	}
-
 	// Tiles (fill in f->tiles[])
 	for (u16 j = 0; j < 6; j++) {
 		fillTileAttribs(tsrc, &tiles[j].layers[0], &tdef[j], tile_shader[j],
 			tsettings.use_normal_texture,
-			tiledef[j].backface_culling, material_type);
-		if (tiledef_overlay[j].name!="")
-			fillTileAttribs(tsrc, &tiles[j].layers[1], &tiledef_overlay[j],
+			tdef[j].backface_culling, material_type);
+		if (tdef_overlay[j].name != "")
+			fillTileAttribs(tsrc, &tiles[j].layers[1], &tdef_overlay[j],
 				tile_shader[j], tsettings.use_normal_texture,
-				tiledef[j].backface_culling, material_type);
+				tdef[j].backface_culling, material_type);
 	}
 
 	// Special tiles (fill in f->special_tiles[])
 	for (u16 j = 0; j < CF_SPECIAL_COUNT; j++) {
-		fillTileAttribs(tsrc, &special_tiles[j].layers[0], &tiledef_special[j],
+		fillTileAttribs(tsrc, &special_tiles[j].layers[0], &tdef_spec[j],
 			tile_shader[j], tsettings.use_normal_texture,
-			tiledef_special[j].backface_culling, material_type);
+			tdef_spec[j].backface_culling, material_type);
 	}
 
 	if (param_type_2 == CPT2_COLOR ||
@@ -879,7 +881,6 @@ public:
 	void serialize(std::ostream &os, u16 protocol_version) const;
 	void deSerialize(std::istream &is);
 
-	inline virtual bool getNodeRegistrationStatus() const;
 	inline virtual void setNodeRegistrationStatus(bool completed);
 
 	virtual void pendNodeResolve(NodeResolver *nr);
@@ -1318,22 +1319,21 @@ void CNodeDefManager::removeNode(const std::string &name)
 
 	// Erase node content from all groups it belongs to
 	for (UNORDERED_MAP<std::string, GroupItems>::iterator iter_groups =
-			m_group_to_items.begin();
-			iter_groups != m_group_to_items.end();) {
+			m_group_to_items.begin(); iter_groups != m_group_to_items.end();) {
 		GroupItems &items = iter_groups->second;
 		for (GroupItems::iterator iter_groupitems = items.begin();
 				iter_groupitems != items.end();) {
 			if (iter_groupitems->first == id)
 				items.erase(iter_groupitems++);
 			else
-				iter_groupitems++;
+				++iter_groupitems;
 		}
 
 		// Check if group is empty
 		if (items.size() == 0)
 			m_group_to_items.erase(iter_groups++);
 		else
-			iter_groups++;
+			++iter_groups;
 	}
 }
 
@@ -1803,13 +1803,6 @@ void ContentFeatures::deSerializeOld(std::istream &is, int version)
 		throw SerializationError("unsupported ContentFeatures version");
 	}
 }
-
-
-inline bool CNodeDefManager::getNodeRegistrationStatus() const
-{
-	return m_node_registration_complete;
-}
-
 
 inline void CNodeDefManager::setNodeRegistrationStatus(bool completed)
 {

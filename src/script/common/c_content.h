@@ -39,6 +39,7 @@ extern "C" {
 #include "util/string.h"
 #include "itemgroup.h"
 #include "itemdef.h"
+#include "c_types.h"
 
 namespace Json { class Value; }
 
@@ -64,8 +65,20 @@ class Schematic;
 
 
 ContentFeatures    read_content_features     (lua_State *L, int index);
+void               push_content_features     (lua_State *L,
+                                              const ContentFeatures &c);
+
+void               push_nodebox              (lua_State *L,
+                                              const NodeBox &box);
+void               push_box                  (lua_State *L,
+                                              const std::vector<aabb3f> &box);
+
+void               push_palette              (lua_State *L,
+                                              const std::vector<video::SColor> *palette);
+
 TileDef            read_tiledef              (lua_State *L, int index,
                                               u8 drawtype);
+
 void               read_soundspec            (lua_State *L, int index,
                                               SimpleSoundSpec &spec);
 NodeBox            read_nodebox              (lua_State *L, int index);
@@ -88,6 +101,11 @@ void               push_tool_capabilities    (lua_State *L,
 
 void read_item_definition (lua_State *L, int index, const ItemDefinition &default_def,
 		ItemDefinition &def);
+void               push_item_definition      (lua_State *L,
+                                              const ItemDefinition &i);
+void               push_item_definition_full (lua_State *L,
+                                              const ItemDefinition &i);
+
 void               read_object_properties    (lua_State *L, int index,
                                               ObjectProperties *prop,
                                               IItemDefManager *idef);
@@ -145,6 +163,8 @@ std::vector<ItemStack> read_items            (lua_State *L,
 void               read_soundspec            (lua_State *L,
                                               int index,
                                               SimpleSoundSpec &spec);
+void               push_soundspec            (lua_State *L,
+                                              const SimpleSoundSpec &spec);
 
 bool               string_to_enum            (const EnumString *spec,
                                               int &result,
@@ -161,6 +181,10 @@ bool               push_json_value           (lua_State *L,
                                               int nullindex);
 void               read_json_value           (lua_State *L, Json::Value &root,
                                               int index, u8 recursion = 0);
+
+void               push_pointed_thing        (lua_State *L, const PointedThing &pointed, bool csm = false);
+
+void               push_objectRef            (lua_State *L, const u16 id);
 
 extern struct EnumString es_TileAnimationType[];
 

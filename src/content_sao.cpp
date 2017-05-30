@@ -26,7 +26,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "nodedef.h"
 #include "remoteplayer.h"
 #include "server.h"
-#include "serverscripting.h"
+#include "scripting_server.h"
 #include "genericobject.h"
 
 std::map<u16, ServerActiveObject::Factory> ServerActiveObject::m_types;
@@ -764,9 +764,10 @@ bool LuaEntitySAO::collideWithObjects() const
 
 // No prototype, PlayerSAO does not need to be deserialized
 
-PlayerSAO::PlayerSAO(ServerEnvironment *env_, u16 peer_id_, bool is_singleplayer):
+PlayerSAO::PlayerSAO(ServerEnvironment *env_, RemotePlayer *player_, u16 peer_id_,
+		bool is_singleplayer):
 	UnitSAO(env_, v3f(0,0,0)),
-	m_player(NULL),
+	m_player(player_),
 	m_peer_id(peer_id_),
 	m_inventory(NULL),
 	m_damage(0),
@@ -797,7 +798,7 @@ PlayerSAO::PlayerSAO(ServerEnvironment *env_, u16 peer_id_, bool is_singleplayer
 	m_prop.hp_max = PLAYER_MAX_HP;
 	m_prop.physical = false;
 	m_prop.weight = 75;
-	m_prop.collisionbox = aabb3f(-1/3.,-1.0,-1/3., 1/3.,1.0,1/3.);
+	m_prop.collisionbox = aabb3f(-0.3f, -1.0f, -0.3f, 0.3f, 0.75f, 0.3f);
 	// start of default appearance, this should be overwritten by LUA
 	m_prop.visual = "upright_sprite";
 	m_prop.visual_size = v2f(1, 2);
@@ -819,7 +820,7 @@ PlayerSAO::~PlayerSAO()
 		delete m_inventory;
 }
 
-void PlayerSAO::initialize(RemotePlayer *player, const std::set<std::string> &privs)
+void PlayerSAO::finalize(RemotePlayer *player, const std::set<std::string> &privs)
 {
 	assert(player);
 	m_player = player;
@@ -1427,7 +1428,8 @@ bool PlayerSAO::checkMovementCheat()
 
 bool PlayerSAO::getCollisionBox(aabb3f *toset) const
 {
-	*toset = aabb3f(-BS * 0.30, 0.0, -BS * 0.30, BS * 0.30, BS * 1.75, BS * 0.30);
+	*toset = aabb3f(-0.3f * BS, 0.0f, -0.3f * BS, 0.3f * BS, 1.75f * BS, 0.3f * BS);
+
 	toset->MinEdge += m_base_position;
 	toset->MaxEdge += m_base_position;
 	return true;

@@ -30,7 +30,13 @@ class GenericCAO;
 class ClientActiveObject;
 class IGameDef;
 
-enum LocalPlayerAnimations {NO_ANIM, WALK_ANIM, DIG_ANIM, WD_ANIM};  // no local animation, walking, digging, both
+enum LocalPlayerAnimations
+{
+	NO_ANIM,
+	WALK_ANIM,
+	DIG_ANIM,
+	WD_ANIM
+}; // no local animation, walking, digging, both
 
 class LocalPlayer : public Player
 {
@@ -41,7 +47,6 @@ public:
 	ClientActiveObject *parent;
 
 	u16 hp;
-	bool got_teleported;
 	bool isAttached;
 	bool touching_ground;
 	// This oscillates so that the player jumps a bit above the surface
@@ -86,6 +91,8 @@ public:
 
 	float camera_impact;
 
+	bool makes_footstep_sound;
+
 	int last_animation;
 	float last_animation_speed;
 
@@ -97,12 +104,11 @@ public:
 	float hurt_tilt_timer;
 	float hurt_tilt_strength;
 
-	GenericCAO* getCAO() const {
-		return m_cao;
-	}
+	GenericCAO *getCAO() const { return m_cao; }
 
-	void setCAO(GenericCAO* toset) {
-		assert( m_cao == NULL ); // Pre-condition
+	void setCAO(GenericCAO *toset)
+	{
+		assert(m_cao == NULL); // Pre-condition
 		m_cao = toset;
 	}
 
@@ -113,28 +119,24 @@ public:
 
 	v3s16 getLightPosition() const;
 
-	void setYaw(f32 yaw)
-	{
-		m_yaw = yaw;
-	}
+	void setYaw(f32 yaw) { m_yaw = yaw; }
 
 	f32 getYaw() const { return m_yaw; }
 
-	void setPitch(f32 pitch)
-	{
-		m_pitch = pitch;
-	}
+	void setPitch(f32 pitch) { m_pitch = pitch; }
 
 	f32 getPitch() const { return m_pitch; }
 
-	void setPosition(const v3f &position)
+	inline void setPosition(const v3f &position)
 	{
 		m_position = position;
+		m_sneak_node_exists = false;
 	}
 
 	v3f getPosition() const { return m_position; }
 	v3f getEyePosition() const { return m_position + getEyeOffset(); }
 	v3f getEyeOffset() const;
+
 private:
 	void accelerateHorizontal(const v3f &target_speed, const f32 max_increase);
 	void accelerateVertical(const v3f &target_speed, const f32 max_increase);
@@ -169,9 +171,8 @@ private:
 	bool camera_barely_in_ceiling;
 	aabb3f m_collisionbox;
 
-	GenericCAO* m_cao;
+	GenericCAO *m_cao;
 	Client *m_client;
 };
 
 #endif
-

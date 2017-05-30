@@ -40,6 +40,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "tileanimation.h"
 #include "mesh_generator_thread.h"
 
+#define CLIENT_CHAT_MESSAGE_LIMIT_PER_10S 10.0f
+
 struct MeshMakeData;
 class MapBlockMesh;
 class IWritableTextureSource;
@@ -51,7 +53,7 @@ class ClientMediaDownloader;
 struct MapDrawControl;
 class MtEventManager;
 struct PointedThing;
-class Database;
+class MapDatabase;
 class Minimap;
 struct MinimapMapblock;
 class Camera;
@@ -79,6 +81,7 @@ enum ClientEventType
 	CE_HUDCHANGE,
 	CE_SET_SKY,
 	CE_OVERRIDE_DAY_NIGHT_RATIO,
+	CE_CLOUD_PARAMS,
 };
 
 struct ClientEvent
@@ -175,11 +178,21 @@ struct ClientEvent
 			video::SColor *bgcolor;
 			std::string *type;
 			std::vector<std::string> *params;
+			bool clouds;
 		} set_sky;
 		struct{
 			bool do_override;
 			float ratio_f;
 		} override_day_night_ratio;
+		struct {
+			f32 density;
+			u32 color_bright;
+			u32 color_ambient;
+			f32 height;
+			f32 thickness;
+			f32 speed_x;
+			f32 speed_y;
+		} cloud_params;
 	};
 };
 
@@ -248,6 +261,7 @@ public:
 			IrrlichtDevice *device,
 			const char *playername,
 			const std::string &password,
+			const std::string &address_name,
 			MapDrawControl &control,
 			IWritableTextureSource *tsrc,
 			IWritableShaderSource *shsrc,
@@ -275,9 +289,7 @@ public:
 		The name of the local player should already be set when
 		calling this, as it is sent in the initialization.
 	*/
-	void connect(Address address,
-			const std::string &address_name,
-			bool is_local_server);
+	void connect(Address address, bool is_local_server);
 
 	/*
 		Stuff that references the environment is valid only as
@@ -320,7 +332,7 @@ public:
 	void handleCommand_ItemDef(NetworkPacket* pkt);
 	void handleCommand_PlaySound(NetworkPacket* pkt);
 	void handleCommand_StopSound(NetworkPacket* pkt);
-	void handleCommand_FadeSound(NetworkPacket* pkt);
+	void handleCommand_FadeSound(NetworkPacket *pkt);
 	void handleCommand_Privileges(NetworkPacket* pkt);
 	void handleCommand_InventoryFormSpec(NetworkPacket* pkt);
 	void handleCommand_DetachedInventory(NetworkPacket* pkt);
@@ -334,6 +346,7 @@ public:
 	void handleCommand_HudSetFlags(NetworkPacket* pkt);
 	void handleCommand_HudSetParam(NetworkPacket* pkt);
 	void handleCommand_HudSetSky(NetworkPacket* pkt);
+	void handleCommand_CloudParams(NetworkPacket* pkt);
 	void handleCommand_OverrideDayNightRatio(NetworkPacket* pkt);
 	void handleCommand_LocalPlayerAnimations(NetworkPacket* pkt);
 	void handleCommand_EyeOffset(NetworkPacket* pkt);
@@ -351,6 +364,7 @@ public:
 		const StringMap &fields);
 	void sendInventoryAction(InventoryAction *a);
 	void sendChatMessage(const std::wstring &message);
+	void clearOutChatQueue();
 	void sendChangePassword(const std::string &oldpassword,
 		const std::string &newpassword);
 	void sendDamage(u8 damage);
@@ -417,7 +431,8 @@ public:
 	void updateCameraOffset(v3s16 camera_offset)
 	{ m_mesh_update_thread.m_camera_offset = camera_offset; }
 
-	// Get event from queue. CE_NONE is returned if queue is empty.
+	bool hasClientEvents() const { return !m_client_event_queue.empty(); }
+	// Get event from queue. If queue is empty, it triggers an assertion failure.
 	ClientEvent getClientEvent();
 
 	bool accessDenied() const { return m_access_denied; }
@@ -457,8 +472,7 @@ public:
 	Minimap* getMinimap() { return m_minimap; }
 	void setCamera(Camera* camera) { m_camera = camera; }
 
-	Camera* getCamera ()
-	{ return m_camera; }
+	Camera* getCamera () { return m_camera; }
 
 	bool shouldShowMinimap() const;
 
@@ -487,8 +501,6 @@ public:
 	bool loadMedia(const std::string &data, const std::string &filename);
 	// Send a request for conventional media transfer
 	void request_media(const std::vector<std::string> &file_requests);
-	// Send a notification that no conventional media transfer is needed
-	void received_media();
 
 	LocalClientState getState() { return m_state; }
 
@@ -513,6 +525,18 @@ public:
 	void showProfiler(const bool show = true);
 	void showGameFog(const bool show = true);
 	void showGameDebug(const bool show = true);
+
+	IrrlichtDevice *getDevice() const { return m_device; }
+
+	const Address getServerAddress()
+	{
+		return m_con.GetPeerAddress(PEER_ID_SERVER);
+	}
+
+	const std::string &getAddressName() const
+	{
+		return m_address_name;
+	}
 
 private:
 
@@ -546,6 +570,8 @@ private:
 	inline std::string getPlayerName()
 	{ return m_env.getLocalPlayer()->getName(); }
 
+	bool canSendChatMessage() const;
+
 	float m_packetcounter_timer;
 	float m_connection_reinit_timer;
 	float m_avg_rtt_timer;
@@ -566,6 +592,7 @@ private:
 	Ambiance *m_ambiance;
 	ParticleManager m_particle_manager;
 	con::Connection m_con;
+	std::string m_address_name;
 	IrrlichtDevice *m_device;
 	Camera *m_camera;
 	Minimap *m_minimap;
@@ -593,6 +620,9 @@ private:
 	//s32 m_daynight_i;
 	//u32 m_daynight_ratio;
 	std::queue<std::wstring> m_chat_queue;
+	std::queue<std::wstring> m_out_chat_queue;
+	u32 m_last_chat_message_sent;
+	float m_chat_message_allowance;
 
 	// The authentication methods we can use to enter sudo mode (=change password)
 	u32 m_sudo_auth_methods;
@@ -649,7 +679,7 @@ private:
 	LocalClientState m_state;
 
 	// Used for saving server map to disk client-side
-	Database *m_localdb;
+	MapDatabase *m_localdb;
 	IntervalLimiter m_localdb_save_interval;
 	u16 m_cache_save_interval;
 

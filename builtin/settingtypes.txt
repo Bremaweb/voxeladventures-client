@@ -186,6 +186,26 @@ keymap_fastmove (Fast key) key KEY_KEY_J
 #    See http://irrlicht.sourceforge.net/docu/namespaceirr.html#a54da2a0e231901735e3da1b0edf72eb3
 keymap_noclip (Noclip key) key KEY_KEY_H
 
+#    Key for selecting the next item in the hotbar.
+#    See http://irrlicht.sourceforge.net/docu/namespaceirr.html#a54da2a0e231901735e3da1b0edf72eb3
+keymap_hotbar_next (Hotbar next key) key KEY_KEY_N
+
+#    Key for selecting the previous item in the hotbar.
+#    See http://irrlicht.sourceforge.net/docu/namespaceirr.html#a54da2a0e231901735e3da1b0edf72eb3
+keymap_hotbar_previous (Hotbar previous key) key KEY_KEY_B
+
+#    Key for muting the game.
+#    See http://irrlicht.sourceforge.net/docu/namespaceirr.html#a54da2a0e231901735e3da1b0edf72eb3
+keymap_mute (Mute key) key KEY_KEY_M
+
+#    Key for increasing the volume.
+#    See http://irrlicht.sourceforge.net/docu/namespaceirr.html#a54da2a0e231901735e3da1b0edf72eb3
+keymap_increase_volume (Inc. volume key) key
+
+#    Key for decreasing the volume.
+#    See http://irrlicht.sourceforge.net/docu/namespaceirr.html#a54da2a0e231901735e3da1b0edf72eb3
+keymap_decrease_volume (Dec. volume key) key
+
 #    Key for toggling autorun.
 #    See http://irrlicht.sourceforge.net/docu/namespaceirr.html#a54da2a0e231901735e3da1b0edf72eb3
 keymap_autorun (Autorun key) key
@@ -292,6 +312,9 @@ serverlist_url (Serverlist URL) string servers.minetest.net
 #    File in client/serverlist/ that contains your favorite servers displayed in the Multiplayer Tab.
 serverlist_file (Serverlist file) string favoriteservers.txt
 
+#    Maximum size of the out chat queue. 0 to disable queueing and -1 to make the queue size unlimited
+max_out_chat_queue_size (Maximum size of the out chat queue) int 20
+
 [*Graphics]
 
 [**In-Game]
@@ -324,7 +347,7 @@ enable_clouds (Clouds) bool true
 enable_3d_clouds (3D clouds) bool true
 
 #    Method used to highlight selected object.
-node_highlighting (Node highlighting) enum box box,halo
+node_highlighting (Node highlighting) enum box box,halo,none
 
 #    Adds particles when digging a node.
 enable_particles (Digging particles) bool true
@@ -459,6 +482,9 @@ screenW (Screen width) int 800
 #    Height component of the initial window size.
 screenH (Screen height) int 600
 
+#    Save window size automatically when modified.
+autosave_screensize (Autosave Screen Size) bool true
+
 #    Fullscreen mode.
 fullscreen (Full screen) bool false
 
@@ -492,10 +518,7 @@ cloud_height (Cloud height) int 120
 #    Values larger than 26 will start to produce sharp cutoffs at cloud area corners.
 cloud_radius (Cloud radius) int 12
 
-#    Enables view bobbing when walking.
-view_bobbing (Enable view bobbing) bool true
-
-#    Multiplier for view bobbing.
+#    Enable view bobbing and amount of view bobbing.
 #    For example: 0 for no view bobbing; 1.0 for normal; 2.0 for double.
 view_bobbing_amount (View bobbing factor) float 1.0
 
@@ -1445,7 +1468,7 @@ language (Language) enum   ,be,ca,cs,da,de,en,eo,es,et,fr,he,hu,id,it,ja,jbo,ko,
 #    -    action
 #    -    info
 #    -    verbose
-debug_log_level (Debug log level) enum action ,warning,action,info,verbose
+debug_log_level (Debug log level) enum action ,none,error,warning,action,info,verbose
 
 #    IPv6 support.
 enable_ipv6 (IPv6) bool true

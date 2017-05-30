@@ -26,6 +26,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "threading/mutex.h"
 #include "network/networkpacket.h"
 #include "util/cpp11_container.h"
+#include "porting.h"
 
 #include <list>
 #include <vector>
@@ -265,7 +266,7 @@ public:
 		m_version_patch(0),
 		m_full_version("unknown"),
 		m_deployed_compression(0),
-		m_connection_time(getTime(PRECISION_SECONDS))
+		m_connection_time(porting::getTimeS())
 	{
 	}
 	~RemoteClient()
@@ -344,7 +345,7 @@ public:
 		{ serialization_version = m_pending_serialization_version; }
 
 	/* get uptime */
-	u32 uptime();
+	u64 uptime() const;
 
 	/* set version information */
 	void setVersionInfo(u8 major, u8 minor, u8 patch, const std::string &full)
@@ -359,7 +360,6 @@ public:
 	u8 getMajor() const { return m_version_major; }
 	u8 getMinor() const { return m_version_minor; }
 	u8 getPatch() const { return m_version_patch; }
-	std::string getVersion() const { return m_full_version; }
 private:
 	// Version is stored in here after INIT before INIT2
 	u8 m_pending_serialization_version;
@@ -432,7 +432,7 @@ private:
 	/*
 		time this client was created
 	 */
-	const u32 m_connection_time;
+	const u64 m_connection_time;
 };
 
 class ClientInterface {

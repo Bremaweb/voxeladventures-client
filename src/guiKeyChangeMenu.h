@@ -31,7 +31,8 @@
 #include <vector>
 #include <set>
 
-struct key_setting {
+struct key_setting
+{
 	int id;
 	const wchar_t *button_name;
 	KeyPress key;
@@ -47,11 +48,12 @@ typedef struct {
 } key_alias_setting;
 
 
-class GUIKeyChangeMenu: public GUIModalMenu
+class GUIKeyChangeMenu : public GUIModalMenu
+
 {
 public:
-	GUIKeyChangeMenu(gui::IGUIEnvironment* env, gui::IGUIElement* parent,
-			s32 id, IMenuManager *menumgr);
+	GUIKeyChangeMenu(gui::IGUIEnvironment *env, gui::IGUIElement *parent, s32 id,
+			IMenuManager *menumgr);
 	~GUIKeyChangeMenu();
 
 	void removeChildren();
@@ -64,10 +66,9 @@ public:
 
 	bool acceptInput();
 
-	bool OnEvent(const SEvent& event);
+	bool OnEvent(const SEvent &event);
 
 private:
-
 	void init_keys();
 
 	bool resetMenu();
@@ -77,12 +78,13 @@ private:
 	std::wstring keyUsedBy(int id, const KeyPress &key, bool modifier_shift, bool modifier_control);
 	void addCommandAliasKey(const KeyCommand &key);
 	void commandComboChanged();
- 
+
 	bool control_down;
 	bool shift_down;
-	
+
 	s32 activeKey;
-	
+
+	std::vector<KeyPress> key_used;
 	gui::IGUIStaticText *key_used_text;
 	std::vector<key_setting *> key_settings;
 	std::vector<KeyCommand> key_alias_settings;
@@ -100,4 +102,3 @@ private:
 };
 
 #endif
-

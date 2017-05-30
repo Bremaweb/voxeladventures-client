@@ -22,7 +22,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "clientenvironment.h"
 #include "clientsimpleobject.h"
 #include "clientmap.h"
-#include "clientscripting.h"
+#include "scripting_client.h"
 #include "mapblock_mesh.h"
 #include "event.h"
 #include "collision.h"
@@ -30,6 +30,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "raycast.h"
 #include "voxelalgorithms.h"
 #include "settings.h"
+#include <algorithm>
 
 /*
 	ClientEnvironment
@@ -236,11 +237,10 @@ void ClientEnvironment::step(float dtime)
 			pre_factor = 1.0 + (float)addp/100.0;
 		}
 		float speed = pre_factor * speed_diff.getLength();
-		if(speed > tolerance)
-		{
-			f32 damage_f = (speed - tolerance)/BS * post_factor;
-			u16 damage = (u16)(damage_f+0.5);
-			if(damage != 0){
+		if (speed > tolerance) {
+			f32 damage_f = (speed - tolerance) / BS * post_factor;
+			u8 damage = (u8)MYMIN(damage_f + 0.5, 255);
+			if (damage != 0) {
 				damageLocalPlayer(damage, true);
 				MtEvent *e = new SimpleTriggerEvent("PlayerFallingDamage");
 				m_client->event()->put(e);
@@ -598,15 +598,13 @@ void ClientEnvironment::getActiveObjects(v3f origin, f32 max_d,
 	}
 }
 
-ClientEnvEvent ClientEnvironment::getClientEvent()
+ClientEnvEvent ClientEnvironment::getClientEnvEvent()
 {
-	ClientEnvEvent event;
-	if(m_client_event_queue.empty())
-		event.type = CEE_NONE;
-	else {
-		event = m_client_event_queue.front();
-		m_client_event_queue.pop();
-	}
+	FATAL_ERROR_IF(m_client_event_queue.empty(),
+			"ClientEnvironment::getClientEnvEvent(): queue is empty");
+
+	ClientEnvEvent event = m_client_event_queue.front();
+	m_client_event_queue.pop();
 	return event;
 }
 

@@ -116,7 +116,7 @@ private:
 	// get_day_count() -> int
 	static int l_get_day_count(lua_State *L);
 
-	// find_node_near(pos, radius, nodenames) -> pos or nil
+	// find_node_near(pos, radius, nodenames, search_center) -> pos or nil
 	// nodenames: eg. {"ignore", "group:tree"} or "default:dirt"
 	static int l_find_node_near(lua_State *L);
 
@@ -203,11 +203,11 @@ public:
 		m_simple_catch_up(simple_catch_up)
 	{
 	}
-	virtual std::set<std::string> getTriggerContents()
+	virtual const std::set<std::string> &getTriggerContents() const
 	{
 		return m_trigger_contents;
 	}
-	virtual std::set<std::string> getRequiredNeighbors()
+	virtual const std::set<std::string> &getRequiredNeighbors() const
 	{
 		return m_required_neighbors;
 	}

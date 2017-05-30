@@ -65,7 +65,7 @@ public:
 
 	void useTile(int index, bool disable_backface_culling);
 	void useDefaultTile(bool set_color = true);
-	TileSpec getTile(const v3s16 &direction);
+	void getTile(const v3s16 &direction, TileSpec &tile);
 
 // face drawing
 	void drawQuad(v3f *vertices, const v3s16 &normal = v3s16(0, 0, 0));
@@ -93,13 +93,12 @@ public:
 	NeighborData liquid_neighbors[3][3];
 	f32 corner_levels[2][2];
 
-	void prepareLiquidNodeDrawing(bool flowing);
-	void getLiquidNeighborhood(bool flowing);
-	void resetCornerLevels();
+	void prepareLiquidNodeDrawing();
+	void getLiquidNeighborhood();
 	void calculateCornerLevels();
 	f32 getCornerLevel(int i, int k);
-	void drawLiquidSides(bool flowing);
-	void drawLiquidTop(bool flowing);
+	void drawLiquidSides();
+	void drawLiquidTop();
 
 // raillike-specific
 	// name of the group that enables connecting to raillike nodes of different kind
@@ -122,7 +121,7 @@ public:
 		float offset_h, float offset_v = 0.0);
 
 // drawtypes
-	void drawLiquidNode(bool flowing);
+	void drawLiquidNode();
 	void drawGlasslikeNode();
 	void drawGlasslikeFramedNode();
 	void drawAllfacesNode();

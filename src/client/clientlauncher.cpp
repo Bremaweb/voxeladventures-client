@@ -42,30 +42,14 @@ gui::IGUIEnvironment *guienv = NULL;
 gui::IGUIStaticText *guiroot = NULL;
 MainMenuManager g_menumgr;
 
-bool noMenuActive()
+bool isMenuActive()
 {
-	return g_menumgr.menuCount() == 0;
+	return g_menumgr.menuCount() != 0;
 }
 
 // Passed to menus to allow disconnecting and exiting
 MainGameCallback *g_gamecallback = NULL;
 
-
-// Instance of the time getter
-static TimeGetter *g_timegetter = NULL;
-
-u32 getTimeMs()
-{
-	if (g_timegetter == NULL)
-		return 0;
-	return g_timegetter->getTime(PRECISION_MILLI);
-}
-
-u32 getTime(TimePrecision prec) {
-	if (g_timegetter == NULL)
-		return 0;
-	return g_timegetter->getTime(prec);
-}
 
 ClientLauncher::~ClientLauncher()
 {
@@ -95,9 +79,6 @@ bool ClientLauncher::run(GameParams &game_params, const Settings &cmd_args)
 		errorstream << "Could not initialize game engine." << std::endl;
 		return false;
 	}
-
-	// Create time getter
-	g_timegetter = new IrrlichtTimeGetter(device);
 
 	// Speed tests (done after irrlicht is loaded to get timer)
 	if (cmd_args.getFlag("speedtests")) {
@@ -515,7 +496,7 @@ void ClientLauncher::main_menu(MainMenuData *menudata)
 
 	infostream << "Waiting for other menus" << std::endl;
 	while (device->run() && *kill == false) {
-		if (noMenuActive())
+		if (!isMenuActive())
 			break;
 		driver->beginScene(true, true, video::SColor(255, 128, 128, 128));
 		guienv->drawAll();

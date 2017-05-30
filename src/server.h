@@ -134,6 +134,7 @@ struct ServerSoundParams
 struct ServerPlayingSound
 {
 	ServerSoundParams params;
+	SimpleSoundSpec spec;
 	UNORDERED_SET<u16> clients; // peer ids
 };
 
@@ -310,6 +311,7 @@ public:
 	bool showFormspec(const char *name, const std::string &formspec, const std::string &formname);
 	Map & getMap() { return m_env->getMap(); }
 	ServerEnvironment & getEnv() { return *m_env; }
+	v3f findSpawnPos();
 
 	u32 hudAdd(RemotePlayer *player, HudElement *element);
 	bool hudRemove(RemotePlayer *player, u32 id);
@@ -334,7 +336,14 @@ public:
 	bool setPlayerEyeOffset(RemotePlayer *player, v3f first, v3f third);
 
 	bool setSky(RemotePlayer *player, const video::SColor &bgcolor,
-			const std::string &type, const std::vector<std::string> &params);
+			const std::string &type, const std::vector<std::string> &params,
+			bool &clouds);
+	bool setClouds(RemotePlayer *player, float density,
+			const video::SColor &color_bright,
+			const video::SColor &color_ambient,
+			float height,
+			float thickness,
+			const v2f &speed);
 
 	bool overrideDayNightRatio(RemotePlayer *player, bool do_override, float brightness);
 
@@ -403,7 +412,14 @@ private:
 	void SendHUDSetFlags(u16 peer_id, u32 flags, u32 mask);
 	void SendHUDSetParam(u16 peer_id, u16 param, const std::string &value);
 	void SendSetSky(u16 peer_id, const video::SColor &bgcolor,
-			const std::string &type, const std::vector<std::string> &params);
+			const std::string &type, const std::vector<std::string> &params,
+			bool &clouds);
+	void SendCloudParams(u16 peer_id, float density,
+			const video::SColor &color_bright,
+			const video::SColor &color_ambient,
+			float height,
+			float thickness,
+			const v2f &speed);
 	void SendOverrideDayNightRatio(u16 peer_id, bool do_override, float ratio);
 
 	/*
@@ -475,8 +491,6 @@ private:
 		bool check_shout_priv = false,
 		RemotePlayer *player = NULL);
 	void handleAdminChat(const ChatEventChat *evt);
-
-	v3f findSpawnPos();
 
 	// When called, connection mutex should be locked
 	RemoteClient* getClient(u16 peer_id,ClientState state_min=CS_Active);

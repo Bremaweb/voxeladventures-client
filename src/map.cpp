@@ -44,7 +44,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "database.h"
 #include "database-dummy.h"
 #include "database-sqlite3.h"
-#include "script/serverscripting.h"
+#include "script/scripting_server.h"
 #include <deque>
 #include <queue>
 #if USE_LEVELDB
@@ -981,7 +981,7 @@ void Map::transformLiquids(std::map<v3s16, MapBlock*> &modified_blocks,
 
 	time_until_purge *= 1000;	// seconds -> milliseconds
 
-	u32 curr_time = getTime(PRECISION_MILLI);
+	u64 curr_time = porting::getTimeMs();
 	u32 prev_unprocessed = m_unprocessed_count;
 	m_unprocessed_count = m_transforming_liquid.size();
 
@@ -2286,13 +2286,13 @@ bool ServerMap::loadSectorFull(v2s16 p2d)
 }
 #endif
 
-Database *ServerMap::createDatabase(
+MapDatabase *ServerMap::createDatabase(
 	const std::string &name,
 	const std::string &savedir,
 	Settings &conf)
 {
 	if (name == "sqlite3")
-		return new Database_SQLite3(savedir);
+		return new MapDatabaseSQLite3(savedir);
 	if (name == "dummy")
 		return new Database_Dummy();
 	#if USE_LEVELDB
@@ -2304,8 +2304,11 @@ Database *ServerMap::createDatabase(
 		return new Database_Redis(conf);
 	#endif
 	#if USE_POSTGRESQL
-	else if (name == "postgresql")
-		return new Database_PostgreSQL(conf);
+	else if (name == "postgresql") {
+		std::string connect_string = "";
+		conf.getNoEx("pgsql_connection", connect_string);
+		return new MapDatabasePostgreSQL(connect_string);
+	}
 	#endif
 	else
 		throw BaseException(std::string("Database backend ") + name + " not supported.");
@@ -2326,7 +2329,7 @@ bool ServerMap::saveBlock(MapBlock *block)
 	return saveBlock(block, dbase);
 }
 
-bool ServerMap::saveBlock(MapBlock *block, Database *db)
+bool ServerMap::saveBlock(MapBlock *block, MapDatabase *db)
 {
 	v3s16 p3d = block->getPos();
 

@@ -47,6 +47,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #endif
 #ifndef SERVER
 #include "client/clientlauncher.h"
+
 #endif
 
 #ifdef HAVE_TOUCHSCREENGUI
@@ -102,28 +103,10 @@ static bool get_game_from_cmdline(GameParams *game_params, const Settings &cmd_a
 static bool determine_subgame(GameParams *game_params);
 
 static bool run_dedicated_server(const GameParams &game_params, const Settings &cmd_args);
-static bool migrate_database(const GameParams &game_params, const Settings &cmd_args);
+static bool migrate_map_database(const GameParams &game_params, const Settings &cmd_args);
 
 /**********************************************************************/
 
-/*
-	gettime.h implementation
-*/
-
-#ifdef SERVER
-
-u32 getTimeMs()
-{
-	/* Use imprecise system calls directly (from porting.h) */
-	return porting::getTime(PRECISION_MILLI);
-}
-
-u32 getTime(TimePrecision prec)
-{
-	return porting::getTime(prec);
-}
-
-#endif
 
 FileLogOutput file_log_output;
 
@@ -292,6 +275,8 @@ static void set_allowed_options(OptionList *allowed_options)
 			_("Set gameid (\"--gameid list\" prints available ones)"))));
 	allowed_options->insert(std::make_pair("migrate", ValueSpec(VALUETYPE_STRING,
 			_("Migrate from current map backend to another (Only works when using minetestserver or with --server)"))));
+	allowed_options->insert(std::make_pair("migrate-players", ValueSpec(VALUETYPE_STRING,
+		_("Migrate from current players backend to another (Only works when using minetestserver or with --server)"))));
 	allowed_options->insert(std::make_pair("terminal", ValueSpec(VALUETYPE_FLAG,
 			_("Feature an interactive terminal (Only works when using minetestserver or with --server)"))));
 #ifndef SERVER
@@ -332,7 +317,7 @@ static void print_allowed_options(const OptionList &allowed_options)
 		if (i->second.type != VALUETYPE_FLAG)
 			os1 << _(" <value>");
 
-		std::cout << padStringRight(os1.str(), 24);
+		std::cout << padStringRight(os1.str(), 30);
 
 		if (i->second.help != NULL)
 			std::cout << i->second.help;
@@ -828,7 +813,9 @@ static bool run_dedicated_server(const GameParams &game_params, const Settings &
 
 	// Database migration
 	if (cmd_args.exists("migrate"))
-		return migrate_database(game_params, cmd_args);
+		return migrate_map_database(game_params, cmd_args);
+	else if (cmd_args.exists("migrate-players"))
+		return ServerEnvironment::migratePlayersDatabase(game_params, cmd_args);
 
 	if (cmd_args.exists("terminal")) {
 #if USE_CURSES
@@ -912,7 +899,7 @@ static bool run_dedicated_server(const GameParams &game_params, const Settings &
 	return true;
 }
 
-static bool migrate_database(const GameParams &game_params, const Settings &cmd_args)
+static bool migrate_map_database(const GameParams &game_params, const Settings &cmd_args)
 {
 	std::string migrate_to = cmd_args.get("migrate");
 	Settings world_mt;
@@ -921,20 +908,23 @@ static bool migrate_database(const GameParams &game_params, const Settings &cmd_
 		errorstream << "Cannot read world.mt!" << std::endl;
 		return false;
 	}
+
 	if (!world_mt.exists("backend")) {
 		errorstream << "Please specify your current backend in world.mt:"
 			<< std::endl
-			<< "	backend = {sqlite3|leveldb|redis|dummy}"
+			<< "	backend = {sqlite3|leveldb|redis|dummy|postgresql}"
 			<< std::endl;
 		return false;
 	}
+
 	std::string backend = world_mt.get("backend");
 	if (backend == migrate_to) {
 		errorstream << "Cannot migrate: new backend is same"
 			<< " as the old one" << std::endl;
 		return false;
 	}
-	Database *old_db = ServerMap::createDatabase(backend, game_params.world_path, world_mt),
+
+	MapDatabase *old_db = ServerMap::createDatabase(backend, game_params.world_path, world_mt),
 		*new_db = ServerMap::createDatabase(migrate_to, game_params.world_path, world_mt);
 
 	u32 count = 0;
@@ -976,4 +966,3 @@ static bool migrate_database(const GameParams &game_params, const Settings &cmd_
 
 	return true;
 }
-

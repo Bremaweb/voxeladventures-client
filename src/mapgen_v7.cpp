@@ -1,7 +1,7 @@
 /*
 Minetest
-Copyright (C) 2010-2015 kwolekr, Ryan Kwolek <kwolekr@minetest.net>
-Copyright (C) 2010-2015 paramat, Matt Gregory
+Copyright (C) 2013-2016 kwolekr, Ryan Kwolek <kwolekr@minetest.net>
+Copyright (C) 2014-2017 paramat
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by
@@ -292,12 +292,12 @@ void MapgenV7::makeChunk(BlockMakeData *data)
 
 	// Generate caverns, tunnels and classic caves
 	if (flags & MG_CAVES) {
-		bool has_cavern = false;
+		bool near_cavern = false;
 		// Generate caverns
 		if (spflags & MGV7_CAVERNS)
-			has_cavern = generateCaverns(stone_surface_max_y);
+			near_cavern = generateCaverns(stone_surface_max_y);
 		// Generate tunnels and classic caves
-		if (has_cavern)
+		if (near_cavern)
 			// Disable classic caves in this mapchunk by setting
 			// 'large cave depth' to world base. Avoids excessive liquid in
 			// large caverns and floating blobs of overgenerated liquid.

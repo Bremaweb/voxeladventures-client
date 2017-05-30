@@ -134,6 +134,7 @@ LOCAL_SRC_FILES := \
 		jni/src/convert_json.cpp                  \
 		jni/src/craftdef.cpp                      \
 		jni/src/database-dummy.cpp                \
+		jni/src/database-files.cpp                \
 		jni/src/database-sqlite3.cpp              \
 		jni/src/database.cpp                      \
 		jni/src/debug.cpp                         \
@@ -142,6 +143,7 @@ LOCAL_SRC_FILES := \
 		jni/src/dungeongen.cpp                    \
 		jni/src/emerge.cpp                        \
 		jni/src/environment.cpp                   \
+		jni/src/face_position_cache.cpp           \
 		jni/src/filecache.cpp                     \
 		jni/src/filesys.cpp                       \
 		jni/src/fontengine.cpp                    \
@@ -268,6 +270,7 @@ LOCAL_SRC_FILES := \
 		jni/src/settings.cpp                      \
 		jni/src/wieldmesh.cpp                     \
 		jni/src/client/clientlauncher.cpp         \
+		jni/src/client/inputhandler.cpp           \
 		jni/src/client/tile.cpp                   \
 		jni/src/client/joystick_controller.cpp    \
 		jni/src/irrlicht_changes/static_text.cpp
@@ -304,6 +307,7 @@ LOCAL_SRC_FILES += \
 		jni/src/script/cpp_api/s_server.cpp       \
 		jni/src/script/lua_api/l_areastore.cpp    \
 		jni/src/script/lua_api/l_base.cpp         \
+		jni/src/script/lua_api/l_camera.cpp       \
 		jni/src/script/lua_api/l_client.cpp       \
 		jni/src/script/lua_api/l_craft.cpp        \
 		jni/src/script/lua_api/l_env.cpp          \
@@ -328,8 +332,8 @@ LOCAL_SRC_FILES += \
 		jni/src/script/lua_api/l_storage.cpp      \
 		jni/src/script/lua_api/l_util.cpp         \
 		jni/src/script/lua_api/l_vmanip.cpp       \
-		jni/src/script/clientscripting.cpp        \
-		jni/src/script/serverscripting.cpp        \
+		jni/src/script/scripting_client.cpp       \
+		jni/src/script/scripting_server.cpp       \
 		jni/src/script/scripting_mainmenu.cpp
 
 #freetype2 support

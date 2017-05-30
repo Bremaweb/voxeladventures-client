@@ -47,7 +47,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "database-sqlite3.h"
 #include "serialization.h"
 #include "guiscalingfilter.h"
-#include "script/clientscripting.h"
+#include "script/scripting_client.h"
 #include "game.h"
 
 
@@ -61,6 +61,7 @@ Client::Client(
 		IrrlichtDevice *device,
 		const char *playername,
 		const std::string &password,
+		const std::string &address_name,
 		MapDrawControl &control,
 		IWritableTextureSource *tsrc,
 		IWritableShaderSource *shsrc,
@@ -92,8 +93,10 @@ Client::Client(
 	),
 	m_particle_manager(&m_env),
 	m_con(PROTOCOL_ID, 512, CONNECTION_TIMEOUT, ipv6, this),
+	m_address_name(address_name),
 	m_device(device),
 	m_camera(NULL),
+	m_minimap(NULL),
 	m_minimap_disabled_by_server(false),
 	m_server_ser_ver(SER_FMT_VER_INVALID),
 	m_proto_ver(0),
@@ -104,6 +107,8 @@ Client::Client(
 	m_animation_time(0),
 	m_crack_level(-1),
 	m_crack_pos(0,0,0),
+	m_last_chat_message_sent(time(NULL)),
+	m_chat_message_allowance(5.0f),
 	m_map_seed(0),
 	m_password(password),
 	m_chosen_auth_mech(AUTH_MECHANISM_NONE),
@@ -128,7 +133,9 @@ Client::Client(
 	// Add local player
 	m_env.setLocalPlayer(new LocalPlayer(this, playername));
 
-	m_minimap = new Minimap(device, this);
+	if (g_settings->getBool("enable_minimap")) {
+		m_minimap = new Minimap(device, this);
+	}
 	m_cache_save_interval = g_settings->getU16("server_map_save_interval");
 
 	m_modding_enabled = g_settings->getBool("enable_client_modding");
@@ -169,7 +176,7 @@ void Client::initMods()
 		if (!string_allowed(mod.name, MODNAME_ALLOWED_CHARS)) {
 			throw ModError("Error loading mod \"" + mod.name +
 				"\": Mod name does not follow naming conventions: "
-					"Only chararacters [a-z0-9_] are allowed.");
+					"Only characters [a-z0-9_] are allowed.");
 		}
 		std::string script_path = mod.path + DIR_DELIM + "init.lua";
 		infostream << "  [" << padStringRight(mod.name, 12) << "] [\""
@@ -257,13 +264,11 @@ Client::~Client()
 	delete m_minimap;
 }
 
-void Client::connect(Address address,
-		const std::string &address_name,
-		bool is_local_server)
+void Client::connect(Address address, bool is_local_server)
 {
 	DSTACK(FUNCTION_NAME);
 
-	initLocalMapSaving(address, address_name, is_local_server);
+	initLocalMapSaving(address, m_address_name, is_local_server);
 
 	m_con.SetTimeoutMs(0);
 	m_con.Connect(address);
@@ -402,6 +407,14 @@ void Client::step(float dtime)
 	}
 
 	/*
+		Send pending messages on out chat queue
+	*/
+	if (!m_out_chat_queue.empty() && canSendChatMessage()) {
+		sendChatMessage(m_out_chat_queue.front());
+		m_out_chat_queue.pop();
+	}
+
+	/*
 		Handle environment
 	*/
 	// Control local player (0ms)
@@ -420,16 +433,14 @@ void Client::step(float dtime)
 	/*
 		Get events
 	*/
-	for(;;) {
-		ClientEnvEvent event = m_env.getClientEvent();
-		if(event.type == CEE_NONE) {
-			break;
-		}
-		else if(event.type == CEE_PLAYER_DAMAGE) {
-			if(m_ignore_damage_timer <= 0) {
-				u8 damage = event.player_damage.amount;
+	while (m_env.hasClientEnvEvents()) {
+		ClientEnvEvent envEvent = m_env.getClientEnvEvent();
 
-				if(event.player_damage.send_to_server)
+		if (envEvent.type == CEE_PLAYER_DAMAGE) {
+			if (m_ignore_damage_timer <= 0) {
+				u8 damage = envEvent.player_damage.amount;
+
+				if (envEvent.player_damage.send_to_server)
 					sendDamage(damage);
 
 				// Add to ClientEvent queue
@@ -440,8 +451,8 @@ void Client::step(float dtime)
 			}
 		}
 		// Protocol v29 or greater obsoleted this event
-		else if (event.type == CEE_PLAYER_BREATH && m_proto_ver < 29) {
-			u16 breath = event.player_breath.amount;
+		else if (envEvent.type == CEE_PLAYER_BREATH && m_proto_ver < 29) {
+			u16 breath = envEvent.player_breath.amount;
 			sendBreath(breath);
 		}
 	}
@@ -512,7 +523,7 @@ void Client::step(float dtime)
 				delete r.mesh;
 			}
 
-			if (do_mapper_update)
+			if (m_minimap && do_mapper_update)
 				m_minimap->addBlock(r.p, minimap_mapblock);
 
 			if (r.ack_block_to_server) {
@@ -535,7 +546,6 @@ void Client::step(float dtime)
 	if (m_media_downloader && m_media_downloader->isStarted()) {
 		m_media_downloader->step(this);
 		if (m_media_downloader->isDone()) {
-			received_media();
 			delete m_media_downloader;
 			m_media_downloader = NULL;
 		}
@@ -756,14 +766,6 @@ void Client::request_media(const std::vector<std::string> &file_requests)
 			<< file_requests.size() << " files. packet size)" << std::endl;
 }
 
-void Client::received_media()
-{
-	NetworkPacket pkt(TOSERVER_RECEIVED_MEDIA, 0);
-	Send(&pkt);
-	infostream << "Client: Notifying server that we received all media"
-			<< std::endl;
-}
-
 void Client::initLocalMapSaving(const Address &address,
 		const std::string &hostname,
 		bool is_local_server)
@@ -779,7 +781,7 @@ void Client::initLocalMapSaving(const Address &address,
 
 	fs::CreateAllDirs(world_path);
 
-	m_localdb = new Database_SQLite3(world_path);
+	m_localdb = new MapDatabaseSQLite3(world_path);
 	m_localdb->beginSave();
 	actionstream << "Local map saving started, map will be saved at '" << world_path << "'" << std::endl;
 }
@@ -787,7 +789,7 @@ void Client::initLocalMapSaving(const Address &address,
 void Client::ReceiveAll()
 {
 	DSTACK(FUNCTION_NAME);
-	u32 start_ms = porting::getTimeMs();
+	u64 start_ms = porting::getTimeMs();
 	for(;;)
 	{
 		// Limit time even if there would be huge amounts of data to
@@ -1174,13 +1176,50 @@ void Client::sendInventoryAction(InventoryAction *a)
 	Send(&pkt);
 }
 
+bool Client::canSendChatMessage() const
+{
+	u32 now = time(NULL);
+	float time_passed = now - m_last_chat_message_sent;
+
+	float virt_chat_message_allowance = m_chat_message_allowance + time_passed *
+			(CLIENT_CHAT_MESSAGE_LIMIT_PER_10S / 8.0f);
+
+	if (virt_chat_message_allowance < 1.0f)
+		return false;
+
+	return true;
+}
+
 void Client::sendChatMessage(const std::wstring &message)
 {
-	NetworkPacket pkt(TOSERVER_CHAT_MESSAGE, 2 + message.size() * sizeof(u16));
+	const s16 max_queue_size = g_settings->getS16("max_out_chat_queue_size");
+	if (canSendChatMessage()) {
+		u32 now = time(NULL);
+		float time_passed = now - m_last_chat_message_sent;
+		m_last_chat_message_sent = time(NULL);
 
-	pkt << message;
+		m_chat_message_allowance += time_passed * (CLIENT_CHAT_MESSAGE_LIMIT_PER_10S / 8.0f);
+		if (m_chat_message_allowance > CLIENT_CHAT_MESSAGE_LIMIT_PER_10S)
+			m_chat_message_allowance = CLIENT_CHAT_MESSAGE_LIMIT_PER_10S;
 
-	Send(&pkt);
+		m_chat_message_allowance -= 1.0f;
+
+		NetworkPacket pkt(TOSERVER_CHAT_MESSAGE, 2 + message.size() * sizeof(u16));
+
+		pkt << message;
+
+		Send(&pkt);
+	} else if (m_out_chat_queue.size() < (u16) max_queue_size || max_queue_size == -1) {
+		m_out_chat_queue.push(message);
+	} else {
+		infostream << "Could not queue chat message because maximum out chat queue size ("
+				<< max_queue_size << ") is reached." << std::endl;
+	}
+}
+
+void Client::clearOutChatQueue()
+{
+	m_out_chat_queue = std::queue<std::wstring>();
 }
 
 void Client::sendChangePassword(const std::string &oldpassword,
@@ -1614,14 +1653,11 @@ void Client::addUpdateMeshTaskForNode(v3s16 nodepos, bool ack_to_server, bool ur
 
 ClientEvent Client::getClientEvent()
 {
-	ClientEvent event;
-	if (m_client_event_queue.empty()) {
-		event.type = CE_NONE;
-	}
-	else {
-		event = m_client_event_queue.front();
-		m_client_event_queue.pop();
-	}
+	FATAL_ERROR_IF(m_client_event_queue.empty(),
+			"Cannot getClientEvent, queue is empty.");
+
+	ClientEvent event = m_client_event_queue.front();
+	m_client_event_queue.pop();
 	return event;
 }
 
@@ -1636,7 +1672,7 @@ float Client::mediaReceiveProgress()
 typedef struct TextureUpdateArgs {
 	IrrlichtDevice *device;
 	gui::IGUIEnvironment *guienv;
-	u32 last_time_ms;
+	u64 last_time_ms;
 	u16 last_percent;
 	const wchar_t* text_base;
 	ITextureSource *tsrc;
@@ -1649,10 +1685,10 @@ void texture_update_progress(void *args, u32 progress, u32 max_progress)
 
 		// update the loading menu -- if neccessary
 		bool do_draw = false;
-		u32 time_ms = targs->last_time_ms;
+		u64 time_ms = targs->last_time_ms;
 		if (cur_percent != targs->last_percent) {
 			targs->last_percent = cur_percent;
-			time_ms = getTimeMs();
+			time_ms = porting::getTimeMs();
 			// only draw when the user will notice something:
 			do_draw = (time_ms - targs->last_time_ms > 100);
 		}
@@ -1710,7 +1746,7 @@ void Client::afterContentReceived(IrrlichtDevice *device)
 	TextureUpdateArgs tu_args;
 	tu_args.device = device;
 	tu_args.guienv = guienv;
-	tu_args.last_time_ms = getTimeMs();
+	tu_args.last_time_ms = porting::getTimeMs();
 	tu_args.last_percent = 0;
 	tu_args.text_base =  wgettext("Initializing nodes");
 	tu_args.tsrc = m_tsrc;
@@ -1742,7 +1778,7 @@ float Client::getRTT()
 
 float Client::getCurRate()
 {
-	return ( m_con.getLocalStat(con::CUR_INC_RATE) +
+	return (m_con.getLocalStat(con::CUR_INC_RATE) +
 			m_con.getLocalStat(con::CUR_DL_RATE));
 }
 
@@ -1943,4 +1979,3 @@ std::string Client::getModStoragePath() const
 {
 	return porting::path_user + DIR_DELIM + "client" + DIR_DELIM + "mod_storage";
 }
-

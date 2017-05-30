@@ -22,6 +22,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include <iomanip>
 #include "camera.h"
 #include "client.h"
+#include "client/inputhandler.h"
 #include "client/tile.h"     // For TextureSource
 #include "client/keys.h"
 #include "client/joystick_controller.h"
@@ -50,26 +51,18 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "quicktune_shortcutter.h"
 #include "server.h"
 #include "settings.h"
-#include "shader.h"          // For ShaderSource
 #include "sky.h"
 #include "subgame.h"
 #include "tool.h"
+#include "util/basic_macros.h"
 #include "util/directiontables.h"
 #include "util/pointedthing.h"
 #include "irrlicht_changes/static_text.h"
 #include "version.h"
-#include "minimap.h"
-#include "mapblock_mesh.h"
-#include "script/clientscripting.h"
-
-#include "sound.h"
+#include "script/scripting_client.h"
 
 #if USE_SOUND
 	#include "sound_openal.h"
-#endif
-
-#ifdef HAVE_TOUCHSCREENGUI
-	#include "touchscreengui.h"
 #endif
 
 extern Settings *g_settings;
@@ -202,7 +195,8 @@ public:
 
 		return meta->getString("formspec");
 	}
-	std::string resolveText(std::string str)
+
+	virtual std::string resolveText(const std::string &str)
 	{
 		NodeMetadata *meta = m_map->getNodeMetadata(m_p);
 
@@ -475,6 +469,7 @@ class SoundMaker
 	ISoundManager *m_sound;
 	INodeDefManager *m_ndef;
 public:
+	bool makes_footstep_sound;
 	float m_player_step_timer;
 
 	SimpleSoundSpec m_player_step_sound;
@@ -484,6 +479,7 @@ public:
 	SoundMaker(ISoundManager *sound, INodeDefManager *ndef):
 		m_sound(sound),
 		m_ndef(ndef),
+		makes_footstep_sound(true),
 		m_player_step_timer(0)
 	{
 	}
@@ -492,7 +488,8 @@ public:
 	{
 		if (m_player_step_timer <= 0 && m_player_step_sound.exists()) {
 			m_player_step_timer = 0.03;
-			m_sound->playSound(m_player_step_sound, false);
+			if (makes_footstep_sound)
+				m_sound->playSound(m_player_step_sound, false);
 		}
 	}
 
@@ -566,27 +563,35 @@ public:
 class GameOnDemandSoundFetcher: public OnDemandSoundFetcher
 {
 	std::set<std::string> m_fetched;
+private:
+	void paths_insert(std::set<std::string> &dst_paths,
+		const std::string &base,
+		const std::string &name)
+	{
+		dst_paths.insert(base + DIR_DELIM + "sounds" + DIR_DELIM + name + ".ogg");
+		dst_paths.insert(base + DIR_DELIM + "sounds" + DIR_DELIM + name + ".0.ogg");
+		dst_paths.insert(base + DIR_DELIM + "sounds" + DIR_DELIM + name + ".1.ogg");
+		dst_paths.insert(base + DIR_DELIM + "sounds" + DIR_DELIM + name + ".2.ogg");
+		dst_paths.insert(base + DIR_DELIM + "sounds" + DIR_DELIM + name + ".3.ogg");
+		dst_paths.insert(base + DIR_DELIM + "sounds" + DIR_DELIM + name + ".4.ogg");
+		dst_paths.insert(base + DIR_DELIM + "sounds" + DIR_DELIM + name + ".5.ogg");
+		dst_paths.insert(base + DIR_DELIM + "sounds" + DIR_DELIM + name + ".6.ogg");
+		dst_paths.insert(base + DIR_DELIM + "sounds" + DIR_DELIM + name + ".7.ogg");
+		dst_paths.insert(base + DIR_DELIM + "sounds" + DIR_DELIM + name + ".8.ogg");
+		dst_paths.insert(base + DIR_DELIM + "sounds" + DIR_DELIM + name + ".9.ogg");
+	}
 public:
 	void fetchSounds(const std::string &name,
-			std::set<std::string> &dst_paths,
-			std::set<std::string> &dst_datas)
+		std::set<std::string> &dst_paths,
+		std::set<std::string> &dst_datas)
 	{
 		if (m_fetched.count(name))
 			return;
 
 		m_fetched.insert(name);
-		std::string base = porting::path_share + DIR_DELIM + "sounds";
-		dst_paths.insert(base + DIR_DELIM + name + ".ogg");
-		dst_paths.insert(base + DIR_DELIM + name + ".0.ogg");
-		dst_paths.insert(base + DIR_DELIM + name + ".1.ogg");
-		dst_paths.insert(base + DIR_DELIM + name + ".2.ogg");
-		dst_paths.insert(base + DIR_DELIM + name + ".3.ogg");
-		dst_paths.insert(base + DIR_DELIM + name + ".4.ogg");
-		dst_paths.insert(base + DIR_DELIM + name + ".5.ogg");
-		dst_paths.insert(base + DIR_DELIM + name + ".6.ogg");
-		dst_paths.insert(base + DIR_DELIM + name + ".7.ogg");
-		dst_paths.insert(base + DIR_DELIM + name + ".8.ogg");
-		dst_paths.insert(base + DIR_DELIM + name + ".9.ogg");
+
+		paths_insert(dst_paths, porting::path_share, name);
+		paths_insert(dst_paths, porting::path_user,  name);
 	}
 };
 
@@ -710,16 +715,19 @@ public:
 		m_eye_position_pixel.set(eye_position_array, services);
 		m_eye_position_vertex.set(eye_position_array, services);
 
-		float minimap_yaw_array[3];
-		v3f minimap_yaw = m_client->getMinimap()->getYawVec();
+		if (m_client->getMinimap()) {
+			float minimap_yaw_array[3];
+			v3f minimap_yaw = m_client->getMinimap()->getYawVec();
 #if (IRRLICHT_VERSION_MAJOR == 1 && IRRLICHT_VERSION_MINOR < 8)
-		minimap_yaw_array[0] = minimap_yaw.X;
-		minimap_yaw_array[1] = minimap_yaw.Y;
-		minimap_yaw_array[2] = minimap_yaw.Z;
+			minimap_yaw_array[0] = minimap_yaw.X;
+			minimap_yaw_array[1] = minimap_yaw.Y;
+			minimap_yaw_array[2] = minimap_yaw.Z;
 #else
-		minimap_yaw.getAs3Values(minimap_yaw_array);
+			minimap_yaw.getAs3Values(minimap_yaw_array);
 #endif
-		m_minimap_yaw.set(minimap_yaw_array, services);
+			m_minimap_yaw.set(minimap_yaw_array, services);
+
+		}
 
 		SamplerLayer_t base_tex = 0,
 				normal_tex = 1,
@@ -1037,6 +1045,11 @@ void KeyCache::populate()
 	key[KeyType::FREEMOVE]     = getKeySetting("keymap_freemove");
 	key[KeyType::FASTMOVE]     = getKeySetting("keymap_fastmove");
 	key[KeyType::NOCLIP]       = getKeySetting("keymap_noclip");
+	key[KeyType::HOTBAR_PREV]  = getKeySetting("keymap_hotbar_previous");
+	key[KeyType::HOTBAR_NEXT]  = getKeySetting("keymap_hotbar_next");
+	key[KeyType::MUTE]         = getKeySetting("keymap_mute");
+	key[KeyType::INC_VOLUME]   = getKeySetting("keymap_increase_volume");
+	key[KeyType::DEC_VOLUME]   = getKeySetting("keymap_decrease_volume");
 	key[KeyType::CINEMATIC]    = getKeySetting("keymap_cinematic");
 	key[KeyType::SCREENSHOT]   = getKeySetting("keymap_screenshot");
 	key[KeyType::TOGGLE_HUD]   = getKeySetting("keymap_toggle_hud");
@@ -1108,6 +1121,7 @@ struct GameRunData {
 	PointedThing pointed_old;
 	bool digging;
 	bool ldown_for_dig;
+	bool dig_instantly;
 	bool left_punch;
 	bool update_wielded_item_trigger;
 	bool reset_jump_timer;
@@ -1619,9 +1633,25 @@ void Game::run()
 			&& client->checkPrivilege("fast");
 #endif
 
+	irr::core::dimension2d<u32> previous_screen_size(g_settings->getU16("screenW"),
+		g_settings->getU16("screenH"));
+
 	while (device->run()
 			&& !(*kill || g_gamecallback->shutdown_requested
 			|| (server && server->getShutdownRequested()))) {
+
+		const irr::core::dimension2d<u32> &current_screen_size =
+			device->getVideoDriver()->getScreenSize();
+		// Verify if window size has changed and save it if it's the case
+		// Ensure evaluating settings->getBool after verifying screensize
+		// First condition is cheaper
+		if (previous_screen_size != current_screen_size &&
+				current_screen_size != irr::core::dimension2d<u32>(0,0) &&
+				g_settings->getBool("autosave_screensize")) {
+			g_settings->setU16("screenW", current_screen_size.Width);
+			g_settings->setU16("screenH", current_screen_size.Height);
+			previous_screen_size = current_screen_size;
+		}
 
 		/* Must be called immediately after a device->run() call because it
 		 * uses device->getTimer()->getTime()
@@ -1671,6 +1701,8 @@ void Game::shutdown()
 		driver->setRenderTarget(irr::video::ERT_STEREO_BOTH_BUFFERS);
 	}
 #endif
+	if (current_formspec)
+		current_formspec->quitMenu();
 
 	showOverlayMessage(wgettext("Shutting down..."), 0, 0, false);
 
@@ -1921,7 +1953,8 @@ bool Game::createClient(const std::string &playername,
 	}
 
 	mapper = client->getMinimap();
-	mapper->setMinimapMode(MINIMAP_MODE_OFF);
+	if (mapper)
+		mapper->setMinimapMode(MINIMAP_MODE_OFF);
 
 	return true;
 }
@@ -2034,7 +2067,7 @@ bool Game::connectToServer(const std::string &playername,
 	}
 
 	client = new Client(device,
-			playername.c_str(), password,
+			playername.c_str(), password, *address,
 			*draw_control, texture_src, shader_src,
 			itemdef_manager, nodedef_manager, sound, eventmgr,
 			connect_address.isIPv6(), &flags);
@@ -2046,7 +2079,7 @@ bool Game::connectToServer(const std::string &playername,
 	connect_address.print(&infostream);
 	infostream << std::endl;
 
-	client->connect(connect_address, *address,
+	client->connect(connect_address,
 		simple_singleplayer_mode || local_server_mode);
 
 	/*
@@ -2399,7 +2432,7 @@ void Game::updateStats(RunStats *stats, const FpsControl &draw_times,
 void Game::processUserInput(f32 dtime)
 {
 	// Reset input if window not active or some menu is active
-	if (!device->isWindowActive() || !noMenuActive() || guienv->hasFocus(gui_chat_console)) {
+	if (!device->isWindowActive() || isMenuActive() || guienv->hasFocus(gui_chat_console)) {
 		input->clear();
 #ifdef HAVE_TOUCHSCREENGUI
 		g_touchscreengui->hide();
@@ -2464,6 +2497,30 @@ void Game::processKeyInput()
 		toggleFast();
 	} else if (wasKeyDown(KeyType::NOCLIP)) {
 		toggleNoClip();
+	} else if (wasKeyDown(KeyType::MUTE)) {
+		float volume = g_settings->getFloat("sound_volume");
+		if (volume < 0.001f) {
+			g_settings->setFloat("sound_volume", 1.0f);
+			m_statustext = narrow_to_wide(gettext("Volume changed to 100%"));
+		} else {
+			g_settings->setFloat("sound_volume", 0.0f);
+			m_statustext = narrow_to_wide(gettext("Volume changed to 0%"));
+		}
+		runData.statustext_time = 0;
+	} else if (wasKeyDown(KeyType::INC_VOLUME)) {
+		float new_volume = rangelim(g_settings->getFloat("sound_volume") + 0.1f, 0.0f, 1.0f);
+		char buf[100];
+		g_settings->setFloat("sound_volume", new_volume);
+		snprintf(buf, sizeof(buf), gettext("Volume changed to %d%%"), myround(new_volume * 100));
+		m_statustext = narrow_to_wide(buf);
+		runData.statustext_time = 0;
+	} else if (wasKeyDown(KeyType::DEC_VOLUME)) {
+		float new_volume = rangelim(g_settings->getFloat("sound_volume") - 0.1f, 0.0f, 1.0f);
+		char buf[100];
+		g_settings->setFloat("sound_volume", new_volume);
+		snprintf(buf, sizeof(buf), gettext("Volume changed to %d%%"), myround(new_volume * 100));
+		m_statustext = narrow_to_wide(buf);
+		runData.statustext_time = 0;
 	} else if (wasKeyDown(KeyType::CINEMATIC)) {
 		toggleCinematic();
 	} else if (wasKeyDown(KeyType::SCREENSHOT)) {
@@ -2582,11 +2639,13 @@ void Game::processItemSelection(u16 *new_playeritem)
 
 	s32 dir = wheel;
 
-	if (input->joystick.wasKeyDown(KeyType::SCROLL_DOWN)) {
+	if (input->joystick.wasKeyDown(KeyType::SCROLL_DOWN) ||
+			wasKeyDown(KeyType::HOTBAR_NEXT)) {
 		dir = -1;
 	}
 
-	if (input->joystick.wasKeyDown(KeyType::SCROLL_UP)) {
+	if (input->joystick.wasKeyDown(KeyType::SCROLL_UP) ||
+			wasKeyDown(KeyType::HOTBAR_PREV)) {
 		dir = 1;
 	}
 
@@ -2779,7 +2838,7 @@ void Game::toggleHud()
 
 void Game::toggleMinimap(bool shift_pressed)
 {
-	if (!flags.show_hud || !g_settings->getBool("enable_minimap"))
+	if (!mapper || !flags.show_hud || !g_settings->getBool("enable_minimap"))
 		return;
 
 	if (shift_pressed) {
@@ -2954,7 +3013,8 @@ void Game::toggleFullViewRange()
 
 void Game::updateCameraDirection(CameraOrientation *cam, float dtime)
 {
-	if ((device->isWindowActive() && noMenuActive()) || random_input) {
+	if ((device->isWindowActive() && device->isWindowFocused()
+			&& !isMenuActive()) || random_input) {
 
 #ifndef __ANDROID__
 		if (!random_input) {
@@ -2979,8 +3039,7 @@ void Game::updateCameraDirection(CameraOrientation *cam, float dtime)
 			device->getCursorControl()->setVisible(true);
 #endif
 
-		if (!m_first_loop_after_window_activation)
-			m_first_loop_after_window_activation = true;
+		m_first_loop_after_window_activation = true;
 
 	}
 }
@@ -3096,11 +3155,10 @@ inline void Game::step(f32 *dtime)
 
 void Game::processClientEvents(CameraOrientation *cam)
 {
-	ClientEvent event = client->getClientEvent();
-
 	LocalPlayer *player = client->getEnv().getLocalPlayer();
 
-	for ( ; event.type != CE_NONE; event = client->getClientEvent()) {
+	while (client->hasClientEvents()) {
+		ClientEvent event = client->getClientEvent();
 
 		switch (event.type) {
 		case CE_PLAYER_DAMAGE:
@@ -3297,6 +3355,8 @@ void Game::processClientEvents(CameraOrientation *cam)
 
 		case CE_SET_SKY:
 			sky->setVisible(false);
+			// Whether clouds are visible in front of a custom skybox
+			sky->setCloudsEnabled(event.set_sky.clouds);
 
 			if (skybox) {
 				skybox->remove();
@@ -3306,6 +3366,7 @@ void Game::processClientEvents(CameraOrientation *cam)
 			// Handle according to type
 			if (*event.set_sky.type == "regular") {
 				sky->setVisible(true);
+				sky->setCloudsEnabled(true);
 			} else if (*event.set_sky.type == "skybox" &&
 					event.set_sky.params->size() == 6) {
 				sky->setFallbackBgColor(*event.set_sky.bgcolor);
@@ -3335,6 +3396,19 @@ void Game::processClientEvents(CameraOrientation *cam)
 			client->getEnv().setDayNightRatioOverride(
 					event.override_day_night_ratio.do_override,
 					event.override_day_night_ratio.ratio_f * 1000);
+			break;
+
+		case CE_CLOUD_PARAMS:
+			if (clouds) {
+				clouds->setDensity(event.cloud_params.density);
+				clouds->setColorBright(video::SColor(event.cloud_params.color_bright));
+				clouds->setColorAmbient(video::SColor(event.cloud_params.color_ambient));
+				clouds->setHeight(event.cloud_params.height);
+				clouds->setThickness(event.cloud_params.thickness);
+				clouds->setSpeed(v2f(
+						event.cloud_params.speed_x,
+						event.cloud_params.speed_y));
+			}
 			break;
 
 		default:
@@ -3427,15 +3501,27 @@ void Game::updateSound(f32 dtime)
 			      v3f(0, 0, 0), // velocity
 			      camera->getDirection(),
 			      camera->getCameraNode()->getUpVector());
-	sound->setListenerGain(g_settings->getFloat("sound_volume"));
 
+	// Check if volume is in the proper range, else fix it.
+	float old_volume = g_settings->getFloat("sound_volume");
+	float new_volume = rangelim(old_volume, 0.0f, 1.0f);
+	sound->setListenerGain(new_volume);
 
-	//	Update sound maker
-	soundmaker->step(dtime);
+	if (old_volume != new_volume) {
+		g_settings->setFloat("sound_volume", new_volume);
+	}
 
 	LocalPlayer *player = client->getEnv().getLocalPlayer();
 
+
 	v3s16 spos = player->getStandingNodePos();
+	// Tell the sound maker whether to make footstep sounds
+	soundmaker->makes_footstep_sound = player->makes_footstep_sound;
+
+	//	Update sound maker
+	if (player->makes_footstep_sound)
+		soundmaker->step(dtime);
+
 	ClientMap &map = client->getEnv().getClientMap();
 
 	MapNode n = map.getNodeNoEx(player->getFootstepNodePos());
@@ -3545,6 +3631,10 @@ void Game::processPlayerInteraction(f32 dtime, bool show_hud, bool show_debug)
 			client->setCrack(-1, v3s16(0, 0, 0));
 			runData.dig_time = 0.0;
 		}
+	} else if (runData.dig_instantly && getLeftReleased()) {
+		// Remove e.g. torches faster when clicking instead of holding LMB
+		runData.nodig_delay_timer = 0;
+		runData.dig_instantly = false;
 	}
 
 	if (!runData.digging && runData.ldown_for_dig && !isLeftPressed()) {
@@ -3561,7 +3651,8 @@ void Game::processPlayerInteraction(f32 dtime, bool show_hud, bool show_debug)
 		runData.repeat_rightclick_timer = 0;
 
 	if (playeritem_def.usable && isLeftPressed()) {
-		if (getLeftClicked())
+		if (getLeftClicked() && (!client->moddingEnabled()
+				|| !client->getScript()->on_item_use(playeritem, pointed)))
 			client->interact(4, pointed);
 	} else if (pointed.type == POINTEDTHING_NODE) {
 		ToolCapabilities playeritem_toolcap =
@@ -3684,12 +3775,9 @@ PointedThing Game::updatePointedThing(
 		float sin_r = 0.08 * sin(timerf);
 		float sin_g = 0.08 * sin(timerf + irr::core::PI * 0.5);
 		float sin_b = 0.08 * sin(timerf + irr::core::PI);
-		c.setRed(
-			core::clamp(core::round32(c.getRed() * (0.8 + sin_r)), 0, 255));
-		c.setGreen(
-			core::clamp(core::round32(c.getGreen() * (0.8 + sin_g)), 0, 255));
-		c.setBlue(
-			core::clamp(core::round32(c.getBlue() * (0.8 + sin_b)), 0, 255));
+		c.setRed(core::clamp(core::round32(c.getRed() * (0.8 + sin_r)), 0, 255));
+		c.setGreen(core::clamp(core::round32(c.getGreen() * (0.8 + sin_g)), 0, 255));
+		c.setBlue(core::clamp(core::round32(c.getBlue() * (0.8 + sin_b)), 0, 255));
 
 		// Set mesh final color
 		hud->setSelectionMeshColor(c);
@@ -3718,6 +3806,13 @@ void Game::handlePointingAtNode(const PointedThing &pointed, const ItemDefinitio
 	*/
 
 	ClientMap &map = client->getEnv().getClientMap();
+
+	if (runData.nodig_delay_timer <= 0.0 && isLeftPressed()
+			&& client->checkPrivilege("interact")) {
+		handleDigging(pointed, nodepos, playeritem_toolcap, dtime);
+	}
+
+	// This should be done after digging handling
 	NodeMetadata *meta = map.getNodeMetadata(nodepos);
 
 	if (meta) {
@@ -3729,11 +3824,6 @@ void Game::handlePointingAtNode(const PointedThing &pointed, const ItemDefinitio
 			infotext = L"Unknown node: ";
 			infotext += utf8_to_wide(nodedef_manager->get(n).name);
 		}
-	}
-
-	if (runData.nodig_delay_timer <= 0.0 && isLeftPressed()
-			&& client->checkPrivilege("interact")) {
-		handleDigging(pointed, nodepos, playeritem_toolcap, dtime);
 	}
 
 	if ((getRightClicked() ||
@@ -3775,6 +3865,9 @@ void Game::handlePointingAtNode(const PointedThing &pointed, const ItemDefinitio
 				// Read the sound
 				soundmaker->m_player_rightpunch_sound =
 						playeritem_def.sound_place;
+
+				if (client->moddingEnabled())
+					client->getScript()->on_placenode(pointed, playeritem_def);
 			} else {
 				soundmaker->m_player_rightpunch_sound =
 						SimpleSoundSpec();
@@ -3857,15 +3950,6 @@ void Game::handleDigging(const PointedThing &pointed, const v3s16 &nodepos,
 	ClientMap &map = client->getEnv().getClientMap();
 	MapNode n = client->getEnv().getClientMap().getNodeNoEx(nodepos);
 
-	if (!runData.digging) {
-		infostream << "Started digging" << std::endl;
-		if (client->moddingEnabled() && client->getScript()->on_punchnode(nodepos, n))
-			return;
-		client->interact(0, pointed);
-		runData.digging = true;
-		runData.ldown_for_dig = true;
-	}
-
 	// NOTE: Similar piece of code exists on the server side for
 	// cheat detection.
 	// Get digging parameters
@@ -3897,12 +3981,22 @@ void Game::handleDigging(const PointedThing &pointed, const v3s16 &nodepos,
 		}
 	}
 
-	if (runData.dig_time_complete >= 0.001) {
+	if (!runData.digging) {
+		infostream << "Started digging" << std::endl;
+		runData.dig_instantly = runData.dig_time_complete == 0;
+		if (client->moddingEnabled() && client->getScript()->on_punchnode(nodepos, n))
+			return;
+		client->interact(0, pointed);
+		runData.digging = true;
+		runData.ldown_for_dig = true;
+	}
+
+	if (!runData.dig_instantly) {
 		runData.dig_index = (float)crack_animation_length
 				* runData.dig_time
 				/ runData.dig_time_complete;
 	} else {
-		// This is for torches
+		// This is for e.g. torches
 		runData.dig_index = crack_animation_length;
 	}
 
@@ -3937,18 +4031,19 @@ void Game::handleDigging(const PointedThing &pointed, const v3s16 &nodepos,
 		runData.nodig_delay_timer =
 				runData.dig_time_complete / (float)crack_animation_length;
 
-		// We don't want a corresponding delay to
-		// very time consuming nodes
+		// We don't want a corresponding delay to very time consuming nodes
+		// and nodes without digging time (e.g. torches) get a fixed delay.
 		if (runData.nodig_delay_timer > 0.3)
 			runData.nodig_delay_timer = 0.3;
+		else if (runData.dig_instantly)
+			runData.nodig_delay_timer = 0.15;
 
 		bool is_valid_position;
 		MapNode wasnode = map.getNodeNoEx(nodepos, &is_valid_position);
 		if (is_valid_position) {
-			if (client->moddingEnabled()) {
-				if (client->getScript()->on_dignode(nodepos, wasnode)) {
-					return;
-				}
+			if (client->moddingEnabled() &&
+			    		client->getScript()->on_dignode(nodepos, wasnode)) {
+				return;
 			}
 			client->removeNode(nodepos);
 		}
@@ -4152,7 +4247,7 @@ void Game::updateFrame(ProfilerGraph *graph, RunStats *stats, f32 dtime,
 		if (current_formspec->getReferenceCount() == 1) {
 			current_formspec->drop();
 			current_formspec = NULL;
-		} else if (!noMenuActive()) {
+		} else if (isMenuActive()) {
 			guiroot->bringToFront(current_formspec);
 		}
 	}
@@ -4166,7 +4261,7 @@ void Game::updateFrame(ProfilerGraph *graph, RunStats *stats, f32 dtime,
 	TimeTaker tt_draw("mainloop: draw");
 	driver->beginScene(true, true, skycolor);
 
-	draw_scene(driver, smgr, *camera, *client, player, *hud, *mapper,
+	draw_scene(driver, smgr, *camera, *client, player, *hud, mapper,
 			guienv, screensize, skycolor, flags.show_hud,
 			flags.show_minimap);
 
@@ -4201,7 +4296,7 @@ void Game::updateFrame(ProfilerGraph *graph, RunStats *stats, f32 dtime,
 	/*
 		Update minimap pos and rotation
 	*/
-	if (flags.show_minimap && flags.show_hud) {
+	if (mapper && flags.show_minimap && flags.show_hud) {
 		mapper->setPos(floatToInt(player->getPosition(), BS));
 		mapper->setAngle(player->getYaw());
 	}
@@ -4485,6 +4580,7 @@ void Game::extendedResourceCleanup()
 		       << " (note: irrlicht doesn't support removing renderers)" << std::endl;
 }
 
+#define GET_KEY_NAME(KEY) gettext(getKeySetting(#KEY).name())
 void Game::showPauseMenu()
 {
 #ifdef __ANDROID__
@@ -4502,21 +4598,41 @@ void Game::showPauseMenu()
 		" --> place single item to slot\n"
 		);
 #else
-	static const std::string control_text = strgettext("Default Controls:\n"
-		"- WASD: move\n"
-		"- Space: jump/climb\n"
-		"- Shift: sneak/go down\n"
-		"- Q: drop item\n"
-		"- I: inventory\n"
+	static const std::string control_text_template = strgettext("Controls:\n"
+		"- %s: move forwards\n"
+		"- %s: move backwards\n"
+		"- %s: move left\n"
+		"- %s: move right\n"
+		"- %s: jump/climb\n"
+		"- %s: sneak/go down\n"
+		"- %s: drop item\n"
+		"- %s: inventory\n"
 		"- Mouse: turn/look\n"
 		"- Mouse left: dig/punch\n"
 		"- Mouse right: place/use\n"
 		"- Mouse wheel: select item\n"
-		"- T: chat\n"
+		"- %s: chat\n"
 	);
+
+	 char control_text_buf[600];
+
+	 snprintf(control_text_buf, ARRLEN(control_text_buf), control_text_template.c_str(),
+			GET_KEY_NAME(keymap_forward),
+			GET_KEY_NAME(keymap_backward),
+			GET_KEY_NAME(keymap_left),
+			GET_KEY_NAME(keymap_right),
+			GET_KEY_NAME(keymap_jump),
+			GET_KEY_NAME(keymap_sneak),
+			GET_KEY_NAME(keymap_drop),
+			GET_KEY_NAME(keymap_inventory),
+			GET_KEY_NAME(keymap_chat)
+			);
+
+	std::string control_text = std::string(control_text_buf);
+	str_formspec_escape(control_text);
 #endif
 
-	float ypos = simple_singleplayer_mode ? 0.5 : 0.1;
+	float ypos = simple_singleplayer_mode ? 0.7f : 0.1f;
 	std::ostringstream os;
 
 	os << FORMSPEC_VERSION_STRING  << SIZE_TAG
@@ -4526,6 +4642,8 @@ void Game::showPauseMenu()
 	if (!simple_singleplayer_mode) {
 		os << "button_exit[4," << (ypos++) << ";3,0.5;btn_change_password;"
 			<< strgettext("Change Password") << "]";
+	} else {
+		os << "field[4.95,0;5,1.5;;" << strgettext("Game paused") << ";]";
 	}
 
 #ifndef __ANDROID__
@@ -4539,10 +4657,43 @@ void Game::showPauseMenu()
 	os		<< "button_exit[4," << (ypos++) << ";3,0.5;btn_exit_os;"
 		<< strgettext("Exit to OS")   << "]"
 		<< "textarea[7.5,0.25;3.9,6.25;;" << control_text << ";]"
-		<< "textarea[0.4,0.25;3.5,6;;" << PROJECT_NAME_C "\n"
-		<< g_build_info << "\n"
-		<< "path_user = " << wrap_rows(porting::path_user, 20)
-		<< "\n;]";
+		<< "textarea[0.4,0.25;3.9,6.25;;" << PROJECT_NAME_C " " VERSION_STRING "\n"
+		<< "\n"
+		<<  strgettext("Game info:") << "\n";
+	const std::string &address = client->getAddressName();
+	static const std::string mode = strgettext("- Mode: ");
+	if (!simple_singleplayer_mode) {
+		Address serverAddress = client->getServerAddress();
+		if (address != "") {
+			os << mode << strgettext("Remote server") << "\n"
+					<< strgettext("- Address: ") << address;
+		} else {
+			os << mode << strgettext("Hosting server");
+		}
+		os << "\n" << strgettext("- Port: ") << serverAddress.getPort() << "\n";
+	} else {
+		os << mode << strgettext("Singleplayer") << "\n";
+	}
+	if (simple_singleplayer_mode || address == "") {
+		static const std::string on = strgettext("On");
+		static const std::string off = strgettext("Off");
+		const std::string &damage = g_settings->getBool("enable_damage") ? on : off;
+		const std::string &creative = g_settings->getBool("creative_mode") ? on : off;
+		const std::string &announced = g_settings->getBool("server_announce") ? on : off;
+		os << strgettext("- Damage: ") << damage << "\n"
+				<< strgettext("- Creative Mode: ") << creative << "\n";
+		if (!simple_singleplayer_mode) {
+			const std::string &pvp = g_settings->getBool("enable_pvp") ? on : off;
+			os << strgettext("- PvP: ") << pvp << "\n"
+					<< strgettext("- Public: ") << announced << "\n";
+			std::string server_name = g_settings->get("server_name");
+			str_formspec_escape(server_name);
+			if (announced == on && server_name != "")
+				os << strgettext("- Server Name: ") << server_name;
+
+		}
+	}
+	os << ";]";
 
 	/* Create menu */
 	/* Note: FormspecFormSource and LocalFormspecHandler  *

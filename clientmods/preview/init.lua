@@ -8,6 +8,25 @@ end)
 
 core.register_on_connect(function()
 	print("[PREVIEW] Player connection completed")
+	local server_info = core.get_server_info()
+	print("Server version: " .. server_info.protocol_version)
+	print("Server ip: " .. server_info.ip)
+	print("Server address: " .. server_info.address)
+	print("Server port: " .. server_info.port)
+end)
+
+core.register_on_placenode(function(pointed_thing, node)
+	print("The local player place a node!")
+	print("pointed_thing :" .. dump(pointed_thing))
+	print("node placed :" .. dump(node))
+	return false
+end)
+
+core.register_on_item_use(function(itemstack, pointed_thing)
+	print("The local player used an item!")
+	print("pointed_thing :" .. dump(pointed_thing))
+	print("item = " .. itemstack:get_name())
+	return false
 end)
 
 -- This is an example function to ensure it's working properly, should be removed before merge
@@ -59,6 +78,10 @@ core.register_chatcommand("test_node", {
 
 local function preview_minimap()
 	local minimap = core.ui.minimap
+	if not minimap then
+		print("[PREVIEW] Minimap is disabled. Skipping.")
+		return
+	end
 	minimap:set_mode(4)
 	minimap:show()
 	minimap:set_pos({x=5, y=50, z=5})
@@ -73,12 +96,13 @@ core.after(2, function()
 	print("[PREVIEW] loaded " .. modname .. " mod")
 	modstorage:set_string("current_mod", modname)
 	print(modstorage:get_string("current_mod"))
-	print("Server version:" .. core.get_protocol_version())
 	preview_minimap()
 end)
 
 core.after(5, function()
-	core.ui.minimap:show()
+	if core.ui.minimap then
+		core.ui.minimap:show()
+	end
 
 	print("[PREVIEW] Day count: " .. core.get_day_count() ..
 		" time of day " .. core.get_timeofday())

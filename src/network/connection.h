@@ -175,7 +175,7 @@ struct BufferedPacket
 	Buffer<u8> data; // Data of the packet, including headers
 	float time; // Seconds from buffering the packet or re-sending
 	float totaltime; // Seconds from buffering the packet
-	unsigned int absolute_send_time;
+	u64 absolute_send_time;
 	Address address; // Sender or destination
 	unsigned int resend_count;
 };
@@ -769,7 +769,7 @@ class Peer {
 		// Seconds from last receive
 		float m_timeout_counter;
 
-		u32 m_last_timeout_check;
+		u64 m_last_timeout_check;
 };
 
 class UDPPeer : public Peer

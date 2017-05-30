@@ -44,6 +44,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "camera.h" // CameraModes
 #include "wieldmesh.h"
 #include "log.h"
+#include <algorithm>
 
 class Settings;
 struct ToolCapabilities;
@@ -705,24 +706,9 @@ scene::ISceneNode* GenericCAO::getSceneNode()
 	return NULL;
 }
 
-scene::IMeshSceneNode* GenericCAO::getMeshSceneNode()
-{
-	return m_meshnode;
-}
-
 scene::IAnimatedMeshSceneNode* GenericCAO::getAnimatedMeshSceneNode()
 {
 	return m_animated_meshnode;
-}
-
-WieldMeshSceneNode* GenericCAO::getWieldMeshSceneNode()
-{
-	return m_wield_meshnode;
-}
-
-scene::IBillboardSceneNode* GenericCAO::getSpriteSceneNode()
-{
-	return m_spritenode;
 }
 
 void GenericCAO::setChildrenVisible(bool toset)
@@ -1041,12 +1027,9 @@ void GenericCAO::updateNodePos()
 void GenericCAO::step(float dtime, ClientEnvironment *env)
 {
 	// Handel model of local player instantly to prevent lags
-	if(m_is_local_player)
-	{
+	if (m_is_local_player) {
 		LocalPlayer *player = m_env->getLocalPlayer();
-
-		if (m_is_visible)
-		{
+		if (m_is_visible) {
 			int old_anim = player->last_animation;
 			float old_anim_speed = player->last_animation_speed;
 			m_position = player->getPosition() + v3f(0,BS,0);
@@ -1054,7 +1037,7 @@ void GenericCAO::step(float dtime, ClientEnvironment *env)
 			m_acceleration = v3f(0,0,0);
 			pos_translator.vect_show = m_position;
 			m_yaw = player->getYaw();
-			PlayerControl controls = player->getPlayerControl();
+			const PlayerControl &controls = player->getPlayerControl();
 
 			bool walking = false;
 			if (controls.up || controls.down || controls.left || controls.right ||
@@ -1075,11 +1058,10 @@ void GenericCAO::step(float dtime, ClientEnvironment *env)
 					m_client->checkLocalPrivilege("fly"))))
 					new_speed *= 1.5;
 			// slowdown speed if sneeking
-			if(controls.sneak && walking)
+			if (controls.sneak && walking)
 				new_speed /= 2;
 
-			if(walking && (controls.LMB || controls.RMB))
-			{
+			if (walking && (controls.LMB || controls.RMB)) {
 				new_anim = player->local_animations[3];
 				player->last_animation = WD_ANIM;
 			} else if(walking) {
@@ -1092,8 +1074,7 @@ void GenericCAO::step(float dtime, ClientEnvironment *env)
 
 			// Apply animations if input detected and not attached
 			// or set idle animation
-			if ((new_anim.X + new_anim.Y) > 0 && !player->isAttached)
-			{
+			if ((new_anim.X + new_anim.Y) > 0 && !player->isAttached) {
 				allow_update = true;
 				m_animation_range = new_anim;
 				m_animation_speed = new_speed;
@@ -1101,8 +1082,7 @@ void GenericCAO::step(float dtime, ClientEnvironment *env)
 			} else {
 				player->last_animation = NO_ANIM;
 
-				if (old_anim != NO_ANIM)
-				{
+				if (old_anim != NO_ANIM) {
 					m_animation_range = player->local_animations[0];
 					updateAnimation();
 				}
@@ -1589,6 +1569,10 @@ void GenericCAO::processMessage(const std::string &data)
 			m_initial_tx_basepos_set = true;
 			m_tx_basepos = m_prop.initial_sprite_basepos;
 		}
+		if (m_is_local_player) {
+			LocalPlayer *player = m_env->getLocalPlayer();
+			player->makes_footstep_sound = m_prop.makes_footstep_sound;
+		}
 
 		if ((m_is_player && !m_is_local_player) && m_prop.nametag == "")
 			m_prop.nametag = m_name;
@@ -1751,7 +1735,7 @@ void GenericCAO::processMessage(const std::string &data)
 						m_smgr, m_env, m_position,
 						m_prop.visual_size * BS);
 				m_env->addSimpleObject(simple);
-			} else {
+			} else if (m_reset_textures_timer < 0) {
 				// TODO: Execute defined fast response
 				// Flashing shall suffice as there is no definition
 				m_reset_textures_timer = 0.05;
@@ -1822,10 +1806,12 @@ bool GenericCAO::directReportPunch(v3f dir, const ItemStack *punchitem,
 		}
 		// TODO: Execute defined fast response
 		// Flashing shall suffice as there is no definition
-		m_reset_textures_timer = 0.05;
-		if(result.damage >= 2)
-			m_reset_textures_timer += 0.05 * result.damage;
-		updateTextures(m_current_texture_modifier + "^[brighten");
+		if (m_reset_textures_timer < 0) {
+			m_reset_textures_timer = 0.05;
+			if (result.damage >= 2)
+				m_reset_textures_timer += 0.05 * result.damage;
+			updateTextures(m_current_texture_modifier + "^[brighten");
+		}
 	}
 
 	return false;

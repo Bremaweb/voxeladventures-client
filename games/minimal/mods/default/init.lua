@@ -18,6 +18,8 @@ dofile(minetest.get_modpath("default").."/mapgen.lua")
 minetest.register_on_joinplayer(function(player)
 	local cb = function(player)
 		minetest.chat_send_player(player:get_player_name(), "This is the [minimal] \"Minimal Development Test\" game. Use [minetest_game] for the real thing.")
+		player:set_attribute("test_attribute", "test_me")
+		player:set_attribute("remove_this", nil)
 	end
 	minetest.after(2.0, cb, player)
 end)
@@ -990,37 +992,37 @@ minetest.register_node("default:cloud", {
 
 minetest.register_node("default:water_flowing", {
 	description = "Water (flowing)",
-	inventory_image = minetest.inventorycube("default_water.png"),
 	drawtype = "flowingliquid",
-	tiles ={"default_water.png"},
+	tiles = {"default_water.png"},
 	special_tiles = {
-		{name="default_water.png", backface_culling=false},
-		{name="default_water.png", backface_culling=true},
+		{name = "default_water.png", backface_culling = false},
+		{name = "default_water.png", backface_culling = true},
 	},
 	alpha = WATER_ALPHA,
 	paramtype = "light",
+	paramtype2 = "flowingliquid",
 	walkable = false,
 	pointable = false,
 	diggable = false,
 	buildable_to = true,
 	is_ground_content = false,
+	drop = "",
 	drowning = 1,
 	liquidtype = "flowing",
 	liquid_alternative_flowing = "default:water_flowing",
 	liquid_alternative_source = "default:water_source",
 	liquid_viscosity = WATER_VISC,
-	post_effect_color = {a=64, r=100, g=100, b=200},
-	groups = {water=3, liquid=3},
+	post_effect_color = {a = 64, r = 100, g = 100, b = 200},
+	groups = {water = 3, liquid = 3},
 })
 
 minetest.register_node("default:water_source", {
 	description = "Water",
-	inventory_image = minetest.inventorycube("default_water.png"),
 	drawtype = "liquid",
-	tiles ={"default_water.png"},
+	tiles = {"default_water.png"},
 	special_tiles = {
 		-- New-style water source material (mostly unused)
-		{name="default_water.png", backface_culling=false},
+		{name = "default_water.png", backface_culling = false},
 	},
 	alpha = WATER_ALPHA,
 	paramtype = "light",
@@ -1029,13 +1031,70 @@ minetest.register_node("default:water_source", {
 	diggable = false,
 	buildable_to = true,
 	is_ground_content = false,
+	drop = "",
 	drowning = 1,
 	liquidtype = "source",
 	liquid_alternative_flowing = "default:water_flowing",
 	liquid_alternative_source = "default:water_source",
 	liquid_viscosity = WATER_VISC,
-	post_effect_color = {a=64, r=100, g=100, b=200},
-	groups = {water=3, liquid=3},
+	post_effect_color = {a = 64, r = 100, g = 100, b = 200},
+	groups = {water = 3, liquid = 3},
+})
+
+minetest.register_node("default:river_water_source", {
+	description = "River Water Source",
+	drawtype = "liquid",
+	tiles = {"default_river_water.png"},
+	special_tiles = {
+		-- New-style water source material (mostly unused)
+		{name = "default_river_water.png", backface_culling = false},
+	},
+	alpha = 160,
+	paramtype = "light",
+	walkable = false,
+	pointable = false,
+	diggable = false,
+	buildable_to = true,
+	is_ground_content = false,
+	drop = "",
+	drowning = 1,
+	liquidtype = "source",
+	liquid_alternative_flowing = "default:river_water_flowing",
+	liquid_alternative_source = "default:river_water_source",
+	liquid_viscosity = 1,
+	liquid_renewable = false,
+	liquid_range = 2,
+	post_effect_color = {a = 103, r = 30, g = 76, b = 90},
+	groups = {water = 3, liquid = 3, puts_out_fire = 1, cools_lava = 1},
+})
+
+minetest.register_node("default:river_water_flowing", {
+	description = "Flowing River Water",
+	drawtype = "flowingliquid",
+	tiles = {"default_river_water.png"},
+	special_tiles = {
+		{name = "default_river_water.png", backface_culling = false},
+		{name = "default_river_water.png", backface_culling = true},
+	},
+	alpha = 160,
+	paramtype = "light",
+	paramtype2 = "flowingliquid",
+	walkable = false,
+	pointable = false,
+	diggable = false,
+	buildable_to = true,
+	is_ground_content = false,
+	drop = "",
+	drowning = 1,
+	liquidtype = "flowing",
+	liquid_alternative_flowing = "default:river_water_flowing",
+	liquid_alternative_source = "default:river_water_source",
+	liquid_viscosity = 1,
+	liquid_renewable = false,
+	liquid_range = 2,
+	post_effect_color = {a = 103, r = 30, g = 76, b = 90},
+	groups = {water = 3, liquid = 3, puts_out_fire = 1,
+		not_in_creative_inventory = 1, cools_lava = 1},
 })
 
 minetest.register_node("default:lava_flowing", {
@@ -1226,6 +1285,8 @@ minetest.register_node("default:chest_locked", {
 		meta:set_string("owner", "")
 		local inv = meta:get_inventory()
 		inv:set_size("main", 8*4)
+		-- this is not really the intended usage but works for testing purposes:
+		meta:mark_as_private("owner")
 	end,
 	can_dig = function(pos,player)
 		local meta = minetest.get_meta(pos);
@@ -1387,13 +1448,13 @@ minetest.register_abm({
 
 		local srclist = inv:get_list("src")
 		local cooked = nil
-		
+
 		if srclist then
 			cooked = minetest.get_craft_result({method = "cooking", width = 1, items = srclist})
 		end
-		
+
 		local was_active = false
-		
+
 		if meta:get_float("fuel_time") < meta:get_float("fuel_totaltime") then
 			was_active = true
 			meta:set_float("fuel_time", meta:get_float("fuel_time") + 1)
@@ -1413,7 +1474,7 @@ minetest.register_abm({
 				meta:set_string("src_time", 0)
 			end
 		end
-		
+
 		if meta:get_float("fuel_time") < meta:get_float("fuel_totaltime") then
 			local percent = math.floor(meta:get_float("fuel_time") /
 					meta:get_float("fuel_totaltime") * 100)
@@ -1438,7 +1499,7 @@ minetest.register_abm({
 		local cooked = nil
 		local fuellist = inv:get_list("fuel")
 		local srclist = inv:get_list("src")
-		
+
 		if srclist then
 			cooked = minetest.get_craft_result({method = "cooking", width = 1, items = srclist})
 		end
@@ -1464,7 +1525,7 @@ minetest.register_abm({
 
 		meta:set_string("fuel_totaltime", fuel.time)
 		meta:set_string("fuel_time", 0)
-		
+
 		local stack = inv:get_stack("fuel", 1)
 		stack:take_item()
 		inv:set_stack("fuel", 1, stack)
@@ -1571,7 +1632,7 @@ function default.grow_tree(data, a, pos, is_apple_tree, seed)
 	y = y+th-1 -- (x, y, z) is now last piece of trunk
 	local leaves_a = VoxelArea:new{MinEdge={x=-2, y=-1, z=-2}, MaxEdge={x=2, y=2, z=2}}
 	local leaves_buffer = {}
-	
+
 	-- Force leaves near the trunk
 	local d = 1
 	for xi = -d, d do
@@ -1581,14 +1642,14 @@ function default.grow_tree(data, a, pos, is_apple_tree, seed)
 	end
 	end
 	end
-	
+
 	-- Add leaves randomly
 	for iii = 1, 8 do
 		local d = 1
 		local xx = pr:next(leaves_a.MinEdge.x, leaves_a.MaxEdge.x - d)
 		local yy = pr:next(leaves_a.MinEdge.y, leaves_a.MaxEdge.y - d)
 		local zz = pr:next(leaves_a.MinEdge.z, leaves_a.MaxEdge.z - d)
-		
+
 		for xi = 0, d do
 		for yi = 0, d do
 		for zi = 0, d do
@@ -1597,7 +1658,7 @@ function default.grow_tree(data, a, pos, is_apple_tree, seed)
 		end
 		end
 	end
-	
+
 	-- Add the leaves
 	for xi = leaves_a.MinEdge.x, leaves_a.MaxEdge.x do
 	for yi = leaves_a.MinEdge.y, leaves_a.MaxEdge.y do
