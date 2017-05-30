@@ -283,11 +283,10 @@ private:
 		float step;
 		float current_gain;
 		float target_gain;
-
+	};
 
 	UNORDERED_MAP<int, FadeState> m_sounds_fading;
 	float m_fade_delay;
-
 public:
 	bool m_is_initialized;
 	OpenALSoundManager(OnDemandSoundFetcher *fetcher):
@@ -565,7 +564,6 @@ public:
 	int playSound(const std::string &name, bool loop, float volume, float fade)
 	{
 		maintain();
-		int handle = -1;
 		if(name == "")
 			return 0;
 		SoundBuffer *buf = getFetchBuffer(name);
