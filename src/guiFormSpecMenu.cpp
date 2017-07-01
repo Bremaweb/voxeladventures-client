@@ -89,22 +89,9 @@ GUIFormSpecMenu::GUIFormSpecMenu(irr::IrrlichtDevice* dev,
 	m_invmgr(client),
 	m_tsrc(tsrc),
 	m_client(client),
-	m_selected_item(NULL),
-	m_selected_amount(0),
-	m_selected_dragging(false),
-	m_tooltip_element(NULL),
-	m_hovered_time(0),
-	m_old_tooltip_id(-1),
-	m_rmouse_auto_place(false),
-	m_allowclose(true),
-	m_lock(false),
 	m_form_src(fsrc),
 	m_text_dst(tdst),
-	m_formspec_version(0),
-	m_focused_element(""),
 	m_joystick(joystick),
-	current_field_enter_pending(""),
-	m_font(NULL),
 	m_remap_dbl_click(remap_dbl_click)
 #ifdef __ANDROID__
 	, m_JavaDialogFieldName("")
@@ -134,13 +121,8 @@ GUIFormSpecMenu::~GUIFormSpecMenu()
 	}
 
 	delete m_selected_item;
-
-	if (m_form_src != NULL) {
-		delete m_form_src;
-	}
-	if (m_text_dst != NULL) {
-		delete m_text_dst;
-	}
+	delete m_form_src;
+	delete m_text_dst;
 }
 
 void GUIFormSpecMenu::removeChildren()
@@ -2005,6 +1987,7 @@ void GUIFormSpecMenu::regenerateGui(v2u32 screensize)
 	m_tooltips.clear();
 	m_inventory_rings.clear();
 	m_static_texts.clear();
+	m_dropdowns.clear();
 
 	// Set default values (fits old formspec values)
 	m_bgcolor = video::SColor(140,0,0,0);
@@ -2021,7 +2004,7 @@ void GUIFormSpecMenu::regenerateGui(v2u32 screensize)
 
 	// Add tooltip
 	{
-		assert(m_tooltip_element == NULL);
+		assert(!m_tooltip_element);
 		// Note: parent != this so that the tooltip isn't clipped by the menu rectangle
 		m_tooltip_element = addStaticText(Environment, L"",core::rect<s32>(0,0,110,18));
 		m_tooltip_element->enableOverrideColor(true);
@@ -2174,7 +2157,7 @@ void GUIFormSpecMenu::regenerateGui(v2u32 screensize)
 	m_tooltip_element->setOverrideFont(m_font);
 
 	gui::IGUISkin* skin = Environment->getSkin();
-	sanity_check(skin != NULL);
+	sanity_check(skin);
 	gui::IGUIFont *old_font = skin->getFont();
 	skin->setFont(m_font);
 
@@ -2398,37 +2381,9 @@ void GUIFormSpecMenu::drawList(const ListDrawSpec &s, int phase,
 				if (!item.name.empty() && tooltip_text.empty())
 					tooltip_text = utf8_to_wide(item.name);
 			}
-			if (tooltip_text != L"") {
-				std::vector<std::wstring> tt_rows = str_split(tooltip_text, L'\n');
-				m_tooltip_element->setBackgroundColor(m_default_tooltip_bgcolor);
-				m_tooltip_element->setOverrideColor(m_default_tooltip_color);
-				m_tooltip_element->setVisible(true);
-				this->bringToFront(m_tooltip_element);
-				setStaticText(m_tooltip_element, tooltip_text.c_str());
-				s32 tooltip_width = m_tooltip_element->getTextWidth() + m_btn_height;
-#if (IRRLICHT_VERSION_MAJOR <= 1 && IRRLICHT_VERSION_MINOR <= 8 && IRRLICHT_VERSION_REVISION < 2) || USE_FREETYPE == 1
-				s32 tooltip_height = m_tooltip_element->getTextHeight() * tt_rows.size() + 5;
-#else
-				s32 tooltip_height = m_tooltip_element->getTextHeight() + 5;
-#endif
-				v2u32 screenSize = driver->getScreenSize();
-				int tooltip_offset_x = m_btn_height;
-				int tooltip_offset_y = m_btn_height;
-#ifdef __ANDROID__
-				tooltip_offset_x *= 3;
-				tooltip_offset_y  = 0;
-				if (m_pointer.X > (s32)screenSize.X / 2)
-					tooltip_offset_x = (tooltip_offset_x + tooltip_width) * -1;
-#endif
-				s32 tooltip_x = m_pointer.X + tooltip_offset_x;
-				s32 tooltip_y = m_pointer.Y + tooltip_offset_y;
-				if (tooltip_x + tooltip_width > (s32)screenSize.X)
-					tooltip_x = (s32)screenSize.X - tooltip_width  - m_btn_height;
-				if (tooltip_y + tooltip_height > (s32)screenSize.Y)
-					tooltip_y = (s32)screenSize.Y - tooltip_height - m_btn_height;
-				m_tooltip_element->setRelativePosition(core::rect<s32>(
-						core::position2d<s32>(tooltip_x, tooltip_y),
-						core::dimension2d<s32>(tooltip_width, tooltip_height)));
+			if (!tooltip_text.empty()) {
+				showTooltip(tooltip_text, m_default_tooltip_color,
+					m_default_tooltip_bgcolor);
 			}
 		}
 	}
@@ -2661,7 +2616,6 @@ void GUIFormSpecMenu::drawMenu()
 		u64 delta = 0;
 		if (id == -1) {
 			m_old_tooltip_id = id;
-			m_old_tooltip = L"";
 		} else {
 			if (id == m_old_tooltip_id) {
 				delta = porting::getDeltaMs(m_hovered_time, porting::getTimeMs());
@@ -2671,40 +2625,20 @@ void GUIFormSpecMenu::drawMenu()
 			}
 		}
 
+		// Find and update the current tooltip
 		if (id != -1 && delta >= m_tooltip_show_delay) {
-			for(std::vector<FieldSpec>::iterator iter =  m_fields.begin();
+			for (std::vector<FieldSpec>::iterator iter = m_fields.begin();
 					iter != m_fields.end(); ++iter) {
-				if (iter->fid == id && m_tooltips[iter->fname].tooltip != L"") {
-					if (m_old_tooltip != m_tooltips[iter->fname].tooltip) {
-						m_tooltip_element->setBackgroundColor(m_tooltips[iter->fname].bgcolor);
-						m_tooltip_element->setOverrideColor(m_tooltips[iter->fname].color);
-						m_old_tooltip = m_tooltips[iter->fname].tooltip;
-						setStaticText(m_tooltip_element, m_tooltips[iter->fname].tooltip.c_str());
-						std::vector<std::wstring> tt_rows = str_split(m_tooltips[iter->fname].tooltip, L'\n');
-						s32 tooltip_width = m_tooltip_element->getTextWidth() + m_btn_height;
-						s32 tooltip_height = m_tooltip_element->getTextHeight() * tt_rows.size() + 5;
-						int tooltip_offset_x = m_btn_height;
-						int tooltip_offset_y = m_btn_height;
-#ifdef __ANDROID__
-						tooltip_offset_x *= 3;
-						tooltip_offset_y  = 0;
-						if (m_pointer.X > (s32)screenSize.X / 2)
-							tooltip_offset_x = (tooltip_offset_x + tooltip_width) * -1;
-#endif
-						s32 tooltip_x = m_pointer.X + tooltip_offset_x;
-						s32 tooltip_y = m_pointer.Y + tooltip_offset_y;
-						if (tooltip_x + tooltip_width > (s32)screenSize.X)
-							tooltip_x = (s32)screenSize.X - tooltip_width  - m_btn_height;
-						if (tooltip_y + tooltip_height > (s32)screenSize.Y)
-							tooltip_y = (s32)screenSize.Y - tooltip_height - m_btn_height;
-						m_tooltip_element->setRelativePosition(core::rect<s32>(
-						core::position2d<s32>(tooltip_x, tooltip_y),
-						core::dimension2d<s32>(tooltip_width, tooltip_height)));
-					}
-					m_tooltip_element->setVisible(true);
-					this->bringToFront(m_tooltip_element);
-					break;
-				}
+
+				if (iter->fid != id)
+					continue;
+
+				const std::wstring &text = m_tooltips[iter->fname].tooltip;
+				if (!text.empty())
+					showTooltip(text, m_tooltips[iter->fname].color,
+						m_tooltips[iter->fname].bgcolor);
+
+				break;
 			}
 		}
 	}
@@ -2717,6 +2651,52 @@ void GUIFormSpecMenu::drawMenu()
 	drawSelectedItem();
 
 	skin->setFont(old_font);
+}
+
+
+void GUIFormSpecMenu::showTooltip(const std::wstring &text,
+	const irr::video::SColor &color, const irr::video::SColor &bgcolor)
+{
+	m_tooltip_element->setOverrideColor(color);
+	m_tooltip_element->setBackgroundColor(bgcolor);
+	setStaticText(m_tooltip_element, text.c_str());
+
+	// Tooltip size and offset
+	s32 tooltip_width = m_tooltip_element->getTextWidth() + m_btn_height;
+#if (IRRLICHT_VERSION_MAJOR <= 1 && IRRLICHT_VERSION_MINOR <= 8 && IRRLICHT_VERSION_REVISION < 2) || USE_FREETYPE == 1
+	std::vector<std::wstring> text_rows = str_split(text, L'\n');
+	s32 tooltip_height = m_tooltip_element->getTextHeight() * text_rows.size() + 5;
+#else
+	s32 tooltip_height = m_tooltip_element->getTextHeight() + 5;
+#endif
+	v2u32 screenSize = Environment->getVideoDriver()->getScreenSize();
+	int tooltip_offset_x = m_btn_height;
+	int tooltip_offset_y = m_btn_height;
+#ifdef __ANDROID__
+	tooltip_offset_x *= 3;
+	tooltip_offset_y  = 0;
+	if (m_pointer.X > (s32)screenSize.X / 2)
+		tooltip_offset_x = -(tooltip_offset_x + tooltip_width);
+#endif
+
+	// Calculate and set the tooltip position
+	s32 tooltip_x = m_pointer.X + tooltip_offset_x;
+	s32 tooltip_y = m_pointer.Y + tooltip_offset_y;
+	if (tooltip_x + tooltip_width > (s32)screenSize.X)
+		tooltip_x = (s32)screenSize.X - tooltip_width  - m_btn_height;
+	if (tooltip_y + tooltip_height > (s32)screenSize.Y)
+		tooltip_y = (s32)screenSize.Y - tooltip_height - m_btn_height;
+
+	m_tooltip_element->setRelativePosition(
+		core::rect<s32>(
+			core::position2d<s32>(tooltip_x, tooltip_y),
+			core::dimension2d<s32>(tooltip_width, tooltip_height)
+		)
+	);
+
+	// Display the tooltip
+	m_tooltip_element->setVisible(true);
+	bringToFront(m_tooltip_element);
 }
 
 void GUIFormSpecMenu::updateSelectedItem()
@@ -3042,7 +3022,6 @@ bool GUIFormSpecMenu::preprocessEvent(const SEvent& event)
 				core::position2d<s32>(x, y));
 		if (event.MouseInput.Event == EMIE_LMOUSE_PRESSED_DOWN) {
 			m_old_tooltip_id = -1;
-			m_old_tooltip = L"";
 		}
 		if (!isChild(hovered,this)) {
 			if (DoubleClickDetection(event)) {
@@ -3807,7 +3786,7 @@ bool GUIFormSpecMenu::OnEvent(const SEvent& event)
 					if (s.ftype == f_Unknown &&
 							s.fid == event.GUIEvent.Caller->getID()) {
 						current_field_enter_pending = s.fname;
-						UNORDERED_MAP<std::string, bool>::const_iterator it =
+						std::unordered_map<std::string, bool>::const_iterator it =
 							field_close_on_enter.find(s.fname);
 						if (it != field_close_on_enter.end())
 							close_on_enter = (*it).second;

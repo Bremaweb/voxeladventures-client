@@ -23,13 +23,13 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "network/connection.h"
 #include "clientenvironment.h"
 #include "irrlichttypes_extrabloated.h"
-#include "threading/mutex.h"
 #include <ostream>
 #include <map>
 #include <set>
 #include <vector>
 
 #include "ambiance.h"
+#include <unordered_set>
 #include "clientobject.h"
 #include "gamedef.h"
 #include "inventorymanager.h"
@@ -274,6 +274,7 @@ public:
 	);
 
 	~Client();
+	DISABLE_CLASS_COPY(Client);
 
 	void initMods();
 
@@ -350,6 +351,7 @@ public:
 	void handleCommand_OverrideDayNightRatio(NetworkPacket* pkt);
 	void handleCommand_LocalPlayerAnimations(NetworkPacket* pkt);
 	void handleCommand_EyeOffset(NetworkPacket* pkt);
+	void handleCommand_UpdatePlayerList(NetworkPacket* pkt);
 	void handleCommand_SrpBytesSandB(NetworkPacket* pkt);
 
 	void ProcessData(NetworkPacket *pkt);
@@ -418,6 +420,9 @@ public:
 	bool checkPrivilege(const std::string &priv) const
 	{ return (m_privileges.count(priv) != 0); }
 
+	const std::unordered_set<std::string> &getPrivilegeList() const
+	{ return m_privileges; }
+
 	bool getChatMessage(std::wstring &message);
 	void typeChatMessage(const std::wstring& message);
 
@@ -454,7 +459,7 @@ public:
 	bool nodedefReceived()
 	{ return m_nodedef_received; }
 	bool mediaReceived()
-	{ return m_media_downloader == NULL; }
+	{ return !m_media_downloader; }
 
 	u8 getProtoVersion()
 	{ return m_proto_ver; }
@@ -572,11 +577,11 @@ private:
 
 	bool canSendChatMessage() const;
 
-	float m_packetcounter_timer;
-	float m_connection_reinit_timer;
-	float m_avg_rtt_timer;
-	float m_playerpos_send_timer;
-	float m_ignore_damage_timer; // Used after server moves player
+	float m_packetcounter_timer = 0.0f;
+	float m_connection_reinit_timer = 0.1f;
+	float m_avg_rtt_timer = 0.0f;
+	float m_playerpos_send_timer = 0.0f;
+	float m_ignore_damage_timer = 0.0f; // Used after server moves player
 	IntervalLimiter m_map_timer_and_unload_interval;
 
 	IWritableTextureSource *m_tsrc;
@@ -589,14 +594,14 @@ private:
 
 	MeshUpdateThread m_mesh_update_thread;
 	ClientEnvironment m_env;
-	Ambiance *m_ambiance;
+	//Ambiance *m_ambiance;
 	ParticleManager m_particle_manager;
 	con::Connection m_con;
 	std::string m_address_name;
 	IrrlichtDevice *m_device;
-	Camera *m_camera;
-	Minimap *m_minimap;
-	bool m_minimap_disabled_by_server;
+	Camera *m_camera = nullptr;
+	Minimap *m_minimap = nullptr;
+	bool m_minimap_disabled_by_server = false;
 	// Server serialization version
 	u8 m_server_ser_ver;
 
@@ -605,16 +610,16 @@ private:
 	// and aren't accurate. We simply just don't know, because
 	// the server didn't send the version back then.
 	// If 0, server init hasn't been received yet.
-	u8 m_proto_ver;
+	u8 m_proto_ver = 0;
 
-	u16 m_playeritem;
-	bool m_inventory_updated;
-	Inventory *m_inventory_from_server;
-	float m_inventory_from_server_age;
+	u16 m_playeritem = 0;
+	bool m_inventory_updated = false;
+	Inventory *m_inventory_from_server = nullptr;
+	float m_inventory_from_server_age = 0.0f;
 	PacketCounter m_packetcounter;
 	// Block mesh animation parameters
-	float m_animation_time;
-	int m_crack_level;
+	float m_animation_time = 0.0f;
+	int m_crack_level = -1;
 	v3s16 m_crack_pos;
 	// 0 <= m_daynight_i < DAYNIGHT_CACHE_COUNT
 	//s32 m_daynight_i;
@@ -622,13 +627,13 @@ private:
 	std::queue<std::wstring> m_chat_queue;
 	std::queue<std::wstring> m_out_chat_queue;
 	u32 m_last_chat_message_sent;
-	float m_chat_message_allowance;
+	float m_chat_message_allowance = 5.0f;
 
 	// The authentication methods we can use to enter sudo mode (=change password)
 	u32 m_sudo_auth_methods;
 
 	// The seed returned by the server in TOCLIENT_INIT is stored here
-	u64 m_map_seed;
+	u64 m_map_seed = 0;
 
 	// Auth data
 	std::string m_playername;
@@ -637,40 +642,40 @@ private:
 	std::string m_new_password;
 	// Usable by auth mechanisms.
 	AuthMechanism m_chosen_auth_mech;
-	void * m_auth_data;
+	void *m_auth_data = nullptr;
 
 
-	bool m_access_denied;
-	bool m_access_denied_reconnect;
-	std::string m_access_denied_reason;
+	bool m_access_denied = false;
+	bool m_access_denied_reconnect = false;
+	std::string m_access_denied_reason = "";
 	std::queue<ClientEvent> m_client_event_queue;
-	bool m_itemdef_received;
-	bool m_nodedef_received;
+	bool m_itemdef_received = false;
+	bool m_nodedef_received = false;
 	ClientMediaDownloader *m_media_downloader;
 
 	// time_of_day speed approximation for old protocol
-	bool m_time_of_day_set;
-	float m_last_time_of_day_f;
-	float m_time_of_day_update_timer;
+	bool m_time_of_day_set = false;
+	float m_last_time_of_day_f = -1.0f;
+	float m_time_of_day_update_timer = 0.0f;
 
 	// An interval for generally sending object positions and stuff
-	float m_recommended_send_interval;
+	float m_recommended_send_interval = 0.1f;
 
 	// Sounds
-	float m_removed_sounds_check_timer;
+	float m_removed_sounds_check_timer = 0.0f;
 	// Mapping from server sound ids to our sound ids
-	UNORDERED_MAP<s32, int> m_sounds_server_to_client;
+	std::unordered_map<s32, int> m_sounds_server_to_client;
 	// And the other way!
-	UNORDERED_MAP<int, s32> m_sounds_client_to_server;
+	std::unordered_map<int, s32> m_sounds_client_to_server;
 	// And relations to objects
-	UNORDERED_MAP<int, u16> m_sounds_to_objects;
+	std::unordered_map<int, u16> m_sounds_to_objects;
 
 	// Privileges
-	UNORDERED_SET<std::string> m_privileges;
+	std::unordered_set<std::string> m_privileges;
 
 	// Detached inventories
 	// key = name
-	UNORDERED_MAP<std::string, Inventory*> m_detached_inventories;
+	std::unordered_map<std::string, Inventory*> m_detached_inventories;
 
 	// Storage for mesh data for creating multiple instances of the same mesh
 	StringMap m_mesh_data;
@@ -679,20 +684,17 @@ private:
 	LocalClientState m_state;
 
 	// Used for saving server map to disk client-side
-	MapDatabase *m_localdb;
+	MapDatabase *m_localdb = nullptr;
 	IntervalLimiter m_localdb_save_interval;
 	u16 m_cache_save_interval;
 
-	ClientScripting *m_script;
+	ClientScripting *m_script = nullptr;
 	bool m_modding_enabled;
-	UNORDERED_MAP<std::string, ModMetadata *> m_mod_storages;
-	float m_mod_storage_save_timer;
+	std::unordered_map<std::string, ModMetadata *> m_mod_storages;
+	float m_mod_storage_save_timer = 10.0f;
 	GameUIFlags *m_game_ui_flags;
 
-
-	//DISABLE_CLASS_COPY(Client);
-	bool m_shutdown;
-
+	bool m_shutdown = false;
 };
 
 #endif // !CLIENT_HEADER

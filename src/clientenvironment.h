@@ -64,6 +64,7 @@ struct ClientEnvEvent
 	};
 };
 
+typedef std::unordered_map<u16, ClientActiveObject*> ClientActiveObjectMap;
 class ClientEnvironment : public Environment
 {
 public:
@@ -175,13 +176,13 @@ public:
 	v3s16 getCameraOffset() const { return m_camera_offset; }
 private:
 	ClientMap *m_map;
-	LocalPlayer *m_local_player;
+	LocalPlayer *m_local_player = nullptr;
 	scene::ISceneManager *m_smgr;
 	ITextureSource *m_texturesource;
 	Client *m_client;
-	ClientScripting *m_script;
+	ClientScripting *m_script = nullptr;
 	IrrlichtDevice *m_irr;
-	UNORDERED_MAP<u16, ClientActiveObject*> m_active_objects;
+	ClientActiveObjectMap m_active_objects;
 	std::vector<ClientSimpleObject*> m_simple_objects;
 	std::queue<ClientEnvEvent> m_client_event_queue;
 	IntervalLimiter m_active_object_light_update_interval;

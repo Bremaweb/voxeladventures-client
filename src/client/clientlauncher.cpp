@@ -53,14 +53,11 @@ MainGameCallback *g_gamecallback = NULL;
 
 ClientLauncher::~ClientLauncher()
 {
-	if (receiver)
-		delete receiver;
+	delete receiver;
 
-	if (input)
-		delete input;
+	delete input;
 
-	if (g_fontengine)
-		delete g_fontengine;
+	delete g_fontengine;
 
 	if (device)
 		device->drop();
@@ -360,8 +357,6 @@ bool ClientLauncher::launch_game(std::string &error_message,
 	if (cmd_args.exists("password"))
 		menudata.password = cmd_args.get("password");
 
-	menudata.enable_public = g_settings->getBool("server_announce");
-
 	// If a world was commanded, append and select it
 	if (game_params.world_path != "") {
 		worldspec.gameid = getWorldGameId(game_params.world_path, true);
@@ -522,8 +517,8 @@ bool ClientLauncher::create_engine_device()
 {
 	// Resolution selection
 	bool fullscreen = g_settings->getBool("fullscreen");
-	u16 screenW = g_settings->getU16("screenW");
-	u16 screenH = g_settings->getU16("screenH");
+	u16 screen_w = g_settings->getU16("screen_w");
+	u16 screen_h = g_settings->getU16("screen_h");
 
 	// bpp, fsaa, vsync
 	bool vsync = g_settings->getBool("vsync");
@@ -553,7 +548,7 @@ bool ClientLauncher::create_engine_device()
 
 	SIrrlichtCreationParameters params = SIrrlichtCreationParameters();
 	params.DriverType    = driverType;
-	params.WindowSize    = core::dimension2d<u32>(screenW, screenH);
+	params.WindowSize    = core::dimension2d<u32>(screen_w, screen_h);
 	params.Bits          = bits;
 	params.AntiAlias     = fsaa;
 	params.Fullscreen    = fullscreen;
@@ -657,7 +652,7 @@ void ClientLauncher::speed_tests()
 		infostream << "Around 5000/ms should do well here." << std::endl;
 		TimeTaker timer("Testing mutex speed");
 
-		Mutex m;
+		std::mutex m;
 		u32 n = 0;
 		u32 i = 0;
 		do {

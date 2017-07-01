@@ -104,29 +104,19 @@ struct MediaInfo
 
 struct ServerSoundParams
 {
-	float gain;
-	std::string to_player;
-	enum Type{
-		SSP_LOCAL=0,
-		SSP_POSITIONAL=1,
-		SSP_OBJECT=2
-	} type;
-	v3f pos;
-	u16 object;
-	float max_hear_distance;
-	bool loop;
-	float fade;
-
-	ServerSoundParams():
-		gain(1.0),
-		to_player(""),
-		type(SSP_LOCAL),
-		pos(0,0,0),
-		object(0),
-		max_hear_distance(32*BS),
-		loop(false),
-		fade(0)
-	{}
+	enum Type {
+		SSP_LOCAL,
+		SSP_POSITIONAL,
+		SSP_OBJECT
+	} type = SSP_LOCAL;
+	float gain = 1.0f;
+	float fade = 0.0f;
+	float pitch = 1.0f;
+	bool loop = false;
+	float max_hear_distance = 32*BS;
+	v3f pos = v3f(0, 0, 0);
+	u16 object = 0;
+	std::string to_player = "";
 
 	v3f getPos(ServerEnvironment *env, bool *pos_exists) const;
 };
@@ -135,7 +125,7 @@ struct ServerPlayingSound
 {
 	ServerSoundParams params;
 	SimpleSoundSpec spec;
-	UNORDERED_SET<u16> clients; // peer ids
+	std::unordered_set<u16> clients; // peer ids
 };
 
 class Server : public con::PeerHandler, public MapEventReceiver,
@@ -155,6 +145,8 @@ public:
 		ChatInterface *iface = NULL
 	);
 	~Server();
+	DISABLE_CLASS_COPY(Server);
+
 	void start(Address bind_addr);
 	void stop();
 	// This is mainly a way to pass the time to the server.
@@ -376,7 +368,7 @@ public:
 	Address m_bind_addr;
 
 	// Environment mutex (envlock)
-	Mutex m_env_mutex;
+	std::mutex m_env_mutex;
 
 private:
 
@@ -487,7 +479,7 @@ private:
 
 	// This returns the answer to the sender of wmessage, or "" if there is none
 	std::wstring handleChat(const std::string &name, const std::wstring &wname,
-		const std::wstring &wmessage,
+		std::wstring wmessage_input,
 		bool check_shout_priv = false,
 		RemotePlayer *player = NULL);
 	void handleAdminChat(const ChatEventChat *evt);
@@ -579,7 +571,7 @@ private:
 	// A buffer for time steps
 	// step() increments and AsyncRunStep() run by m_thread reads it.
 	float m_step_dtime;
-	Mutex m_step_dtime_mutex;
+	std::mutex m_step_dtime_mutex;
 
 	// current server step lag counter
 	float m_lag;
@@ -654,12 +646,12 @@ private:
 	u16 m_ignore_map_edit_events_peer_id;
 
 	// media files known to server
-	UNORDERED_MAP<std::string, MediaInfo> m_media;
+	std::unordered_map<std::string, MediaInfo> m_media;
 
 	/*
 		Sounds
 	*/
-	UNORDERED_MAP<s32, ServerPlayingSound> m_playing_sounds;
+	std::unordered_map<s32, ServerPlayingSound> m_playing_sounds;
 	s32 m_next_sound_id;
 
 	/*
@@ -670,10 +662,8 @@ private:
 	// value = "" (visible to all players) or player name
 	std::map<std::string, std::string> m_detached_inventories_player;
 
-	UNORDERED_MAP<std::string, ModMetadata *> m_mod_storages;
+	std::unordered_map<std::string, ModMetadata *> m_mod_storages;
 	float m_mod_storage_save_timer;
-
-	//DISABLE_CLASS_COPY(Server);
 };
 
 /*

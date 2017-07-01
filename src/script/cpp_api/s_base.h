@@ -22,14 +22,14 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #include <iostream>
 #include <string>
+#include <thread>
+#include "util/basic_macros.h"
 
 extern "C" {
 #include <lua.h>
 }
 
 #include "irrlichttypes.h"
-#include "threads.h"
-#include "threading/mutex.h"
 #include "threading/mutex_auto_lock.h"
 #include "common/c_types.h"
 #include "common/c_internal.h"
@@ -67,6 +67,7 @@ class ScriptApiBase {
 public:
 	ScriptApiBase();
 	virtual ~ScriptApiBase();
+	DISABLE_CLASS_COPY(ScriptApiBase);
 
 	// These throw a ModError on failure
 	void loadMod(const std::string &script_path, const std::string &mod_name);
@@ -116,12 +117,12 @@ protected:
 
 	void objectrefGetOrCreate(lua_State *L, ServerActiveObject *cobj);
 
-	RecursiveMutex  m_luastackmutex;
+	std::recursive_mutex m_luastackmutex;
 	std::string     m_last_run_mod;
 	bool            m_secure;
 #ifdef SCRIPTAPI_LOCK_DEBUG
 	int             m_lock_recursion_count;
-	threadid_t      m_owning_thread;
+	std::thread::id m_owning_thread;
 #endif
 
 private:

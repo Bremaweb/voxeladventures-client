@@ -75,17 +75,17 @@ private:
 
 	void add_key(int id, const wchar_t *button_name, const std::string &setting_name);
 
+
 	std::wstring keyUsedBy(int id, const KeyPress &key, bool modifier_shift, bool modifier_control);
 	void addCommandAliasKey(const KeyCommand &key);
 	void commandComboChanged();
 
 	bool control_down;
-	bool shift_down;
-
-	s32 activeKey;
+	bool shift_down = false;
+	s32 activeKey = -1;
 
 	std::vector<KeyPress> key_used;
-	gui::IGUIStaticText *key_used_text;
+	gui::IGUIStaticText *key_used_text = nullptr;
 	std::vector<key_setting *> key_settings;
 	std::vector<KeyCommand> key_alias_settings;
 

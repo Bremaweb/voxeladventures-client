@@ -85,7 +85,7 @@ static MapgenDesc g_reg_mapgens[] = {
 	{"flat",       true},
 	{"fractal",    true},
 	{"valleys",    true},
-	{"singlenode", false},
+	{"singlenode", true},
 };
 
 STATIC_ASSERT(
@@ -98,25 +98,12 @@ STATIC_ASSERT(
 
 Mapgen::Mapgen()
 {
-	generating   = false;
-	id           = -1;
-	seed         = 0;
-	water_level  = 0;
-	mapgen_limit = 0;
-	flags        = 0;
-
-	vm        = NULL;
-	ndef      = NULL;
-	biomegen  = NULL;
-	biomemap  = NULL;
-	heightmap = NULL;
 }
 
 
 Mapgen::Mapgen(int mapgenid, MapgenParams *params, EmergeManager *emerge) :
 	gennotify(emerge->gen_notify_on, &emerge->gen_notify_on_deco_ids)
 {
-	generating   = false;
 	id           = mapgenid;
 	water_level  = params->water_level;
 	mapgen_limit = params->mapgen_limit;
@@ -138,11 +125,7 @@ Mapgen::Mapgen(int mapgenid, MapgenParams *params, EmergeManager *emerge) :
 	*/
 	seed = (s32)params->seed;
 
-	vm        = NULL;
 	ndef      = emerge->ndef;
-	biomegen  = NULL;
-	biomemap  = NULL;
-	heightmap = NULL;
 }
 
 
@@ -317,7 +300,6 @@ void Mapgen::updateHeightmap(v3s16 nmin, v3s16 nmax)
 			heightmap[index] = y;
 		}
 	}
-	//printf("updateHeightmap: %dus\n", t.stop());
 }
 
 inline bool Mapgen::isLiquidHorizontallyFlowable(u32 vi, v3s16 em)
@@ -930,7 +912,6 @@ void MapgenBasic::generateDungeons(s16 max_stone_y, MgStoneType stone_type)
 
 GenerateNotifier::GenerateNotifier()
 {
-	m_notify_on = 0;
 }
 
 
@@ -1048,4 +1029,64 @@ void MapgenParams::writeParams(Settings *settings) const
 
 	if (bparams)
 		bparams->writeParams(settings);
+}
+
+// Calculate edges of outermost generated mapchunks (less than
+// 'mapgen_limit'), and corresponding exact limits for SAO entities.
+void MapgenParams::calcMapgenEdges()
+{
+	if (m_mapgen_edges_calculated)
+		return;
+
+	// Central chunk offset, in blocks
+	s16 ccoff_b = -chunksize / 2;
+	// Chunksize, in nodes
+	s32 csize_n = chunksize * MAP_BLOCKSIZE;
+	// Minp/maxp of central chunk, in nodes
+	s16 ccmin = ccoff_b * MAP_BLOCKSIZE;
+	s16 ccmax = ccmin + csize_n - 1;
+	// Fullminp/fullmaxp of central chunk, in nodes
+	s16 ccfmin = ccmin - MAP_BLOCKSIZE;
+	s16 ccfmax = ccmax + MAP_BLOCKSIZE;
+	// Effective mapgen limit, in blocks
+	// Uses same calculation as ServerMap::blockpos_over_mapgen_limit(v3s16 p)
+	s16 mapgen_limit_b = rangelim(mapgen_limit,
+		0, MAX_MAP_GENERATION_LIMIT) / MAP_BLOCKSIZE;
+	// Effective mapgen limits, in nodes
+	s16 mapgen_limit_min = -mapgen_limit_b * MAP_BLOCKSIZE;
+	s16 mapgen_limit_max = (mapgen_limit_b + 1) * MAP_BLOCKSIZE - 1;
+	// Number of complete chunks from central chunk fullminp/fullmaxp
+	// to effective mapgen limits.
+	s16 numcmin = MYMAX((ccfmin - mapgen_limit_min) / csize_n, 0);
+	s16 numcmax = MYMAX((mapgen_limit_max - ccfmax) / csize_n, 0);
+	// Mapgen edges, in nodes
+	mapgen_edge_min = ccmin - numcmin * csize_n;
+	mapgen_edge_max = ccmax + numcmax * csize_n;
+	// SAO position limits, in Irrlicht units
+	m_sao_limit_min = mapgen_edge_min * BS - 3.0f;
+	m_sao_limit_max = mapgen_edge_max * BS + 3.0f;
+
+	m_mapgen_edges_calculated = true;
+}
+
+
+bool MapgenParams::saoPosOverLimit(const v3f &p)
+{
+	if (!m_mapgen_edges_calculated)
+		calcMapgenEdges();
+
+	return p.X < m_sao_limit_min ||
+		p.X > m_sao_limit_max ||
+		p.Y < m_sao_limit_min ||
+		p.Y > m_sao_limit_max ||
+		p.Z < m_sao_limit_min ||
+		p.Z > m_sao_limit_max;
+}
+
+
+s32 MapgenParams::getSpawnRangeMax()
+{
+	calcMapgenEdges();
+
+	return MYMIN(-mapgen_edge_min, mapgen_edge_max);
 }

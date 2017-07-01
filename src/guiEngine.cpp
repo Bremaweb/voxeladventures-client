@@ -142,18 +142,7 @@ GUIEngine::GUIEngine(	irr::IrrlichtDevice* dev,
 	m_menumanager(menumgr),
 	m_smgr(smgr),
 	m_data(data),
-	m_texture_source(NULL),
-	m_sound_manager(NULL),
-	m_formspecgui(0),
-	m_buttonhandler(0),
-	m_menu(0),
-	m_kill(kill),
-	m_startgame(false),
-	m_script(0),
-	m_scriptdir(""),
-	m_irr_toplefttext(0),
-	m_clouds_enabled(true),
-	m_cloud()
+	m_kill(kill)
 {
 	//initialize texture pointers
 	for (unsigned int i = 0; i < TEX_LAYER_MAX; i++) {
@@ -262,8 +251,8 @@ void GUIEngine::run()
 
 	unsigned int text_height = g_fontengine->getTextHeight();
 
-	irr::core::dimension2d<u32> previous_screen_size(g_settings->getU16("screenW"),
-		g_settings->getU16("screenH"));
+	irr::core::dimension2d<u32> previous_screen_size(g_settings->getU16("screen_w"),
+		g_settings->getU16("screen_h"));
 
 	while (m_device->run() && (!m_startgame) && (!m_kill)) {
 
@@ -275,8 +264,8 @@ void GUIEngine::run()
 		if (previous_screen_size != current_screen_size &&
 				current_screen_size != irr::core::dimension2d<u32>(0,0) &&
 				g_settings->getBool("autosave_screensize")) {
-			g_settings->setU16("screenW", current_screen_size.Width);
-			g_settings->setU16("screenH", current_screen_size.Height);
+			g_settings->setU16("screen_w", current_screen_size.Width);
+			g_settings->setU16("screen_h", current_screen_size.Height);
 			previous_screen_size = current_screen_size;
 		}
 
@@ -334,7 +323,7 @@ GUIEngine::~GUIEngine()
 
 	//clean up texture pointers
 	for (unsigned int i = 0; i < TEX_LAYER_MAX; i++) {
-		if (m_textures[i].texture != NULL)
+		if (m_textures[i].texture)
 			driver->removeTexture(m_textures[i].texture);
 	}
 

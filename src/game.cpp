@@ -1033,7 +1033,7 @@ void KeyCache::populate()
 	key[KeyType::SPECIAL1]     = getKeySetting("keymap_special1");
 	key[KeyType::SNEAK]        = getKeySetting("keymap_sneak");
 
-	key[KeyType::AUTORUN]      = getKeySetting("keymap_autorun");
+	key[KeyType::AUTOFORWARD]  = getKeySetting("keymap_autoforward");
 
 	key[KeyType::DROP]         = getKeySetting("keymap_drop");
 	key[KeyType::INVENTORY]    = getKeySetting("keymap_inventory");
@@ -1238,7 +1238,7 @@ protected:
 	void toggleFast();
 	void toggleNoClip();
 	void toggleCinematic();
-	void toggleAutorun();
+	void toggleAutoforward();
 
 	void toggleChat();
 	void toggleHud();
@@ -1633,8 +1633,8 @@ void Game::run()
 			&& client->checkPrivilege("fast");
 #endif
 
-	irr::core::dimension2d<u32> previous_screen_size(g_settings->getU16("screenW"),
-		g_settings->getU16("screenH"));
+	irr::core::dimension2d<u32> previous_screen_size(g_settings->getU16("screen_w"),
+		g_settings->getU16("screen_h"));
 
 	while (device->run()
 			&& !(*kill || g_gamecallback->shutdown_requested
@@ -1648,8 +1648,8 @@ void Game::run()
 		if (previous_screen_size != current_screen_size &&
 				current_screen_size != irr::core::dimension2d<u32>(0,0) &&
 				g_settings->getBool("autosave_screensize")) {
-			g_settings->setU16("screenW", current_screen_size.Width);
-			g_settings->setU16("screenH", current_screen_size.Height);
+			g_settings->setU16("screen_w", current_screen_size.Width);
+			g_settings->setU16("screen_h", current_screen_size.Height);
 			previous_screen_size = current_screen_size;
 		}
 
@@ -2473,8 +2473,8 @@ void Game::processKeyInput()
 {
 	if (wasKeyDown(KeyType::DROP)) {
 		dropSelectedItem();
-	} else if (wasKeyDown(KeyType::AUTORUN)) {
-		toggleAutorun();
+	} else if (wasKeyDown(KeyType::AUTOFORWARD)) {
+		toggleAutoforward();
 	} else if (wasKeyDown(KeyType::INVENTORY)) {
 		openInventory();
 	} else if (wasKeyDown(KeyType::ESC) || input->wasKeyDown(CancelKey)) {
@@ -2690,7 +2690,7 @@ void Game::openInventory()
 	 */
 
 	LocalPlayer *player = client->getEnv().getLocalPlayer();
-	if (player == NULL || player->getCAO() == NULL)
+	if (!player || !player->getCAO())
 		return;
 
 	infostream << "the_game: " << "Launching inventory" << std::endl;
@@ -2802,15 +2802,15 @@ void Game::toggleCinematic()
 	m_statustext = msg[cinematic];
 }
 
-// Add WoW-style autorun by toggling continuous forward.
-void Game::toggleAutorun()
+// Autoforward by toggling continuous forward.
+void Game::toggleAutoforward()
 {
-	static const wchar_t *msg[] = { L"autorun disabled", L"autorun enabled" };
-	bool autorun_enabled = !g_settings->getBool("continuous_forward");
-	g_settings->set("continuous_forward", bool_to_cstr(autorun_enabled));
+	static const wchar_t *msg[] = { L"autoforward disabled", L"autoforward enabled" };
+	bool autoforward_enabled = !g_settings->getBool("continuous_forward");
+	g_settings->set("continuous_forward", bool_to_cstr(autoforward_enabled));
 
 	runData.statustext_time = 0;
-	m_statustext = msg[autorun_enabled ? 1 : 0];
+	m_statustext = msg[autoforward_enabled ? 1 : 0];
 }
 
 void Game::toggleChat()
@@ -3278,8 +3278,7 @@ void Game::processClientEvents(CameraOrientation *cam)
 			{
 				HudElement *e = player->removeHud(event.hudrm.id);
 
-				if (e != NULL)
-					delete e;
+				delete e;
 			}
 			break;
 
@@ -3450,7 +3449,7 @@ void Game::updateCamera(u32 busy_time, f32 dtime)
 		GenericCAO *playercao = player->getCAO();
 
 		// If playercao not loaded, don't change camera
-		if (playercao == NULL)
+		if (!playercao)
 			return;
 
 		camera->toggleCameraMode();
@@ -3653,7 +3652,7 @@ void Game::processPlayerInteraction(f32 dtime, bool show_hud, bool show_debug)
 	} else if (pointed.type == POINTEDTHING_NODE) {
 		ToolCapabilities playeritem_toolcap =
 				playeritem.getToolCapabilities(itemdef_manager);
-		if (playeritem.name.empty()) {
+		if (playeritem.name.empty() && hand_def.tool_capabilities != NULL) {
 			playeritem_toolcap = *hand_def.tool_capabilities;
 		}
 		handlePointingAtNode(pointed, playeritem_def, playeritem_toolcap, dtime);
@@ -3694,7 +3693,7 @@ PointedThing Game::updatePointedThing(
 	std::vector<aabb3f> *selectionboxes = hud->getSelectionBoxes();
 	selectionboxes->clear();
 	hud->setSelectedFaceNormal(v3f(0.0, 0.0, 0.0));
-	static const bool show_entity_selectionbox = g_settings->getBool(
+	static thread_local const bool show_entity_selectionbox = g_settings->getBool(
 		"show_entity_selectionbox");
 
 	ClientMap &map = client->getEnv().getClientMap();

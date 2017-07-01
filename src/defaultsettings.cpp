@@ -63,7 +63,7 @@ void set_default_settings(Settings *settings)
 	// Keymap
 	settings->setDefault("remote_port", "30000");
 	settings->setDefault("keymap_forward", "KEY_KEY_W");
-	settings->setDefault("keymap_autorun", "");
+	settings->setDefault("keymap_autoforward", "");
 	settings->setDefault("keymap_backward", "KEY_KEY_S");
 	settings->setDefault("keymap_left", "KEY_KEY_A");
 	settings->setDefault("keymap_right", "KEY_KEY_D");
@@ -126,8 +126,8 @@ void set_default_settings(Settings *settings)
 	settings->setDefault("fps_max", "60");
 	settings->setDefault("pause_fps_max", "20");
 	settings->setDefault("viewing_range", "100");
-	settings->setDefault("screenW", "800");
-	settings->setDefault("screenH", "600");
+	settings->setDefault("screen_w", "800");
+	settings->setDefault("screen_h", "600");
 	settings->setDefault("autosave_screensize", "true");
 	settings->setDefault("fullscreen", "false");
 	settings->setDefault("fullscreen_bpp", "24");
@@ -264,6 +264,7 @@ void set_default_settings(Settings *settings)
 
 	// Server
 	settings->setDefault("disable_escape_sequences", "false");
+	settings->setDefault("strip_color_codes", "false");
 
 	// Network
 	settings->setDefault("enable_ipv6", "true");
@@ -375,8 +376,8 @@ void set_default_settings(Settings *settings)
 	settings->setDefault("enable_console", "false");
 
 #ifdef __ANDROID__
-	settings->setDefault("screenW", "0");
-	settings->setDefault("screenH", "0");
+	settings->setDefault("screen_w", "0");
+	settings->setDefault("screen_h", "0");
 	settings->setDefault("enable_shaders", "false");
 	settings->setDefault("fullscreen", "true");
 	settings->setDefault("video_driver", "ogles1");

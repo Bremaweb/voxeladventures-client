@@ -124,7 +124,6 @@ LOCAL_SRC_FILES := \
 		jni/src/clientobject.cpp                  \
 		jni/src/clouds.cpp                        \
 		jni/src/collision.cpp                     \
-		jni/src/content_abm.cpp                   \
 		jni/src/content_cao.cpp                   \
 		jni/src/content_cso.cpp                   \
 		jni/src/content_mapblock.cpp              \
@@ -152,7 +151,7 @@ LOCAL_SRC_FILES := \
 		jni/src/gettext.cpp                       \
 		jni/src/guiChatConsole.cpp                \
 		jni/src/guiEngine.cpp                     \
-		jni/src/guiFileSelectMenu.cpp             \
+		jni/src/guiPathSelectMenu.cpp             \
 		jni/src/guiFormSpecMenu.cpp               \
 		jni/src/guiKeyChangeMenu.cpp              \
 		jni/src/guiPasswordChange.cpp             \

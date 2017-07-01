@@ -104,13 +104,9 @@ GUIKeyChangeMenu::GUIKeyChangeMenu(gui::IGUIEnvironment* env,
 				gui::IGUIElement* parent, s32 id, IMenuManager *menumgr) :
 GUIModalMenu(env, parent, id, menumgr)
 {
-	m_command_active_id = -1;
-	m_command_adding = false;
-	shift_down = false;
-	control_down = false;
-	activeKey = -1;
-	this->key_used_text = NULL;
 	init_keys();
+	for (size_t i = 0; i < key_settings.size(); i++)
+		key_used.push_back(key_settings.at(i)->key);
 }
 
 GUIKeyChangeMenu::~GUIKeyChangeMenu()
@@ -441,6 +437,7 @@ bool GUIKeyChangeMenu::resetMenu()
 }
 bool GUIKeyChangeMenu::OnEvent(const SEvent& event)
 {
+
 	if (event.EventType == EET_KEY_INPUT_EVENT && activeKey >= 0 && event.KeyInput.PressedDown)
 	{
 		bool prefer_character = shift_down && (activeKey != GUI_ID_KEY_ALIAS_BUTTON);
