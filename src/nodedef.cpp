@@ -21,9 +21,10 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #include "itemdef.h"
 #ifndef SERVER
-#include "client/tile.h"
 #include "mesh.h"
 #include "client.h"
+#include "client/renderingengine.h"
+#include "client/tile.h"
 #include <IMeshManipulator.h>
 #endif
 #include "log.h"
@@ -689,6 +690,8 @@ void ContentFeatures::updateTextures(ITextureSource *tsrc, IShaderSource *shdsrc
 	switch (drawtype) {
 	default:
 	case NDT_NORMAL:
+		material_type = (alpha == 255) ?
+			TILE_MATERIAL_OPAQUE : TILE_MATERIAL_ALPHA;
 		solidness = 2;
 		break;
 	case NDT_AIRLIKE:
@@ -785,6 +788,16 @@ void ContentFeatures::updateTextures(ITextureSource *tsrc, IShaderSource *shdsrc
 		tile_shader[j] = shdsrc->getShader("nodes_shader",
 			material_type, drawtype);
 	}
+	u8 overlay_material = material_type;
+	if (overlay_material == TILE_MATERIAL_OPAQUE)
+		overlay_material = TILE_MATERIAL_BASIC;
+	else if (overlay_material == TILE_MATERIAL_LIQUID_OPAQUE)
+		overlay_material = TILE_MATERIAL_LIQUID_TRANSPARENT;
+	u32 overlay_shader[6];
+	for (u16 j = 0; j < 6; j++) {
+		overlay_shader[j] = shdsrc->getShader("nodes_shader",
+			overlay_material, drawtype);
+	}
 
 	// Tiles (fill in f->tiles[])
 	for (u16 j = 0; j < 6; j++) {
@@ -793,8 +806,8 @@ void ContentFeatures::updateTextures(ITextureSource *tsrc, IShaderSource *shdsrc
 			tdef[j].backface_culling, material_type);
 		if (tdef_overlay[j].name != "")
 			fillTileAttribs(tsrc, &tiles[j].layers[1], &tdef_overlay[j],
-				tile_shader[j], tsettings.use_normal_texture,
-				tdef[j].backface_culling, material_type);
+				overlay_shader[j], tsettings.use_normal_texture,
+				tdef[j].backface_culling, overlay_material);
 	}
 
 	// Special tiles (fill in f->special_tiles[])
@@ -1427,8 +1440,8 @@ void CNodeDefManager::updateTextures(IGameDef *gamedef,
 	Client *client = (Client *)gamedef;
 	ITextureSource *tsrc = client->tsrc();
 	IShaderSource *shdsrc = client->getShaderSource();
-	scene::ISceneManager* smgr = client->getSceneManager();
-	scene::IMeshManipulator* meshmanip = smgr->getMeshManipulator();
+	scene::IMeshManipulator *meshmanip =
+		RenderingEngine::get_scene_manager()->getMeshManipulator();
 	TextureSettings tsettings;
 	tsettings.readSettings();
 
@@ -1923,11 +1936,6 @@ bool CNodeDefManager::nodeboxConnects(MapNode from, MapNode to, u8 connect_face)
 
 NodeResolver::NodeResolver()
 {
-	m_ndef            = NULL;
-	m_nodenames_idx   = 0;
-	m_nnlistsizes_idx = 0;
-	m_resolve_done    = false;
-
 	m_nodenames.reserve(16);
 	m_nnlistsizes.reserve(4);
 }

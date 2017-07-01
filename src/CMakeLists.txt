@@ -151,8 +151,6 @@ if(ENABLE_FREETYPE)
 	if(FREETYPE_FOUND)
 		message(STATUS "Freetype enabled.")
 		set(USE_FREETYPE TRUE)
-		set(CGUITTFONT_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/cguittfont")
-		set(CGUITTFONT_LIBRARY cguittfont)
 	endif()
 endif(ENABLE_FREETYPE)
 
@@ -503,7 +501,6 @@ set(client_SRCS
 	content_cso.cpp
 	content_mapblock.cpp
 	convert_json.cpp
-	drawscene.cpp
 	filecache.cpp
 	fontengine.cpp
 	game.cpp
@@ -561,7 +558,7 @@ include_directories(
 
 
 if(USE_FREETYPE)
-	include_directories(${FREETYPE_INCLUDE_DIRS} ${CGUITTFONT_INCLUDE_DIR})
+	include_directories(${FREETYPE_INCLUDE_DIRS})
 endif()
 
 if(USE_CURL)
@@ -620,7 +617,6 @@ if(BUILD_CLIENT)
 		target_link_libraries(
 			${PROJECT_NAME}
 			${FREETYPE_LIBRARY}
-			${CGUITTFONT_LIBRARY}
 		)
 	endif()
 	if (USE_CURSES)
@@ -708,9 +704,12 @@ include(CheckCXXCompilerFlag)
 
 if(MSVC)
 	# Visual Studio
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /std:c++11")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /D WIN32_LEAN_AND_MEAN /MP")
 	# EHa enables SEH exceptions (used for catching segfaults)
-	set(CMAKE_CXX_FLAGS_RELEASE "/EHa /Ox /GL /FD /MT /GS- /Zi /arch:SSE /fp:fast /D NDEBUG /D _HAS_ITERATOR_DEBUGGING=0 /TP")
+	set(CMAKE_CXX_FLAGS_RELEASE "/EHa /Ox /GL /FD /MT /GS- /Zi /fp:fast /D NDEBUG /D _HAS_ITERATOR_DEBUGGING=0 /TP")
+	if(CMAKE_SIZEOF_VOID_P EQUAL 4)
+		set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /arch:SSE")
+	endif()
 	#set(CMAKE_EXE_LINKER_FLAGS_RELEASE "/LTCG /NODEFAULTLIB:\"libcmtd.lib\" /NODEFAULTLIB:\"libcmt.lib\"")
 	set(CMAKE_EXE_LINKER_FLAGS_RELEASE "/LTCG /INCREMENTAL:NO /DEBUG /OPT:REF /OPT:ICF")
 
@@ -753,6 +752,7 @@ else()
 
 	if(MINGW)
 		set(OTHER_FLAGS "${OTHER_FLAGS} -mthreads -fexceptions")
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DWIN32_LEAN_AND_MEAN")
 	endif()
 
 	set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG ${RELEASE_WARNING_FLAGS} ${WARNING_FLAGS} ${OTHER_FLAGS} -Wall -pipe -funroll-loops")
@@ -878,11 +878,4 @@ if (USE_GETTEXT)
 	endforeach()
 
 	add_custom_target(translations ALL COMMENT "mo update" DEPENDS ${MO_FILES})
-endif()
-
-
-# Subdirectories
-
-if (BUILD_CLIENT AND USE_FREETYPE)
-	add_subdirectory(cguittfont)
 endif()
